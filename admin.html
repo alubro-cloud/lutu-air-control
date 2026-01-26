@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUTU 訂單管理後台</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-box">
+            <h2><i class="fas fa-lock"></i> 管理員登入</h2>
+            <p>請輸入管理密碼以存取後台</p>
+            <input type="password" id="admin-pass" placeholder="請輸入密碼">
+            <button onclick="checkLogin()">登入</button>
+            <div id="login-msg"></div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard-container hidden" id="dashboard">
+        <aside class="sidebar">
+            <div class="brand">LUTU 管理後台</div>
+            <nav class="nav-menu">
+                <div class="nav-label">訂單分類</div>
+                <button id="nav-all-orders" class="nav-btn active" onclick="showAllOrders(this)"><i
+                        class="fas fa-list"></i> 全部訂單</button>
+
+                <!-- Delivery Sub-filters (Sidebar) -->
+                <div id="sidebar-filters" class="sidebar-sub-menu">
+                    <button class="sub-nav-btn active" onclick="filterByDelivery('all', this)">全部</button>
+                    <button class="sub-nav-btn" onclick="filterByDelivery('宅配', this)">宅配</button>
+                    <button class="sub-nav-btn" onclick="filterByDelivery('公司配送', this)">公司配送</button>
+                    <button class="sub-nav-btn" onclick="filterByDelivery('自取', this)">自取</button>
+                    <button class="sub-nav-btn" onclick="filterByDelivery('店到店', this)">店到店</button>
+                </div>
+
+                <button class="nav-btn" onclick="showWorkOrders(this)"><i class="fas fa-tools"></i> 今日工單</button>
+                <button class="nav-btn" onclick="showWarehouseShipment(this)"><i class="fas fa-shipping-fast"></i>
+                    今日出貨</button>
+                <button class="nav-btn" onclick="showInventory(this)"><i class="fas fa-warehouse"></i> 庫存查詢</button>
+
+                <div class="nav-separator"></div>
+                <button class="nav-btn logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> 登出</button>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h1 id="page-title">全部訂單</h1>
+                <div class="actions">
+                    <button class="btn-refresh" onclick="fetchOrders()"><i class="fas fa-sync-alt"></i> 重新整理</button>
+                    <span id="last-update">最後更新: --</span>
+                </div>
+            </header>
+
+            <!-- Status Swimlanes (Kanban) -->
+            <div class="kanban-board">
+
+                <div class="kanban-columns">
+                    <!-- 1. 未報價 -->
+                    <div class="kanban-column">
+                        <div class="column-header status-unquoted">
+                            <span>未報價</span>
+                            <span class="count-badge" id="count-unquoted">0</span>
+                        </div>
+                        <div class="column-body" id="col-unquoted">
+                            <!-- Cards injected here -->
+                        </div>
+                    </div>
+
+                    <!-- 2. 已報價 -->
+                    <div class="kanban-column">
+                        <div class="column-header status-quoted">
+                            <span>已報價</span>
+                            <span class="count-badge" id="count-quoted">0</span>
+                        </div>
+                        <div class="column-body" id="col-quoted"></div>
+                    </div>
+
+                    <!-- 3. 已付款 -->
+                    <div class="kanban-column">
+                        <div class="column-header status-paid">
+                            <span>已付款</span>
+                            <span class="count-badge" id="count-paid">0</span>
+                        </div>
+                        <div class="column-body" id="col-paid"></div>
+                    </div>
+
+                    <!-- 4. 待出貨 -->
+                    <div class="kanban-column">
+                        <div class="column-header status-shipping">
+                            <span>待出貨</span>
+                            <span class="count-badge" id="count-shipping">0</span>
+                        </div>
+                        <div class="column-body" id="col-shipping"></div>
+                    </div>
+
+                    <!-- 5. 已派單 -->
+                    <div class="kanban-column">
+                        <div class="column-header status-dispatched">
+                            <span>已派單</span>
+                            <span class="count-badge" id="count-dispatched">0</span>
+                        </div>
+                        <div class="column-body" id="col-dispatched"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. Inventory Management Section (Hidden by default) -->
+            <div id="inventory-section" class="hidden" style="padding: 20px;">
+                <!-- Category Hub (Initial View) -->
+                <div id="inventory-hub" class="category-hub">
+                    <div class="category-card" onclick="switchInventoryCategory('aluminum')">
+                        <i class="fas fa-layer-group category-icon"></i>
+                        <div class="category-name">鋁材總覽</div>
+                        <div class="category-desc">管理 20/30/40系列 鋁材庫存與餘料</div>
+                    </div>
+                    <div class="category-card" onclick="switchInventoryCategory('accessory')">
+                        <i class="fas fa-tools category-icon"></i>
+                        <div class="category-name">配件總覽</div>
+                        <div class="category-desc">管理各式配件、螺絲與耗材庫存</div>
+                    </div>
+                </div>
+
+                <!-- Inventory Details (Shown after selecting category) -->
+                <div id="inventory-details" class="hidden">
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; flex-wrap: wrap; gap:15px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <button class="btn-back-hub" onclick="backToInventoryHub()"><i
+                                    class="fas fa-arrow-left"></i> 返回類別</button>
+                            <h2 style="margin:0;" id="inventory-view-title"><i class="fas fa-warehouse"></i> 鋁材庫存監視</h2>
+                        </div>
+                        <div
+                            style="display:flex; flex-direction:column; gap:10px; flex:1; min-width:300px; max-width: 600px;">
+                            <div style="display:flex; gap:10px; align-items:center;">
+                                <input type="text" id="inventory-search" placeholder="搜尋項目名稱..."
+                                    style="padding:8px 15px; border-radius:20px; border:1px solid #ddd; width:220px; font-size:0.9rem;"
+                                    oninput="filterInventory()">
+                                <div id="aluminum-series-filters" class="inventory-type-filters"
+                                    style="display:flex; gap:5px;">
+                                    <button class="filter-pill active" onclick="filterBySeries('all', this)">全部</button>
+                                    <button class="filter-pill" onclick="filterBySeries('20', this)">20系</button>
+                                    <button class="filter-pill" onclick="filterBySeries('30', this)">30系</button>
+                                    <button class="filter-pill" onclick="filterBySeries('40', this)">40系</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn-refresh" onclick="fetchInventoryData()"><i class="fas fa-sync-alt"></i>
+                            刷新</button>
+                    </div>
+
+                    <div id="inventory-stats"
+                        style="margin-bottom:20px; display:flex; gap:15px; animation: fadeIn 0.3s ease-in-out;">
+                        <!-- Stats pills will be injected here -->
+                    </div>
+
+                    <div id="inventory-content">
+                        <!-- Dynamic inventory table/cards injected here -->
+                        <div style="text-align:center; padding:50px; color:#999;">載入中...</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Order Detail Modal -->
+    <div id="modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>訂單詳情</h3>
+                <button class="close-modal" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Injected via JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>
