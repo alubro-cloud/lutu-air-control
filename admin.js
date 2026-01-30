@@ -3213,10 +3213,10 @@ window.runCuttingOptimization = async function () {
             let qMatch = line.match(/\( x (\d+) \)/);
             if (qMatch) qty = parseInt(qMatch[1]);
 
-            // Extract Length
+            // Extract Length (支援小數)
             let len = 0;
-            let lMatch = line.match(/\(L=(\d+)cm\)/);
-            if (lMatch) len = parseInt(lMatch[1]);
+            let lMatch = line.match(/\(L=([\d.]+)cm\)/);
+            if (lMatch) len = parseFloat(lMatch[1]);
 
             if (len > 0) {
                 allItems.push({ model: model, length: len, qty: qty, orderId: o.timestamp });
