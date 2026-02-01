@@ -1044,3 +1044,336 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
 }
+
+/* --- Mobile Layout Fixes (Max Width 768px) --- */
+@media (max-width: 768px) {
+
+    html,
+    body {
+        overflow-x: hidden;
+        overflow-y: auto;
+        height: auto !important;
+        width: 100%;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .dashboard-container {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+        width: 100%;
+    }
+
+    .sidebar {
+        width: 100% !important;
+        height: auto !important;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        display: flex;
+        flex-direction: row !important;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 10px !important;
+        background: #545454;
+        overflow-x: hidden !important;
+        overflow-y: hidden;
+        border-bottom: 2px solid #1a252f;
+        gap: 0;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sidebar .brand {
+        display: none !important;
+    }
+
+    .sidebar .nav-menu {
+        display: flex;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        justify-content: center;
+        gap: 5px;
+        width: 100%;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .nav-label,
+    .nav-separator {
+        display: none !important;
+    }
+
+    #sidebar-filters {
+        display: none !important;
+    }
+
+    .nav-btn {
+        width: auto !important;
+        padding: 7px 10px !important;
+        margin: 0 !important;
+        border-radius: 16px !important;
+        font-size: 0.8rem !important;
+        flex-shrink: 0;
+        white-space: nowrap;
+        min-width: fit-content;
+    }
+
+    .nav-btn i {
+        display: none !important;
+    }
+
+    .nav-btn.logout-btn {
+        width: auto !important;
+        margin-top: 0 !important;
+        background: rgba(231, 76, 60, 0.9) !important;
+    }
+
+    .main-content {
+        padding: 10px !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+        width: 100%;
+    }
+
+    .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px !important;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .top-bar h1 {
+        margin: 0;
+        font-size: 1.3rem;
+    }
+
+    .top-bar .actions {
+        margin-top: 5px;
+    }
+
+    #last-update {
+        display: none;
+    }
+
+    .kanban-board {
+        display: block;
+        width: 100% !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    .kanban-columns-container,
+    .kanban-group,
+    .group-columns,
+    .kanban-column {
+        display: block;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin-bottom: 20px !important;
+        float: none !important;
+        overflow: visible !important;
+    }
+
+    .group-header {
+        padding: 12px 15px !important;
+        border-radius: 10px !important;
+        /* Symmetric corners */
+        margin-bottom: 10px !important;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .kanban-column {
+        margin-bottom: 25px !important;
+        border-bottom: 1px solid transparent;
+        /* Force layout */
+    }
+
+    .column-header {
+        display: inline-flex !important;
+        /* Compact label */
+        width: fit-content !important;
+        min-width: 100px;
+        margin-left: 10px !important;
+        margin-top: 5px !important;
+        margin-bottom: 0 !important;
+        padding: 8px 45px 8px 15px !important;
+        /* Right padding for chevron */
+        border-radius: 20px !important;
+        /* Pill style */
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+        z-index: 10;
+        font-size: 0.85rem !important;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Chevron indicator */
+    .column-header::after {
+        content: '\f078';
+        font-family: 'Font Awesome 6 Free';
+        font-weight: 900;
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        transition: transform 0.3s ease;
+        font-size: 0.8rem;
+    }
+
+    .column-header.collapsed::after {
+        transform: translateY(-50%) rotate(-90deg);
+    }
+
+    .column-body {
+        /* Switch to Block layout for safest content flow */
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 15px 5px !important;
+        box-sizing: border-box;
+        gap: 0 !important;
+        /* Block doesn't use gap */
+    }
+
+    .column-body.collapsed {
+        display: none !important;
+    }
+
+    .kanban-card {
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        margin-bottom: 15px !important;
+        /* Margin for separation in Block layout */
+        box-sizing: border-box;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08) !important;
+        position: relative;
+        z-index: 5;
+    }
+}
+
+/* --- Desktop Layout Only (Min Width 769px) --- */
+/* Moved from admin.js to prevent mobile conflicts */
+@media (min-width: 769px) {
+
+    /* --- Flat Kanban Board Layout --- */
+    .kanban-board {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 20px;
+        display: flex;
+        gap: 20px;
+        align-items: stretch;
+        min-height: 60vh;
+    }
+
+    .kanban-columns-container {
+        display: flex;
+        flex-direction: row !important;
+        align-items: flex-start;
+        padding: 5px;
+        min-width: max-content;
+    }
+
+    .kanban-group {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        background: #fdfdfd;
+        height: min-content;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-right: 20px;
+        padding: 0 5px;
+        flex-shrink: 0;
+    }
+
+    .group-header {
+        padding: 10px 15px;
+        border-radius: 11px 11px 0 0;
+        font-weight: bold;
+        color: #fff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.95rem;
+        white-space: nowrap;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        text-align: left;
+    }
+
+    .group-columns {
+        display: flex;
+        padding: 10px;
+        gap: 15px;
+    }
+
+    /* --- Column & Card Logic --- */
+    .kanban-column {
+        width: 300px;
+        /* Fixed width for desktop columns */
+        min-width: 300px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        background: #f4f7f6;
+        border-radius: 8px;
+        padding: 8px;
+    }
+
+    .column-header {
+        padding: 10px;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+    }
+
+    .column-body {
+        max-height: calc(100vh - 300px);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .kanban-card {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    .kanban-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-tag {
+        background: rgba(255, 255, 255, 0.9);
+        color: #333;
+        font-size: 0.8rem;
+        padding: 4px 10px;
+        border-radius: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        font-weight: normal;
+        white-space: nowrap;
+        margin-left: 10px;
+    }
+}

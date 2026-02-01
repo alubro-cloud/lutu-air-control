@@ -204,124 +204,8 @@ const WORK_FLOW = ['cutting', 'inspection', 'picking', 'packing'];
 // --- Inject Custom Styles for Checklist & Mobile Layout Rewrite ---
 const customStyles = `
 <style>
-    /* --- Mobile Layout Fixes (Max Width 768px) --- */
-    @media (max-width: 768px) {
-        html, body {
-            overflow-x: hidden;
-            overflow-y: auto;
-            height: auto !important;
-            -webkit-overflow-scrolling: touch;
-        }
 
-        .dashboard-container {
-            display: block !important; 
-            height: auto !important;
-            overflow: visible !important;
-        }
 
-        .sidebar {
-            width: 100% !important;
-            height: auto !important;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            display: flex;
-            flex-direction: row !important;
-            align-items: center;
-            padding: 10px !important;
-            background: #545454;
-            overflow-x: auto; 
-            white-space: nowrap;
-            border-bottom: 2px solid #1a252f;
-        }
-
-        .sidebar .brand {
-            margin: 0 15px 0 0 !important;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-
-        .sidebar .nav-menu {
-            display: flex;
-            flex-direction: row;
-            gap: 10px;
-            width: auto;
-        }
-        
-        .nav-label, .nav-separator { display: none !important; }
-
-        .nav-btn {
-            width: auto !important;
-            padding: 6px 14px !important;
-            margin: 0 !important;
-            border-radius: 20px !important;
-            font-size: 0.9rem;
-            flex-shrink: 0;
-        }
-
-        .main-content {
-            padding: 10px !important;
-            height: auto !important;
-            overflow: visible !important;
-            display: block !important;
-        }
-
-        .top-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px !important;
-            flex-wrap: wrap; 
-        }
-        
-        .top-bar h1 { margin: 0; font-size: 1.3rem; }
-        .top-bar .actions { margin-top: 5px; } 
-        #last-update { display: none; }
-
-        .kanban-board {
-            display: flex;
-            flex-direction: column !important;
-            gap: 25px !important;
-            height: auto !important; 
-            overflow: visible !important;
-        }
-
-        .kanban-column {
-            width: 100% !important;
-            min-height: auto !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            margin: 0 !important;
-            display: block !important; 
-        }
-
-        .column-header {
-            margin-bottom: 8px !important;
-            padding: 8px 10px !important;
-            border-radius: 6px;
-        }
-
-        .column-body {
-            display: flex !important;
-            flex-direction: row !important; 
-            overflow-x: auto !important; 
-            overflow-y: hidden;
-            gap: 15px !important;
-            padding: 5px 5px 15px 5px !important;
-            min-height: 100px;
-            -webkit-overflow-scrolling: touch; 
-        }
-
-        .kanban-card {
-            min-width: 280px !important;
-            max-width: 280px !important;
-            flex: 0 0 auto; 
-            border: 1px solid #ddd;
-            background: #fff;
-            margin-bottom: 0 !important;
-            touch-action: manipulation; 
-        }
-    }
 
     /* Print/Checklist Styles (Preserved) */
     .modal-overlay { align-items: center; padding: 5px; z-index: 9999; } 
@@ -487,136 +371,6 @@ const customStyles = `
     }
     .btn-merge-cut:hover { transform: scale(1.05); background: #c0392b !important; }
     
-    /* --- Flat Kanban Board Layout --- */
-    .kanban-board {
-        width: 100%;
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-bottom: 20px;
-    }
-    .kanban-columns-container {
-        display: flex;
-        flex-direction: row !important; /* Forces horizontal flow */
-        align-items: flex-start;
-        padding: 5px;
-        min-width: max-content;
-    }
-
-    .kanban-group {
-        display: flex;
-        flex-direction: column;
-        border: 1px solid #ddd;
-        border-radius: 12px;
-        background: #fdfdfd;
-        height: min-content;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        margin-right: 20px;
-    }
-    .group-header {
-        padding: 10px 15px;
-        border-radius: 11px 11px 0 0;
-        font-weight: bold;
-        color: #fff;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 0.95rem;
-        white-space: nowrap;
-    }
-    .group-columns {
-        display: flex;
-        padding: 10px;
-        gap: 15px;
-    }
-
-    /* --- Column & Card Logic --- */
-    .kanban-column {
-        width: 300px;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        background: #f4f7f6;
-        border-radius: 8px;
-        padding: 8px;
-    }
-    .column-header {
-        padding: 10px;
-        font-weight: bold;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-radius: 6px;
-        margin-bottom: 10px;
-        font-size: 0.9rem;
-    }
-    .column-body {
-        max-height: calc(100vh - 300px);
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    .kanban-card {
-        background: #fff;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 10px;
-        cursor: pointer;
-        transition: 0.2s;
-    }
-    .kanban-card:hover { 
-        transform: translateY(-2px); 
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1); 
-    }
-
-    /* Card Backgrounds by Area */
-    #col-unquoted .kanban-card, #col-quoted .kanban-card, #col-paid .kanban-card {
-        background: #FFF3E0; border-color: #FFE0B2;
-    }
-    #col-cutting .kanban-card {
-        background: #EBF5FB; border-color: #D6EAF8;
-    }
-    #col-inspection .kanban-card, #col-picking .kanban-card, #col-packing .kanban-card,
-    #col-shipping .kanban-card, #col-dispatched .kanban-card {
-        background: #E9F7EF; border-color: #D4EFDF;
-    }
-
-    /* --- Mobile View: Vertical Columns, Horizontal Cards --- */
-    @media (max-width: 768px) {
-        .kanban-columns-container {
-            flex-direction: column !important; /* Stack Groups Vertically */
-            min-width: 100%;
-            gap: 20px;
-        }
-        .kanban-group {
-            margin-right: 0;
-            width: 100%;
-        }
-        .group-columns {
-            flex-direction: column !important; /* Stack Columns Vertically */
-            padding: 5px;
-            gap: 10px;
-        }
-        .kanban-column {
-            width: 100% !important;
-            padding: 10px;
-        }
-        /* Mobile Specific: Content (Cards) flow horizontal */
-        .column-body {
-            flex-direction: row !important; /* FLOW HORIZONTAL */
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
-            padding-bottom: 15px;
-            gap: 15px;
-            -webkit-overflow-scrolling: touch;
-        }
-        .kanban-card {
-            min-width: 260px !important;
-            max-width: 260px !important;
-            margin-bottom: 0 !important;
-        }
-    }
 </style>
 `;
 document.head.insertAdjacentHTML("beforeend", customStyles);
@@ -631,6 +385,58 @@ document.addEventListener('DOMContentLoaded', () => {
     if (m) {
         m.addEventListener('click', function (e) {
             if (e.target === this) closeModal();
+        });
+    }
+
+    // Mobile Accordion: Toggle column visibility on header click
+    setupMobileAccordion();
+});
+
+// Setup mobile accordion functionality
+function setupMobileAccordion() {
+    // Only activate on mobile (max-width: 768px)
+    if (window.innerWidth > 768) return;
+
+    // Add click listeners to all column headers
+    document.addEventListener('click', function (e) {
+        const header = e.target.closest('.column-header');
+        if (!header || window.innerWidth > 768) return;
+
+        const column = header.closest('.kanban-column');
+        if (!column) return;
+
+        const body = column.querySelector('.column-body');
+        if (!body) return;
+
+        // Toggle collapsed state
+        header.classList.toggle('collapsed');
+        body.classList.toggle('collapsed');
+    });
+
+    // Initialize all columns as collapsed on mobile
+    if (window.innerWidth <= 768) {
+        setTimeout(() => {
+            document.querySelectorAll('.column-header').forEach(header => {
+                header.classList.add('collapsed');
+            });
+            document.querySelectorAll('.column-body').forEach(body => {
+                body.classList.add('collapsed');
+            });
+        }, 100);
+    }
+}
+
+// Re-setup accordion when window is resized
+window.addEventListener('resize', () => {
+    if (window.innerWidth <= 768) {
+        setupMobileAccordion();
+    } else {
+        // Remove collapsed states on desktop
+        document.querySelectorAll('.column-header').forEach(header => {
+            header.classList.remove('collapsed');
+        });
+        document.querySelectorAll('.column-body').forEach(body => {
+            body.classList.remove('collapsed');
         });
     }
 });
@@ -713,6 +519,7 @@ window.showWarehouseShipment = function (btnEl) {
 
 window.showInventory = function (btnEl) {
     setActiveNav(btnEl);
+    window.currentPrimaryView = 'inventory';
 
     const board = document.querySelector('.kanban-board');
     if (board) board.classList.add('hidden');
@@ -811,6 +618,9 @@ function applyFilter() {
     } else if (window.currentPrimaryView === 'shipment') {
         const shipmentStatuses = ['shipping', 'dispatched'];
         filtered = ordersData.filter(o => shipmentStatuses.includes(o.status));
+    } else if (window.currentPrimaryView === 'inventory') {
+        // Don't render Kanban if we are in inventory mode
+        return;
     } else {
         // All Orders View with delivery sub-filter
         if (window.currentDeliveryFilter !== 'all') {
@@ -823,7 +633,7 @@ function applyFilter() {
     // Auto-Scroll Logic
     if (window.lastActiveOrderId) {
         setTimeout(() => {
-            const card = document.querySelector(`.kanban-card[data-id="${window.lastActiveOrderId}"]`);
+            const card = document.querySelector(`.kanban - card[data - id="${window.lastActiveOrderId}"]`);
             if (card) {
                 card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
                 // Add highlight effect?
@@ -906,7 +716,7 @@ function renderKanban(data) {
         // Label now includes both modes: 待出貨/待取件
 
         return `
-            <div class="kanban-column">
+    <div class="kanban-column">
                 <div class="column-header status-${statusKey}">
                     <span>${label}</span>
                     <span class="count-badge" id="count-${statusKey}">0</span>
@@ -917,8 +727,8 @@ function renderKanban(data) {
 
     // Render HTML Structure
     let html = `
-        <div class="kanban-columns-container">
-    `;
+    <div class="kanban-columns-container">
+        `;
 
     groups.forEach(g => {
         let colsHtml = g.cols.map(c => getColHtml(c)).join('');
@@ -980,7 +790,7 @@ class ThinkingCutter {
     setOffcuts(offcutsList) {
         // offcutsList: Array of lengths [150, 45, ...]
         this.offcuts = offcutsList.map((len, idx) => ({
-            id: `off-${idx}`,
+            id: `off - ${idx} `,
             length: len,
             originalLength: len,
             cuts: [],
@@ -1078,7 +888,7 @@ class ThinkingCutter {
             } else {
                 // Create New Stock Bin
                 let newBin = {
-                    id: `new-${bins.length}`,
+                    id: `new- ${bins.length} `,
                     length: this.stockLength,
                     originalLength: this.stockLength,
                     cuts: [piece],
@@ -1177,7 +987,7 @@ async function generateConsolidatedCuttingList() {
                 .replace(/\(L=[0-9]+cm\)/, '')
                 .trim();
 
-            let key = `${series}-${baseName}-${length}`;
+            let key = `${series} -${baseName} -${length} `;
 
             if (!aggregated[key]) {
                 aggregated[key] = {
@@ -1215,40 +1025,40 @@ async function generateConsolidatedCuttingList() {
             if (item.series === 40) seriesColor = '#27ae60';
 
             return `
-                <tr style="border-bottom:1px solid #ddd;">
+    <tr style="border-bottom:1px solid #ddd;">
                     <td style="padding:8px; font-weight:bold; color:${seriesColor};">${item.series}系列</td>
                     <td style="padding:8px;">${item.name}</td>
                     <td style="padding:8px; font-weight:bold; color:#c0392b;">${item.length} cm</td>
                     <td style="padding:8px; font-weight:bold; font-size:1.1em;">${item.qty} 支</td>
                     <td style="padding:8px; font-size:0.8em; color:#7f8c8d;">${item.orders.join(', ')}</td>
                 </tr>
-            `;
+    `;
         }).join('');
 
         return `
-            <div style="margin-bottom:15px; background:#fff3cd; padding:10px; border-radius:4px; color:#856404; font-size:0.9em;">
-                <i class="fas fa-info-circle"></i> 僅包含狀態為「切料單」的訂單中，標註為【銘材 / 鋁擠型】且指定長度(L=xx)的項目。
+    <div style="margin-bottom:15px; background:#fff3cd; padding:10px; border-radius:4px; color:#856404; font-size:0.9em;">
+        <i class="fas fa-info-circle"></i> 僅包含狀態為「切料單」的訂單中，標註為【銘材 / 鋁擠型】且指定長度(L = xx)的項目。
             </div>
-        <table style="width:100%; border-collapse:collapse; background:#fff;">
-            <thead>
-                <tr style="background:#f2f2f2; text-align:left;">
-                    <th style="padding:10px;">系列</th>
-                    <th style="padding:10px;">品名</th>
-                    <th style="padding:10px;">長度</th>
-                    <th style="padding:10px;">總數量</th>
-                    <th style="padding:10px;">來源訂單</th>
-                </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-        </table>
-    `;
+    <table style="width:100%; border-collapse:collapse; background:#fff;">
+        <thead>
+            <tr style="background:#f2f2f2; text-align:left;">
+                <th style="padding:10px;">系列</th>
+                <th style="padding:10px;">品名</th>
+                <th style="padding:10px;">長度</th>
+                <th style="padding:10px;">總數量</th>
+                <th style="padding:10px;">來源訂單</th>
+            </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+    </table>
+`;
     };
 
     // Store data globally for the optimization function to access
     window.currentCuttingData = list;
 
     body.innerHTML = `
-        <div style="padding:10px;">
+    <div style="padding:10px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:2px solid #333; padding-bottom:10px;">
                 <div>
                     <h2 style="margin:0; color:#333;">合併切料工單</h2>
@@ -1304,8 +1114,8 @@ async function generateConsolidatedCuttingList() {
                     關閉
                 </button>
             </div>
-        </div>
-        `;
+        </div >
+    `;
 
     modal.style.display = 'flex';
 }
@@ -1328,7 +1138,7 @@ window.printCuttingList = function () {
     });
 
     printWindow.document.write(`
-        <html>
+    < html >
         <head>
             <title>合併切料工單 - 完整內容</title>
             ${styles}
@@ -1379,8 +1189,8 @@ window.printCuttingList = function () {
                 }
             </script>
         </body>
-        </html>
-        `);
+        </html >
+    `);
     printWindow.document.close();
 };
 
@@ -1440,12 +1250,12 @@ window.switchCutTab = function (tab) {
                 }
             }
 
-            const savedLen = localStorage.getItem(`cut_stock_len_${model}`) || "600";
+            const savedLen = localStorage.getItem(`cut_stock_len_${model} `) || "600";
             // Priority: Inventory > LocalStorage > Empty
             const savedOff = autoOffcuts || localStorage.getItem(`cut_offcuts_${model}`) || "";
 
             return `
-                <div class="opt-param-row" data-model="${cleanModelName}" style="display:grid; grid-template-columns: 1fr 120px 1fr; gap:15px; align-items:center; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
+    <div class="opt-param-row" data-model="${cleanModelName}" style="display:grid; grid-template-columns: 1fr 120px 1fr; gap:15px; align-items:center; background:#fff; padding:10px; border-radius:6px; border:1px solid #eee;">
                     <div style="font-weight:bold; color:${seriesColor};">【${cleanModelName}】</div>
                     <div>
                         <input type="number" class="model-stock-len" data-model="${cleanModelName}" value="${savedLen}" placeholder="標準長" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px;">
@@ -1454,7 +1264,7 @@ window.switchCutTab = function (tab) {
                         <input type="text" class="model-offcuts" data-model="${cleanModelName}" value="${savedOff}" placeholder="餘料 (如: 150, 45)" style="width:100%; padding:5px; border:1px solid #ddd; border-radius:4px;">
                     </div>
                 </div>
-        `;
+    `;
         }).join('');
 
         if (uniqueModels.length === 0) {
@@ -1462,12 +1272,12 @@ window.switchCutTab = function (tab) {
         } else {
             // Add column headers
             container.insertAdjacentHTML('afterbegin', `
-                <div style="display:grid; grid-template-columns: 1fr 120px 1fr; gap:15px; padding:0 10px; font-size:0.8rem; color:#888; font-weight:bold;">
+    <div style="display:grid; grid-template-columns: 1fr 120px 1fr; gap:15px; padding:0 10px; font-size:0.8rem; color:#888; font-weight:bold;">
                     <div>型號名稱</div>
                     <div>標準料長 (cm)</div>
                     <div>現有餘料 (cm)</div>
                 </div>
-        `);
+    `);
         }
     }
 };
@@ -1523,7 +1333,7 @@ window.runCuttingOptimization = function () {
         if (modelSeries === 30) sColor = '#e67e22';
         if (modelSeries === 40) sColor = '#27ae60';
 
-        html += `<h3 style="border-left:5px solid ${sColor}; padding-left:10px; margin-top:30px; color:${sColor};">【${modelName}】 切割計畫 <span style="font-size:0.75em; color:#888; font-weight:normal;"> (原料:${stockLen} cm, 餘料:${offcuts.length}支)</span></h3> `;
+        html += `<h3 style="border-left:5px solid ${sColor}; padding-left:10px; margin-top:30px; color:${sColor};">【${modelName}】 切割計畫 <span style="font-size:0.75em; color:#888; font-weight:normal;">(原料:${stockLen} cm, 餘料:${offcuts.length}支)</span></h3>`;
         html += renderCuttingVisuals(bins, stockLen);
     }
 
@@ -1531,17 +1341,17 @@ window.runCuttingOptimization = function () {
 
     if (html) {
         document.getElementById('opt-results-area').insertAdjacentHTML('beforeend', `
-        <button class="btn-record-offcut" onclick="recordCuttingPlanToInventory()">
-            <i class="fas fa-save"></i> 確認切割計畫並更新庫存（扣料+記錄餘料/廢料）
+    <button class="btn-record-offcut" onclick="recordCuttingPlanToInventory()">
+        <i class="fas fa-save"></i> 確認切割計畫並更新庫存（扣料 + 記錄餘料 / 廢料）
             </button>
-        `);
+    `);
     }
 };
 
 function renderCuttingVisuals(bins, stockLen) {
     if (bins.length === 0) return "無需求";
 
-    let html = `<div class="cutting-visuals"> `;
+    let html = `<div class="cutting-visuals">`;
 
     bins.forEach((bin, idx) => {
         let isOffcut = !bin.isNewStock;
@@ -1558,15 +1368,15 @@ function renderCuttingVisuals(bins, stockLen) {
             if (cut.series === 40) bgColor = '#27ae60'; // Green
 
             cutsHtml += `
-        <div class="cut-block" style="width:${widthPerc}%; background-color:${bgColor};" title="${cut.name} (${cut.length}cm)">
-            <span class="cut-len">${cut.length}</span>
+    <div class="cut-block" style="width:${widthPerc}%; background-color:${bgColor};" title="${cut.name} (${cut.length}cm)">
+        <span class="cut-len">${cut.length}</span>
                 </div>
-        `;
+    `;
             // Kerf visual?
             let kerfPerc = (0.5 / originalLen) * 100;
             cutsHtml += `
-        <div class="cut-kerf" style="width:${kerfPerc}%;" title="鋸路 0.5cm"></div>
-            `;
+    <div class="cut-kerf" style="width:${kerfPerc}%;" title="鋸路 0.5cm"></div>
+        `;
         });
 
         // Remainder
@@ -1577,26 +1387,26 @@ function renderCuttingVisuals(bins, stockLen) {
             let typeClass = remainLen < 10 ? 'waste' : 'leftover';
             let label = remainLen < 10 ? '廢' : '餘';
             cutsHtml += `
-            <div class="cut-remain ${typeClass}" style="width:${remainPerc}%;" title="剩餘 ${remainLen.toFixed(1)}cm">
-                <span class="remain-len">${label} ${remainLen.toFixed(1)}</span>
+        <div class="cut-remain ${typeClass}" style="width:${remainPerc}%;" title="剩餘 ${remainLen.toFixed(1)}cm">
+            <span class="remain-len">${label} ${remainLen.toFixed(1)}</span>
                 </div>
-        `;
+    `;
         }
 
-        let label = isOffcut ? `餘料 #${idx + 1} ` : `新料 #${idx + 1} `;
+        let label = isOffcut ? `餘料 #${idx + 1}` : `新料 #${idx + 1}`;
         let bgStyle = isOffcut ? 'background:#fff3e0; border-color:#e67e22;' : 'background:#e8f8f5; border-color:#2ecc71;';
 
         html += `
-        <div class="cut-row" style="${bgStyle}">
+    <div class="cut-row" style="${bgStyle}">
                 <div class="cut-label">${label} <span style="font-size:0.8em; color:#666;">(${originalLen}cm)</span></div>
                 <div class="cut-bar-container">
                     ${cutsHtml}
                 </div>
-            </div>
-        `;
+            </div >
+    `;
     });
 
-    html += `</div> `;
+    html += `</div > `;
     return html;
 }
 
