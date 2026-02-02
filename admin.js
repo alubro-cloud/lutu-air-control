@@ -2,11 +2,8 @@
 const ADMIN_API_URL = "https://script.google.com/macros/s/AKfycbxEn0_QHCdDmA24QNrXOfFVg2lSlvdt9R7opPpLmOrxEZGxm0L7t73CWneKlaHHo8ZV/exec";
 
 // Global Error Handler for debugging
-window.onerror = function (msg, url, line, col, error) {
-    alert("JavaScript Error:\n" + msg + "\nLine: " + line);
-    console.error("Global Error:", error);
-    return false;
-};
+// Global Error Handler removed to prevent generic script errors from alerting
+// window.onerror = ...
 
 // Simple client-side password
 const ADMIN_PASS = "82830476";
