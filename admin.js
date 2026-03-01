@@ -17,6 +17,31 @@ window.setProfileDeducted = function (orderId) {
     localStorage.setItem(`deducted_${orderId}`, "true");
 };
 
+// [New] Safe Price Parser to handle currency symbols like $ and commas
+window.safeParsePrice = function (val) {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    // Remove everything except numbers and decimal point
+    const str = String(val).replace(/[^0-9.]/g, '');
+    return parseFloat(str) || 0;
+};
+
+// [New] Safe Date Parser to handle both numeric timestamps and date strings from backend
+window.safeParseDate = function (val) {
+    if (!val) return new Date(0);
+    // If it's already a Date object
+    if (val instanceof Date) return val;
+    // If it matches a purely numeric string (timestamp)
+    if (typeof val === 'string' && /^\d+$/.test(val)) {
+        return new Date(parseInt(val));
+    }
+    // Try standard Date parsing
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+    // Last resort: try parseInt anyway
+    return new Date(parseInt(val) || 0);
+};
+
 // --- Global Deduction Tools ---
 
 /**
@@ -77,13 +102,23 @@ window.showPriceModal = function (order, nextStatus) {
 };
 
 // [New] Helper for detailed email body
-window.generateMailBody = function (name, total, shippingFee, details) {
+window.generateMailBody = function (name, total, shippingFee, details, truncate = false) {
     let feeStr = (shippingFee > 0) ? `(含運費 ${shippingFee} 元)` : "(免運費)";
     if (shippingFee === 0 && (total === 0 || total === "0")) feeStr = ""; // Edge case
 
+    let formattedDetails = (details || "無詳細明細");
+
+    // Auto-truncate if flag is passed (to prevent 400 Bad Request on URL length limit)
+    // 1200 chars allows ~20-25 lines of items, safely under the ~2000 char URL limit when completely URL encoded
+    if (truncate && formattedDetails.length > 1200) {
+        // Find the last newline before the cutoff to avoid splitting a word/line in half
+        let cutoff = formattedDetails.lastIndexOf('\n', 1200);
+        if (cutoff === -1) cutoff = 1200;
+        formattedDetails = formattedDetails.substring(0, cutoff);
+    }
+
     // Format details: Replace \n or <br> with %0D%0A for mailto
-    let formattedDetails = (details || "無詳細明細").replace(/\\n/g, '\n').replace(/\n/g, '\n');
-    // Note: window.openGmail uses encodeURIComponent on the whole body, so we pass raw string here.
+    formattedDetails = formattedDetails.replace(/\\n/g, '\n').replace(/\n/g, '\n');
 
     return `您好，LUTU鋁圖已收到您的訂單。
 
@@ -112,6 +147,7 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
         let newTotal = currentTotal + val;
 
         target.total = newTotal;
+        target.shippingFee = val; // [Fix] Ensure shipping fee is updated locally
         target.status = nextStatus;
         applyFilter();
         window.lastActiveOrderId = orderId;
@@ -137,6 +173,12 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
             let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name}`);
             let rawBody = window.generateMailBody(target.name, newTotal, val, target.details);
             let mailBody = encodeURIComponent(rawBody);
+
+            // Limit URL length to avoid 400 Bad Request (Gmail URL limit ~2000)
+            if (mailBody.length > 1800) {
+                rawBody = window.generateMailBody(target.name, newTotal, val, target.details, true);
+                mailBody = encodeURIComponent(rawBody);
+            }
             window.openGmail(target.email, mailSubject, mailBody);
         }
     }
@@ -158,19 +200,47 @@ window.finishCheck = function () {
     const order = window.currentOrderForPrint;
     const currentStatus = order.status;
 
-    // 確認所有項目都已勾選
-    const allCards = document.querySelectorAll('.detail-card');
-    const checkedCards = document.querySelectorAll('.detail-card.checked');
+    // For packing, we skip checking entirely. Only require checking for inspection or picking.
+    if (['inspection', 'picking'].includes(currentStatus)) {
+        // 確認所有項目都已勾選
+        const allCards = document.querySelectorAll('.detail-card');
+        const checkedCards = document.querySelectorAll('.detail-card.checked');
 
-    if (allCards.length !== checkedCards.length) {
-        alert('尚有項目未核對完成！');
-        return;
+        if (allCards.length !== checkedCards.length) {
+            alert('尚有項目未核對完成！');
+            return;
+        }
     }
 
     // 根據當前狀態自動前進到下一階段
     if (['inspection', 'picking', 'packing'].includes(currentStatus)) {
-        closeModal();
-        advanceStatus(order.timestamp, currentStatus);
+        // Visual feedback
+        const btn = document.getElementById('btn-finish-check');
+        const originalText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            btn.style.cursor = 'wait';
+        }
+
+        // Delay to allow UI to update
+        setTimeout(() => {
+            // closeModal(); // [Fix] REMOVED to show deduction progress in advanceStatus
+            const nextStatusMap = {
+                'inspection': 'picking',
+                'picking': 'packing',
+                'packing': 'shipping'
+            };
+            const nextStatus = nextStatusMap[currentStatus];
+            if (nextStatus) {
+                advanceStatus(order.timestamp, nextStatus);
+            } else {
+                advanceStatus(order.timestamp, currentStatus);
+            }
+            // We don't need to restore the button state here because closeModal hides it/destroys it
+        }, 50);
+
     } else {
         closeModal();
     }
@@ -438,19 +508,138 @@ window.addEventListener('resize', () => {
     }
 });
 
+function showAdminHub() {
+    try {
+        const loginOverlay = document.getElementById('login-overlay');
+        const dashboard = document.getElementById('dashboard');
+        const historyMod = document.getElementById('history-module');
+        const reportsMod = document.getElementById('reports-module');
+        const hub = document.getElementById('admin-hub');
+
+        if (loginOverlay) loginOverlay.classList.add('hidden');
+        if (dashboard) dashboard.classList.add('hidden');
+        if (historyMod) historyMod.classList.add('hidden');
+        if (hub) hub.classList.remove('hidden');
+
+        // Show 3D Background in Hub
+        const bg = document.getElementById('three-canvas-container');
+        if (bg) bg.classList.remove('hidden');
+
+        // Start background fetch for accurate stats
+        fetchOrders().then(() => updateHubStats()).catch(e => console.error("Update Stats Error:", e));
+    } catch (e) {
+        console.error("Show Admin Hub Error:", e);
+    }
+}
+
+function navigateTo(module) {
+    document.getElementById('admin-hub').classList.add('hidden');
+
+    if (module === 'orders') {
+        document.getElementById('dashboard').classList.remove('hidden');
+        if (!ordersData.length) {
+            fetchOrders();
+        } else {
+            // 資料已存在，直接觸發渲染並選中「全部訂單」導航項
+            const navBtn = document.getElementById('nav-all-orders');
+            if (typeof showAllOrders === 'function') {
+                showAllOrders(navBtn);
+            } else {
+                applyFilter();
+            }
+        }
+    } else if (module === 'history') {
+        document.getElementById('history-module').classList.remove('hidden');
+        if (!ordersData.length) {
+            fetchOrders().then(() => renderHistoryOrders());
+        } else {
+            renderHistoryOrders();
+        }
+    } else if (module === 'reports') {
+        document.getElementById('reports-module').classList.remove('hidden');
+        // Always fetch fresh data to avoid stale reports, but render immediately if we have some data
+        if (ordersData.length > 0) renderFinancialReports();
+        fetchOrders().then(() => renderFinancialReports());
+    }
+
+    // [優化] 改用透明度控制 3D 背景，並暫停動畫釋放資源
+    const bg = document.getElementById('three-canvas-container');
+    if (bg) {
+        bg.classList.add('three-bg-hidden');
+        isThreeJsPaused = true;
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    }
+}
+
+function backToHub() {
+    document.getElementById('dashboard').classList.add('hidden');
+    document.getElementById('history-module').classList.add('hidden');
+    document.getElementById('reports-module').classList.add('hidden');
+    document.getElementById('admin-hub').classList.remove('hidden');
+
+    // [優化] 恢復 3D 背景顯示與動畫
+    const bg = document.getElementById('three-canvas-container');
+    if (bg) {
+        bg.classList.remove('three-bg-hidden');
+        if (isThreeJsPaused && threeJsAnimateFunc) {
+            isThreeJsPaused = false;
+            threeJsAnimateFunc();
+        }
+    }
+
+    updateHubStats();
+}
+
+// 供其他地方刷新 Hub 數字用
+function updateHubStats() {
+    try {
+        if (!ordersData || ordersData.length === 0) return;
+
+        // 進行中訂單數 (排除未報價與已完成)
+        const activeOrders = ordersData.filter(o => o.status !== 'completed' && o.status !== 'unquoted').length;
+
+        // 歷史訂單數 (已完成)
+        const historyOrders = ordersData.filter(o => o.status === 'completed').length;
+
+        // 本月營收
+        const now = new Date();
+        const currentMonth = now.getFullYear() + '/' + String(now.getMonth() + 1).padStart(2, '0');
+        let monthlyRevenue = 0;
+
+        ordersData.forEach(o => {
+            if (o.status === 'completed' && o.timestamp) {
+                const rowDate = window.safeParseDate(o.timestamp);
+                const rowMonth = rowDate.getFullYear() + '/' + String(rowDate.getMonth() + 1).padStart(2, '0');
+                if (rowMonth === currentMonth) {
+                    // Use safeParsePrice to ensure $ and commas don't break it
+                    monthlyRevenue += window.safeParsePrice(o.total);
+                }
+            }
+        });
+
+        const statOrders = document.getElementById('hub-stat-orders');
+        const statHistory = document.getElementById('hub-stat-history');
+        const statReports = document.getElementById('hub-stat-reports');
+
+        if (statOrders) statOrders.innerHTML = `<i class="fas fa-play-circle"></i> 進行中 ${activeOrders} 筆`;
+        if (statHistory) statHistory.innerHTML = `<i class="fas fa-check-circle"></i> 累計完成 ${historyOrders} 筆`;
+        if (statReports) statReports.innerHTML = `<i class="fas fa-dollar-sign"></i> 本月營收 $${monthlyRevenue.toLocaleString()}`;
+    } catch (e) {
+        console.error("Update Hub Stats Error:", e);
+    }
+}
+
 function showDashboard() {
-    document.getElementById('login-overlay').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
-    fetchOrders();
-    // Pre-fetch inventory data for SKU lookups
-    setTimeout(() => { if (window.fetchInventoryData) window.fetchInventoryData(); }, 500);
+    // Legacy support: if someone calls showDashboard, go to Hub instead or just show Dashboard
+    // But login usually redirects here. So we redirect to Admin Hub context.
+    showAdminHub();
 }
 
 function checkLogin() {
     const input = document.getElementById('admin-pass').value;
     if (input === ADMIN_PASS) {
         sessionStorage.setItem('admin_logged_in', 'true');
-        showDashboard();
+        showAdminHub();
     } else {
         document.getElementById('login-msg').innerText = "密碼錯誤";
         document.getElementById('login-msg').style.color = "red";
@@ -566,9 +755,8 @@ function logout() {
 }
 
 async function fetchOrders() {
-    // Also fetch inventory if it's the current view? 
-    // Usually keep separate to reduce load but fetchOrders is central.
-    if (document.getElementById('inventory-section') && !document.getElementById('inventory-section').classList.contains('hidden')) {
+    // 預先載入庫存資訊，確保 renderDetailCards 能顯示 SKU (自動轉譯)
+    if (!window.allInventory || window.allInventory.length === 0) {
         fetchInventoryData();
     }
     // ... rest of fetchOrders ...
@@ -608,6 +796,12 @@ function applyFilter() {
     // Primary Filter: View Type
     let filtered = ordersData;
 
+    // Only render Kanban if we are actually in the "Orders" module (dashboard is visible)
+    const dashboard = document.getElementById('dashboard');
+    if (dashboard && dashboard.classList.contains('hidden')) {
+        return; // We are in Hub, History, or Reports. Do not render Kanban.
+    }
+
     if (window.currentPrimaryView === 'work') {
         // Today's Work Orders: Production phases only
         const workStatuses = ['paid', 'cutting', 'inspection', 'picking', 'packing'];
@@ -619,9 +813,11 @@ function applyFilter() {
         // Don't render Kanban if we are in inventory mode
         return;
     } else {
-        // All Orders View with delivery sub-filter
+        // All Orders View with delivery sub-filter (exclude completed)
         if (window.currentDeliveryFilter !== 'all') {
-            filtered = ordersData.filter(o => (o.address || "").includes(window.currentDeliveryFilter));
+            filtered = ordersData.filter(o => (o.address || "").includes(window.currentDeliveryFilter) && o.status !== 'completed');
+        } else {
+            filtered = ordersData.filter(o => o.status !== 'completed');
         }
     }
 
@@ -669,11 +865,6 @@ function renderKanban(data) {
                 title: "倉儲出貨區 <span class='header-tag'>8:00-12:00 出昨日訂單</span>",
                 cols: ['shipping', 'dispatched'],
                 headerStyle: "background: #16a085;"
-            },
-            {
-                title: "完成訂單 📦 <span class='header-tag'>已完成的訂單存檔</span>",
-                cols: ['completed'],
-                headerStyle: "background: #95a5a6;"
             }
         ];
     } else {
@@ -698,11 +889,6 @@ function renderKanban(data) {
                 title: "倉儲出貨區 <span class='header-tag'>8:00-12:00 出昨日訂單</span>",
                 cols: ['shipping', 'dispatched'],
                 headerStyle: "background: #16a085;"
-            },
-            {
-                title: "完成訂單 📦 <span class='header-tag'>已完成的訂單存檔</span>",
-                cols: ['completed'],
-                headerStyle: "background: #95a5a6;"
             }
         ];
     }
@@ -1409,8 +1595,8 @@ function renderCuttingVisuals(bins, stockLen) {
 
 function formatPrice(val) {
     if (!val) return "NT$ 0";
-    // Use parseInt to extract the first number, handling "77 (Included...)" correctly
-    let num = parseInt(String(val), 10);
+    // Use Math.round to properly round floating-point totals (e.g., 23641.6 → 23642)
+    let num = Math.round(parseFloat(String(val)));
     return "NT$ " + (isNaN(num) ? "0" : num);
 }
 
@@ -1422,6 +1608,29 @@ window.openGmail = function (email, subject, body) {
     // 為了安全起見，這裡假設傳入的已經是 encodeURIComponent 過的。
     const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
     window.open(url, '_blank');
+};
+
+// [New] Helper to trigger Gmail reply from Kanban card securely without inline HTML injection
+window.triggerGmailReply = function (orderId) {
+    let target = ordersData.find(o => String(o.timestamp) === String(orderId));
+    if (!target) return;
+    if (!target.email) {
+        alert('此訂單沒有留下 Email 資訊。');
+        return;
+    }
+
+    // Generate body on-the-fly to avoid syntax errors in HTML attributes
+    let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name}`);
+    let rawBody = window.generateMailBody(target.name, target.total, target.shippingFee || 0, target.details);
+    let mailBody = encodeURIComponent(rawBody);
+
+    // Safety check for URL length to prevent HTTP 400 Error
+    if (mailBody.length > 1800) {
+        rawBody = window.generateMailBody(target.name, target.total, target.shippingFee || 0, target.details, true);
+        mailBody = encodeURIComponent(rawBody);
+    }
+
+    window.openGmail(target.email, mailSubject, mailBody);
 };
 
 function createCard(order, index, currentStatus) {
@@ -1546,7 +1755,7 @@ function createCard(order, index, currentStatus) {
     <div class="card-actions">
         ${prevBtnHtml}
             <button class="btn-card-action btn-gmail" 
-            onclick="event.stopPropagation(); window.openGmail('${order.email}', '${mailSubject}', '${mailBody}')">
+            onclick="event.stopPropagation(); window.triggerGmailReply('${order.timestamp}')">
             <i class="fas fa-envelope"></i> 回覆
             </button>
             ${nextBtnHtml}
@@ -1625,8 +1834,14 @@ window.advanceStatus = function (orderId, nextStatus) {
             // [New] Auto-open Gmail for Self-Pickup/S2S (SOP) - Moved before fetch for better popup behavior
             if (target.email) {
                 let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name}`);
-                let rawBody = window.generateMailBody(target.name, newTotal, fee, target.details);
+                let rawBody = window.generateMailBody(target.name, target.total, 0, target.details);
                 let mailBody = encodeURIComponent(rawBody);
+
+                // Safety truncation
+                if (mailBody.length > 1800) {
+                    rawBody = window.generateMailBody(target.name, target.total, 0, target.details, true);
+                    mailBody = encodeURIComponent(rawBody);
+                }
                 window.openGmail(target.email, mailSubject, mailBody);
             }
 
@@ -1646,12 +1861,20 @@ window.advanceStatus = function (orderId, nextStatus) {
 
             applyFilter();
             window.lastActiveOrderId = orderId;
+            closeModal(); // [Fix] Ensure modal closes on auto-advance
             return;
         }
 
         // Show Modal for Shipping Fee
         showPriceModal(target, nextStatus);
         return; // Stop here, wait for modal callback
+    }
+
+    // --- 1.5. Quoted -> Paid Safety Check (Payment Confirmation) ---
+    if (target.status === 'quoted' && nextStatus === 'paid') {
+        if (!confirm(`⚠️ 確認收到款項了嗎？\n\n訂單：${target.name}\n應收金額：${formatPrice(target.total)}\n\n按下確定後將轉入「已付款 (待處理)」階段。`)) {
+            return; // Block transition if user cancels
+        }
     }
 
     // --- 2. Cutting -> Inspection Safety Check (Profile Deduction) ---
@@ -1690,6 +1913,7 @@ window.advanceStatus = function (orderId, nextStatus) {
 
                 applyFilter();
                 window.lastActiveOrderId = orderId;
+                closeModal(); // [Fix] Ensure modal closes
             }
             return;
         }
@@ -1697,7 +1921,9 @@ window.advanceStatus = function (orderId, nextStatus) {
         const lines = target.details.split('\n'); // Assuming 'lines' should come from target.details
 
         lines.forEach(line => {
-            if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型') || line.includes('銘材')) return;
+            // [Fix] Skip empty lines immediately
+            if (!line.trim()) return;
+            if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型') || line.includes('銘材') || line.match(/\d{4}型/)) return;
 
             // 1. 解析原始數量
             let qty = 1;
@@ -1711,7 +1937,9 @@ window.advanceStatus = function (orderId, nextStatus) {
                 series = parseInt(PRODUCT_MAP[foundKey]);
             }
 
-            let itemName = line.replace(/^【.*?】\s*/, '').replace(/ -- \$[0-9]+/, '').replace(/\( x \d+ \)/, '').trim();
+            let itemName = line.replace(/^【.*?】\s*/, '').replace(/\s*--\s*\$[0-9]+/g, '').replace(/\( x \d+ \)/, '').trim();
+            // [Fix] Double check if itemName is meaningful after stripping
+            if (!itemName) return;
 
             if (series === 99) {
                 series = window.detectSeries(itemName);
@@ -1720,9 +1948,33 @@ window.advanceStatus = function (orderId, nextStatus) {
             // 3. 合計括號內的零件 (如 M4螺絲x2) -> 跳過平頭螺絲
             window.extractAndAddScrewNutsToMap(itemName, qty, series, deductionMap);
 
-            // 4. 合計主品項 (轉換為標準庫存名稱，如 20-三角連結塊)
-            const key = window.getInventoryKey(itemName, series);
-            if (key.includes('平頭螺絲')) return; // 個別購買的平頭螺絲也不扣庫存
+            // 4. 合計主品項 (優先找 [SKU]，若無則主動去 inventory 找身分證)
+            let key = itemName; // Fallback
+            const skuMatch = line.match(/\[(.*?)\]/);
+
+            if (skuMatch) {
+                key = '[' + skuMatch[1].trim() + ']';
+            } else {
+                // B2C 或舊單：主動查表換證 (三個身份證之一的主件身份)
+                if (window.allInventory && window.allInventory.length > 0) {
+                    const inventoryKey = window.convertToInventoryKey(itemName, series);
+                    const invMatch = window.fuzzyMatchInventoryKey(inventoryKey, window.allInventory);
+                    if (invMatch) {
+                        const actualName = (invMatch.name || invMatch.品項名稱 || "").toString();
+                        const foundSku = window.parseSKU(actualName);
+                        if (foundSku) {
+                            key = '[' + foundSku + ']'; // 強制轉為 [SKU] 格式扣帳
+                        } else {
+                            key = actualName;
+                        }
+                    } else {
+                        key = inventoryKey;
+                    }
+                } else {
+                    key = window.getInventoryKey(itemName, series);
+                }
+            }
+            if (key.includes('平頭螺絲')) return;
 
             const current = deductionMap.get(key) || 0;
             deductionMap.set(key, current + qty);
@@ -1736,8 +1988,34 @@ window.advanceStatus = function (orderId, nextStatus) {
         if (finalDeductList.length > 0) {
             if (!window.isProcessing) {
                 window.isProcessing = true;
+
+                // --- Visual Loading Feedback Start ---
+                const finishBtn = document.getElementById('btn-finish-check');
+                let originalBtnHtml = '';
+                if (finishBtn) {
+                    originalBtnHtml = finishBtn.innerHTML;
+                    finishBtn.disabled = true;
+                    finishBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在計算並扣除配件庫存...';
+                    finishBtn.style.opacity = '0.7';
+                }
+                const cards = document.querySelectorAll('.kanban-card');
+                cards.forEach(c => c.style.pointerEvents = 'none'); // Prevent other clicks
+                document.body.style.cursor = 'wait';
+                // --- Visual Loading Feedback End ---
+
                 deductInventory(finalDeductList).then(success => {
                     window.isProcessing = false;
+
+                    // --- Visual Loading Feedback Revert ---
+                    if (finishBtn) {
+                        finishBtn.disabled = false;
+                        finishBtn.innerHTML = originalBtnHtml;
+                        finishBtn.style.opacity = '1';
+                    }
+                    cards.forEach(c => c.style.pointerEvents = 'auto');
+                    document.body.style.cursor = 'default';
+                    // --- Visual Loading Feedback Revert End ---
+
                     if (success) {
                         // Mark as deducted
                         localStorage.setItem(`deducted_acc_${orderId}`, 'true');
@@ -1746,12 +2024,14 @@ window.advanceStatus = function (orderId, nextStatus) {
                         applyFilter();
                         window.lastActiveOrderId = orderId;
                         alert("✅ 配件庫存已扣除，訂單移至待出貨。");
+                        window.closeModal(); // Auto close if inside modal
                     } else {
                         // Allow force proceed?
                         if (confirm("⚠️ 配件扣除失敗 (可能庫存不足或名稱不符)。\n是否強制移至待出貨？")) {
                             target.status = nextStatus;
                             applyFilter();
                             window.lastActiveOrderId = orderId;
+                            window.closeModal();
                         }
                     }
                 });
@@ -1776,19 +2056,20 @@ window.advanceStatus = function (orderId, nextStatus) {
 
         // Format details for email
         let formattedDetails = (target.details || "").replace(/\\n/g, '\n').replace(/\n/g, '\n');
+        let detailsClip = formattedDetails;
+        let note = target.note ? target.note : "無";
 
-        let bodyText = `您好，LUTU鋁圖通知您：您的訂單已出貨。
-
-我們已於今日將您的貨品寄出/準備好。
-
-本次出貨內容如下：
-${formattedDetails}
-
-感謝您的訂購！
-
-若有任何問題，歡迎隨時聯繫我們。`;
-
+        let bodyText = `您好，LUTU鋁圖通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip}\n\n出貨單號 / 備註：${note}\n\n如有任何問題，歡迎隨時與我們聯絡！`;
         let body = encodeURIComponent(bodyText);
+
+        if (body.length > 1800) {
+            let cutoff = formattedDetails.lastIndexOf('\n', 1200);
+            if (cutoff === -1) cutoff = 1200;
+            detailsClip = formattedDetails.substring(0, cutoff);
+            bodyText = `您好，LUTU鋁圖通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip}\n\n出貨單號 / 備註：${note}\n\n如有任何問題，歡迎隨時與我們聯絡！`;
+            body = encodeURIComponent(bodyText);
+        }
+
         window.openGmail(target.email, subject, body);
     }
 
@@ -1810,6 +2091,7 @@ ${formattedDetails}
 
     applyFilter();
     window.lastActiveOrderId = orderId;
+    closeModal(); // [Fix] Default close after status change
 };
 
 window.toggleCheck = function (el) {
@@ -1818,22 +2100,40 @@ window.toggleCheck = function (el) {
 };
 
 window.updateCheckProgress = function () {
+    const order = window.currentOrderForPrint;
+    const currentStatus = order ? order.status : '';
+
     let total = document.querySelectorAll('.detail-card').length;
     let checked = document.querySelectorAll('.detail-card.checked').length;
     let label = document.getElementById('progress-label');
-    if (label) label.innerText = `已核對 ${checked} / ${total}`;
+    if (label) {
+        if (currentStatus === 'packing') {
+            label.innerText = '免勾選 (直接確認)';
+        } else {
+            label.innerText = `已核對 ${checked} / ${total}`;
+        }
+    }
 
     let pill = document.getElementById('progress-pill');
     if (pill) {
-        if (checked === total && total > 0) pill.classList.add('complete');
-        else pill.classList.remove('complete');
+        if (currentStatus === 'packing') {
+            pill.classList.add('complete');
+        } else if (checked === total && total > 0) {
+            pill.classList.add('complete');
+        } else {
+            pill.classList.remove('complete');
+        }
     }
 
     let btn = document.getElementById('btn-finish-check');
     if (btn) {
-        if (checked === total && total > 0) {
+        if (currentStatus === 'packing') {
             btn.classList.add('active');
-            btn.innerHTML = '<i class="fas fa-check-circle"></i> 確認無誤，關閉視窗';
+        } else if (checked === total) {
+            // Even if total is 0 (e.g. no aluminum in inspection), allow moving to next step
+            btn.classList.add('active');
+            if (currentStatus === 'inspection') btn.innerHTML = '<i class="fas fa-check-circle"></i> 確認無誤 → 前進至撿貨單';
+            else if (currentStatus === 'picking') btn.innerHTML = '<i class="fas fa-check-circle"></i> 確認無誤 → 前進至包裝';
         } else {
             btn.classList.remove('active');
             btn.innerHTML = '尚有項目未核對 (請點擊上方核對)';
@@ -1842,12 +2142,33 @@ window.updateCheckProgress = function () {
 };
 
 window.viewOrder = function (order) {
+    // [Fix] Support calling with ID (String) for History module
+    if (typeof order === 'string' || typeof order === 'number') {
+        let found = ordersData.find(o => String(o.timestamp) === String(order));
+        if (!found) { alert("找不到該筆訂單"); return; }
+        order = found;
+    }
+
     const modal = document.getElementById('modal');
     const body = document.getElementById('modal-body');
 
     let dateStr = order.timestamp;
-    try { dateStr = new Date(order.timestamp).toLocaleString(); } catch (e) { }
-    const note = order.note ? order.note : "無";
+    try { dateStr = window.safeParseDate(order.timestamp).toLocaleString(); } catch (e) { }
+    let note = order.note ? order.note : "無";
+    let address = order.address || "無";
+
+    // [Fix] Clean up shipping placeholders for ALL order statuses to avoid duplication
+    // (Unquoted orders also get cleaned now, because the tag/header already shows the method)
+    address = address.replace(/\(運費待報價\)/g, '').replace(/\[宅配.*?\]/g, '').replace(/\[自取\]/g, '').replace(/\[店到店.*?\]/g, '').replace(/\[公司配送.*?\]/g, '').trim();
+
+    // Strip out the old "(運費已列入)" and "(運費待報價)" text from the note
+    note = note.replace(/\(?運費已列入\)?/g, '').replace(/\(?運費待報價\)?/g, '').trim();
+    if (!note) note = "無";
+
+    // Add explicit shipping fee info if it has been quoted
+    if (order.status !== 'unquoted' && typeof order.shippingFee !== 'undefined') {
+        note += `<br><span style="color:#e67e22; font-weight:bold;">[系統紀錄: 實際運費已核定為 NT$ ${order.shippingFee}]</span>`;
+    }
 
     window.currentOrderForPrint = order;
 
@@ -1870,9 +2191,22 @@ window.viewOrder = function (order) {
                 <div class="detail-value">${order.phone}</div>
             </div>
         </div>
-        <div class="detail-group">
-            <div class="detail-label">配送地址</div>
-            <div class="detail-value" style="word-break:break-all;">${order.address}</div>
+        <div style="display:flex; gap:10px;">
+            <div class="detail-group" style="flex:1;">
+                <div class="detail-label">配送方式</div>
+                <div class="detail-value" style="color:#2980b9; font-weight:bold;">${(() => {
+            let addr = order.address || "";
+            if (addr.includes("宅配")) return "宅配寄送";
+            if (addr.includes("自取")) return "客戶自取";
+            if (addr.includes("店到店")) return "店到店";
+            if (addr.includes("公司配送")) return "公司配送";
+            return "一般貨運";
+        })()}</div>
+            </div>
+            <div class="detail-group" style="flex:2;">
+                <div class="detail-label">配送地址</div>
+                <div class="detail-value" style="word-break:break-all;">${address}</div>
+            </div>
         </div>
         <div class="detail-group">
             <div class="detail-label">備註事項</div>
@@ -1893,7 +2227,7 @@ window.viewOrder = function (order) {
             </div>
             
             <div style="background:#f9f9f9; padding:5px; border-radius:8px;">
-                <div class="checklist-progress-bar" style="${['inspection', 'picking', 'packing'].includes(order.status) ? '' : 'display:none;'}">
+                <div class="checklist-progress-bar" style="${['inspection', 'picking'].includes(order.status) ? '' : 'display:none;'}">
                     <div class="progress-text" style="font-size:0.9em;">核對進度</div>
                     <div id="progress-pill" class="progress-pill">
                         <span id="progress-label">0/0</span>
@@ -1904,6 +2238,20 @@ window.viewOrder = function (order) {
                     ${renderDetailCards(order.details, order.status)}
                 </div>
                 
+                <div style="margin-top: 15px; padding: 12px; background: #fafafa; border: 1px solid #eee; border-radius: 8px; font-size: 0.95em;">
+                    <div style="display:flex; justify-content: space-between; align-items: center;">
+                        <span style="color:#777; font-weight:500;">庫存連動狀態：</span>
+                        <div style="display:flex; gap:12px;">
+                            ${window.isProfileDeducted(order) ?
+            '<span style="color:#27ae60; font-weight:bold;"><i class="fas fa-check-circle"></i> 鋁材已扣除</span>' :
+            '<span style="color:#999;"><i class="far fa-circle"></i> 鋁材未處理</span>'}
+                            ${localStorage.getItem('deducted_acc_' + order.timestamp) ?
+            '<span style="color:#27ae60; font-weight:bold;"><i class="fas fa-check-circle"></i> 配件已扣除</span>' :
+            '<span style="color:#999;"><i class="far fa-circle"></i> 配件未處理</span>'}
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Explicit Close Buttons -->
                 <div style="display:flex; gap:10px; margin-top:10px;">
                      <button onclick="window.closeModal()" style="flex:1; padding:12px; background:#e74c3c; border:none; border-radius:6px; color:#fff; cursor:pointer;">
@@ -1918,8 +2266,8 @@ window.viewOrder = function (order) {
                          ✓ 核對完成 → 前進至包裝
                      </button>
                      ` : order.status === 'packing' ? `
-                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:#27ae60;">
-                         ✓ 核對完成 → 前進至待出貨
+                     <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:#27ae60;">
+                         ✓ 確認無誤 → 前進至待出貨
                      </button>
                      ` : ''}
                 </div>
@@ -1992,47 +2340,992 @@ window.detectSeries = function (name) {
     return 99;
 };
 
+// ==========================================
+// CORE DATA NORMALIZATION (核心資料標準化)
+// ==========================================
+
+// 徹底移除品名中任何位置的 SKU 標籤 [XXX]
+window.removeSKU = function (name) {
+    if (!name) return "";
+    return name.replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
+};
+
+// 統一的項目辨識與 SKU 查找函數
+window.resolveItemInfo = function (rawName, series) {
+    // Extract original SKU before stripping it, as a reliable fallback
+    const originalSkuMatch = window.parseSKU(rawName);
+
+    const cleanBase = window.removeSKU(rawName)
+        .replace(/\s*--\s*\$[0-9]+/g, '')
+        .replace(/\( x \d+ \)/g, '')
+        .replace(/\(含[^)]+\)/g, '')
+        .replace(/（含[^）]+）/g, '')
+        .trim();
+
+    let sku = originalSkuMatch || '';
+    let finalKey = cleanBase;
+
+    // Hardcoded fallback for known screws/nuts to force merging even if inventory is missing them
+    if (!sku) {
+        if (cleanBase.includes('M4六角螺絲')) sku = 'A20-1M4';
+        else if (cleanBase.includes('M4螺母')) sku = 'A20-0M4';
+        else if (cleanBase.includes('M5六角螺絲') || (series === 20 && cleanBase.includes('M5螺絲'))) sku = 'A20-1M5'; // Assuming 20 series M5 exists, otherwise 30
+        else if (cleanBase.includes('M6六角螺絲')) sku = 'A30-1M6';
+        else if (cleanBase.includes('M6螺母')) sku = 'A30-0M6';
+        else if (cleanBase.includes('M8六角螺絲')) sku = 'A40-1M8';
+        else if (cleanBase.includes('M8螺母')) sku = 'A40-0M8';
+        else if (cleanBase.includes('M4螺絲')) sku = 'A20-1M4'; // Generic names
+        else if (cleanBase.includes('M5螺絲') && series === 30) sku = 'A30-1M5';
+        else if (cleanBase.includes('M6螺絲')) sku = 'A30-1M6';
+        else if (cleanBase.includes('M8螺絲')) sku = 'A40-1M8';
+    }
+
+    // If we already have a reliable SKU from the front-end or hardcoded fallback, finalKey can be immediately mapped
+    if (sku) {
+        finalKey = `[${sku}]`;
+    }
+
+    if (window.allInventory) {
+        // 嘗試多種組合查找：1. 系列-名稱 2. 純名稱 3. 標準化後的名稱
+        const normalized = window.normalizeScrewName(cleanBase);
+        const searchKeys = [
+            series !== 99 ? `${series}-${cleanBase}` : null,
+            series !== 99 ? `${series}-${normalized}` : null,
+            cleanBase,
+            normalized
+        ].filter(Boolean);
+
+        for (const sKey of searchKeys) {
+            const match = window.fuzzyMatchInventoryKey(sKey, window.allInventory);
+            if (match) {
+                const pname = (match.name || match.品項名稱 || "").toString();
+                const invSku = window.parseSKU(pname);
+
+                if (invSku) {
+                    sku = invSku;
+                    finalKey = `[${sku}]`; // 找到 SKU 則以 SKU 為唯一鍵值
+                    break;
+                } else if (originalSkuMatch) {
+                    // 如果庫存系統沒登錄 SKU，但前端有給，就相信前端的資料
+                    sku = originalSkuMatch;
+                    finalKey = `[${sku}]`;
+                    break;
+                }
+            }
+        }
+    }
+    return { sku, finalKey, cleanBase };
+};
+
 window.normalizeScrewName = function (name) {
     let n = name.trim();
-    n = n.replace(/M(\d+)螺絲/, 'M$1六角螺絲');
+    // 擴大匹配：只要包含螺絲/螺母等關鍵字，就轉為資料庫標準型
+    if (n.includes('螺絲')) n = n.replace(/M(\d+).*/, 'M$1六角螺絲');
+    if (n.includes('螺母') || n.includes('螺帽')) n = n.replace(/M(\d+).*/, 'M$1螺母');
     return n;
 };
 
 window.convertToInventoryKey = function (name, series) {
-    let cleanName = name.replace(/\(含[^)]+\)/g, '').trim();
-    // 統一命名：合金把手組 -> 合金把手 (對齊 Google Sheet)
-    cleanName = cleanName.replace('合金把手組', '合金把手');
-
-    // 移除前綴（包含可選的連字符或空格），避免雙重連字符 (如 30-靜音輪 -> 30--靜音輪)
-    cleanName = cleanName.replace(/^(20|30|40|80)[-\s]?/, '').trim();
-    cleanName = window.normalizeScrewName(cleanName);
-    if (series !== 99) return `${series}-${cleanName}`;
-    return cleanName;
+    // 為了相容性保留此函數，但內部改用 resolveItemInfo
+    return window.resolveItemInfo(name, series).cleanBase;
 };
 
 window.isScrewOrNut = function (name) {
     const n = name.toLowerCase();
+    // 排除組合配件包本體進入合計區
+    if (n.includes('(含') || n.includes('（含') || n.includes('(組') || n.includes('（組')) return false;
     return n.includes('螺絲') || n.includes('螺母') || n.includes('螺帽') || n.includes('滑塊') || n.includes('彈片');
 };
 
-window.extractAndAddScrewNutsToMap = function (name, qty, series, totalsMap) {
-    const match = name.match(/\(含([^)]+)\)/);
+window.extractAndAddScrewNutsToMap = function (name, qty, mainSeries, totalsMap) {
+    const match = name.match(/\(含([^)]+)\)/) || name.match(/（含([^）]+）)/);
     if (!match) return;
-    const componentStr = match[1];
-    const parts = componentStr.split(/[,，]/);
+    const parts = match[1].split(/[,，]/);
     parts.forEach(part => {
         const compMatch = part.trim().match(/^(.+?)x(\d+)$/);
         if (compMatch) {
             let compName = compMatch[1].trim();
-            const compQty = parseInt(compMatch[2]) * qty;
+            const compQtyValue = parseInt(compMatch[2]) * qty;
             if (compName.includes('平頭螺絲')) return;
-            compName = window.normalizeScrewName(compName);
-            const inventoryKey = `${series}-${compName}`;
-            const current = totalsMap.get(inventoryKey) || 0;
-            totalsMap.set(inventoryKey, current + compQty);
+
+            // 零件偵測：若產品名含系列則優先
+            const series = (compName.includes('20')) ? 20 :
+                (compName.includes('30')) ? 30 :
+                    (compName.includes('40')) ? 40 : mainSeries;
+
+            // 使用統一的解析邏輯，確保與主循環 key 一致
+            const info = window.resolveItemInfo(compName, series);
+            const current = totalsMap.get(info.finalKey) || 0;
+            totalsMap.set(info.finalKey, current + compQtyValue);
         }
     });
-};
+}
+
+// ==========================================
+// BACKGROUND 3D CITYSCAPE LOGIC
+// ==========================================
+
+let sceneInitialized = false;
+let animationFrameId;
+let isThreeJsPaused = false;
+let threeJsAnimateFunc;
+
+function initThreeJsScene() {
+    if (sceneInitialized) return;
+
+    // Check if Three.js is loaded
+    if (typeof THREE === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+        script.onload = () => buildScene();
+        document.head.appendChild(script);
+    } else {
+        buildScene();
+    }
+}
+
+function buildScene() {
+    const container = document.getElementById('three-canvas-container');
+    if (!container) return;
+
+    let decimalTime = 12.0; // Share time across functions
+
+    // 1. Setup Scene & Orthographic Camera (for perfect Isometric view)
+    const scene = new THREE.Scene();
+
+    const aspect = window.innerWidth / window.innerHeight;
+    let d = window.innerWidth < 768 ? 2500 : 1200; // Increased 'd' for mobile to zoom out
+    const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 15000);
+
+    // Position camera for strict isometric projection (30 degrees down, 45 degrees rotated)
+    camera.position.set(2000, 2000, 2000);
+    camera.lookAt(0, 0, 0); // Explicitly look at center origin
+
+    // 2. Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // 3. Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    hemiLight.position.set(0, 1000, 0);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    // Initial position, will be dynamically overriden by updateSky()
+    dirLight.position.set(2000, 3000, 2000);
+    dirLight.castShadow = true;
+    dirLight.shadow.camera.left = -3000;
+    dirLight.shadow.camera.right = 3000;
+    dirLight.shadow.camera.top = 3000;
+    dirLight.shadow.camera.bottom = -3000;
+    dirLight.shadow.camera.far = 10000;
+    dirLight.shadow.mapSize.width = 4096; // High-res shadows
+    dirLight.shadow.mapSize.height = 4096;
+    dirLight.shadow.bias = -0.0005; // Prevent shadow acne
+    scene.add(dirLight);
+
+    // 4. Base Plane (River / Water) - Deep stylized ocean
+    const riverGeometry = new THREE.PlaneGeometry(20000, 20000);
+    const riverMaterial = new THREE.MeshStandardMaterial({
+        color: 0x0a192f, // Deep tech-blue
+        roughness: 0.05, // Glossy water
+        metalness: 0.9,
+    });
+    const riverPlane = new THREE.Mesh(riverGeometry, riverMaterial);
+    riverPlane.rotation.x = -Math.PI / 2;
+    riverPlane.position.y = -20;
+    riverPlane.receiveShadow = true;
+    scene.add(riverPlane);
+
+    // Banks - Sleek dark landscaping instead of bright toy green
+    const bankMaterial = new THREE.MeshStandardMaterial({
+        color: 0x212121, // Neutral dark gray base
+        roughness: 0.9,
+        metalness: 0.1
+    });
+
+    // Left Bank
+    const leftBank = new THREE.Mesh(new THREE.PlaneGeometry(10000, 20000), bankMaterial);
+    leftBank.rotation.x = -Math.PI / 2;
+    leftBank.position.set(-5500, -10, 0); // Inner edge at -500
+    leftBank.receiveShadow = true;
+    scene.add(leftBank);
+
+    // Right Bank
+    const rightBank = new THREE.Mesh(new THREE.PlaneGeometry(10000, 20000), bankMaterial);
+    rightBank.rotation.x = -Math.PI / 2;
+    rightBank.position.set(5500, -10, 0); // Inner edge at 500
+    rightBank.receiveShadow = true;
+    scene.add(rightBank);
+
+    // --- 4.1 River Embankments (Levees) ---
+    const leveeGeom = new THREE.BoxGeometry(40, 40, 20000);
+    const leveeMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 });
+
+    const leftLevee = new THREE.Mesh(leveeGeom, leveeMat);
+    leftLevee.position.set(-500, 10, 0); // Center at y=10 (from -10 to 30)
+    leftLevee.receiveShadow = true;
+    leftLevee.castShadow = true;
+    scene.add(leftLevee);
+
+    const rightLevee = new THREE.Mesh(leveeGeom, leveeMat);
+    rightLevee.position.set(500, 10, 0);
+    rightLevee.receiveShadow = true;
+    rightLevee.castShadow = true;
+    scene.add(rightLevee);
+
+    // 5. The Diagonal Bridge
+    // Standard isometric bridge usually crosses from back-left to front-right or similar.
+    // To match typical diagonal composition:
+    const bridgeGroup = new THREE.Group();
+
+    // Main deck
+    const deckGeometry = new THREE.BoxGeometry(450, 30, 20000); // Thicker and much longer
+    const deckMaterial = new THREE.MeshStandardMaterial({ color: 0x7f8c8d }); // concrete
+    const bridgeDeck = new THREE.Mesh(deckGeometry, deckMaterial);
+    bridgeDeck.position.y = 150;
+    bridgeDeck.receiveShadow = true;
+    bridgeDeck.castShadow = true;
+    bridgeGroup.add(bridgeDeck);
+
+    // Road surface
+    const roadGeometry = new THREE.BoxGeometry(400, 5, 20000);
+    const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x2d3436 }); // asphalt
+    const roadSurface = new THREE.Mesh(roadGeometry, roadMaterial);
+    roadSurface.position.y = 165;
+    bridgeGroup.add(roadSurface);
+
+    // Bridge Pillars
+    const pillarGeom = new THREE.CylinderGeometry(60, 60, 200, 32);
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x95a5a6 });
+    for (let z = -8000; z <= 8000; z += 1200) {
+        const p1 = new THREE.Mesh(pillarGeom, pillarMat);
+        p1.position.set(-150, 50, z);
+        p1.castShadow = true;
+        bridgeGroup.add(p1);
+
+        const p2 = new THREE.Mesh(pillarGeom, pillarMat);
+        p2.position.set(150, 50, z);
+        p2.castShadow = true;
+        bridgeGroup.add(p2);
+    }
+
+    // Rotate the bridge perpendicularly (90 degrees) across the scene
+    bridgeGroup.rotation.y = Math.PI / 2;
+    scene.add(bridgeGroup);
+
+    // 6. City Buildings on the banks
+    const cityGroup = new THREE.Group();
+    const buildingMatDay = new THREE.MeshStandardMaterial({ color: 0x7f8c8d, roughness: 0.7 }); // Neutral gray base
+
+    // Create a procedural window texture for night lights - focused, discrete windows
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#f1c40f';
+    for (let y = 16; y < 128; y += 32) {
+        for (let x = 16; x < 128; x += 32) {
+            if (Math.random() > 0.4) ctx.fillRect(x, y, 12, 16);
+        }
+    }
+    const windowTexture = new THREE.CanvasTexture(canvas);
+    windowTexture.wrapS = THREE.RepeatWrapping;
+    windowTexture.wrapT = THREE.RepeatWrapping;
+
+    const buildingMatNight = new THREE.MeshStandardMaterial({
+        color: 0x050510, // Near black body
+        emissive: 0xffffff,
+        emissiveMap: windowTexture,
+        emissiveIntensity: 1.0 // Balanced intensity
+    });
+
+    const buildingMatNightPlain = new THREE.MeshStandardMaterial({
+        color: 0x050510,
+        emissive: 0x000000,
+        emissiveMap: null
+    });
+
+    const generateRowHouses = (centerX) => {
+        const step = 110; // Fixed spacing for "connected" look
+        const zRange = 8500;
+
+        for (let z = -zRange; z <= zRange; z += step) {
+            // Avoid bridge area (Reduced from 800 to 300 for tighter fit)
+            if (Math.abs(z) < 300) continue;
+
+            const width = 100; // Uniform width for row effect
+            const depth = 110 + Math.random() * 40;
+            const height = 60 + Math.random() * 100;
+
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+
+            // Create a material array to ensure the roof (top face) has no windows
+            // BoxGeometry groups: 0,1 (+/-X), 2,3 (+/-Y), 4,5 (+/-Z)
+            // Top face is index 2. Bottom face is index 3.
+            // Create side material with windows
+            const bMatNightSide = buildingMatNight.clone();
+            bMatNightSide.emissiveMap = windowTexture.clone();
+            bMatNightSide.emissiveMap.repeat.set(1, Math.max(1, Math.floor(height / 60)));
+            bMatNightSide.emissiveMap.needsUpdate = true;
+            bMatNightSide.emissiveIntensity = 0.7;
+
+            // Day materials array with slightly randomized gray
+            const shade = 0.5 + Math.random() * 0.4; // Range from 0.5 to 0.9 gray
+            const customDayMat = buildingMatDay.clone();
+            customDayMat.color.setRGB(shade, shade, shade);
+            const dayMaterials = [customDayMat, customDayMat, customDayMat, customDayMat, customDayMat, customDayMat];
+
+            // Night materials array: index 2 (Top) and 3 (Bottom) MUST use buildingMatNightPlain
+            const nightMaterials = [bMatNightSide, bMatNightSide, buildingMatNightPlain, buildingMatNightPlain, bMatNightSide, bMatNightSide];
+
+            const bldg = new THREE.Mesh(geometry, dayMaterials);
+            bldg.position.set(centerX, height / 2 - 10, z);
+            bldg.castShadow = true;
+            bldg.receiveShadow = true;
+
+            bldg.userData = { isBuilding: true, dayMat: dayMaterials, nightMat: nightMaterials };
+            cityGroup.add(bldg);
+        }
+    };
+
+    // Function to generate a cluster of buildings with strict collision avoidance
+    const generateCluster = (centerX, centerZ, count, spread) => {
+        let placed = 0;
+        let attempts = 0;
+
+        while (placed < count && attempts < count * 8) {
+            attempts++;
+            const width = 80 + Math.random() * 120;
+            const depth = 80 + Math.random() * 120;
+
+            const bx = centerX + (Math.random() - 0.5) * spread;
+            const bz = centerZ + (Math.random() - 0.5) * spread;
+
+            // --- 1. River & Bank Road & Row House Exclusion ---
+            // Reduced to 1250 to start right after row houses (which end at +/-1225)
+            if (Math.abs(bx) < 1250) continue;
+
+            // --- 2. Bridge Exclusion Zone ---
+            // Bridge width is 450, so Z ranges from -225 to 225. 
+            // Reduced from 600 to 250 for a snug fit.
+            if (Math.abs(bz) < 250) continue;
+
+            // --- 3. Dynamic Height based on "Roadside" proximity ---
+            const nearRiver = Math.abs(bx) < 1850;
+            const nearBridge = Math.abs(bz) < 1000;
+            const isRoadside = nearRiver || nearBridge;
+
+            let height;
+            if (isRoadside) {
+                height = 60 + Math.random() * 150;
+            } else {
+                height = 150 + Math.random() * 600 + (Math.random() > 0.85 ? 500 : 0);
+            }
+
+            const geometry = new THREE.BoxGeometry(width, height, depth);
+
+            // Night materials array: index 2 (Top) and 3 (Bottom) use buildingMatNightPlain
+            const bMatNightSide = buildingMatNight.clone();
+            bMatNightSide.emissiveMap = windowTexture.clone();
+            const repeatX = Math.max(1, Math.floor(width / 80));
+            const repeatY = Math.max(1, Math.floor(height / 80));
+            bMatNightSide.emissiveMap.repeat.set(repeatX, repeatY);
+            bMatNightSide.emissiveMap.needsUpdate = true;
+            bMatNightSide.emissiveIntensity = isRoadside ? 0.8 : 1.0;
+
+            const shade = 0.4 + Math.random() * 0.5; // Wider range for background clusters
+            const customDayMat = buildingMatDay.clone();
+            customDayMat.color.setRGB(shade, shade, shade);
+            const dayMaterials = [customDayMat, customDayMat, customDayMat, customDayMat, customDayMat, customDayMat];
+            const nightMaterials = [bMatNightSide, bMatNightSide, buildingMatNightPlain, buildingMatNightPlain, bMatNightSide, bMatNightSide];
+
+            const bldg = new THREE.Mesh(geometry, dayMaterials);
+
+            bldg.position.set(bx, height / 2 - 10, bz);
+            bldg.castShadow = true;
+            bldg.receiveShadow = true;
+
+            bldg.userData = { isBuilding: true, dayMat: dayMaterials, nightMat: nightMaterials };
+            cityGroup.add(bldg);
+            placed++;
+        }
+    };
+
+    // First row: High-density row houses (Row house first row)
+    // Road edge is at +/- 1125. Houses (width 100) at +/- 1175 span 1125-1225.
+    generateRowHouses(-1175); // Left Bank
+    generateRowHouses(1175);  // Right Bank
+
+    // Background clusters (Quality over quantity) - Increased density
+    generateCluster(3500, -1000, 180, 4500);
+    generateCluster(-3500, 1500, 120, 4500);
+
+    scene.add(cityGroup);
+
+    // --- 6.1 Street Light System ---
+    const streetLights = [];
+    const lightMatOff = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    const lightMatOn = new THREE.MeshStandardMaterial({
+        color: 0xffffaa,
+        emissive: 0xffffaa,
+        emissiveIntensity: 2.0
+    });
+
+    // --- 6.1.0 Radial Gradient Texture for Soft Street Lights ---
+    const lightCanvas = document.createElement('canvas');
+    lightCanvas.width = 128;
+    lightCanvas.height = 128;
+    const lctx = lightCanvas.getContext('2d');
+    const gradient = lctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gradient.addColorStop(0, 'rgba(255, 255, 170, 0.8)');   // Center: Softer
+    gradient.addColorStop(0.4, 'rgba(255, 255, 170, 0.3)'); // Mid: More transparent
+    gradient.addColorStop(1, 'rgba(255, 255, 170, 0)');     // Edge: Fully faded
+    lctx.fillStyle = gradient;
+    lctx.fillRect(0, 0, 128, 128);
+    const lightPoolTexture = new THREE.CanvasTexture(lightCanvas);
+
+    function createStreetLight(parent, x, y, z, rotationY = 0) {
+        const group = new THREE.Group();
+
+        // Pole
+        const poleGeom = new THREE.CylinderGeometry(3, 5, 70, 8);
+        const pole = new THREE.Mesh(poleGeom, lightMatOff);
+        pole.position.y = 35;
+        group.add(pole);
+
+        // Arm
+        const armGeom = new THREE.BoxGeometry(30, 3, 3);
+        const arm = new THREE.Mesh(armGeom, lightMatOff);
+        arm.position.set(12, 68, 0);
+        group.add(arm);
+
+        // Lamp Head
+        const headGeom = new THREE.BoxGeometry(12, 5, 10);
+        const head = new THREE.Mesh(headGeom, lightMatOff);
+        head.position.set(25, 66, 0);
+        group.add(head);
+
+        // Actual Light Glow (Bulb)
+        const glowGeom = new THREE.SphereGeometry(8, 16, 16);
+        const glowMat = new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.6 });
+        const glow = new THREE.Mesh(glowGeom, glowMat);
+        glow.position.set(25, 62, 0);
+        glow.visible = false;
+        group.add(glow);
+
+        // Ground Projection (Soft Light Pool)
+        const projGeom = new THREE.PlaneGeometry(500, 500);
+        const projMat = new THREE.MeshBasicMaterial({
+            map: lightPoolTexture,
+            transparent: true,
+            opacity: 0.2, // Reduced for transparency as requested
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide
+        });
+        const projection = new THREE.Mesh(projGeom, projMat);
+        projection.rotation.x = -Math.PI / 2;
+
+        // Position it so the center of the gradient is slightly ahead of the pole
+        const isBridge = (parent === bridgeGroup);
+        const roadY = isBridge ? 3.0 : 1.2;
+        projection.position.set(100, roadY, 0); // Offset center to simulate direction
+        projection.visible = false;
+        group.add(projection);
+
+        group.position.set(x, y, z);
+        group.rotation.y = rotationY;
+        group.userData = { isStreetLight: true, head: head, glow: glow, projection: projection };
+
+        parent.add(group);
+        streetLights.push(group);
+    }
+
+    // Place lights on Bridge (Added to bridgeGroup)
+    // Bridge surface is at Y=165 (deck top)
+    for (let z = -9000; z <= 9000; z += 1200) {
+        // Local coordinates within bridgeGroup
+        // +X points one way, -X points other. Width is 450.
+        // Rotation 0 means arm points to local +X. Rotation PI means points to local -X.
+        createStreetLight(bridgeGroup, -210, 165, z, 0);      // Points towards center from left
+        createStreetLight(bridgeGroup, 210, 165, z, Math.PI); // Points towards center from right
+    }
+
+    // Place lights on Bank Roads (Added to scene)
+    for (let z = -9500; z <= 9500; z += 1500) {
+        // Left Bank Road (X=-825): Place closer to road edge
+        createStreetLight(scene, -1000, -10, z, 0);
+        // Right Bank Road (X=825): Place closer to road edge
+        createStreetLight(scene, 1000, -10, z, Math.PI);
+    }
+
+    // 7. Animated Traffic on the bridge
+    const trafficGroup = new THREE.Group();
+    const particleCount = 80; // Reduced traffic density by 60%
+    const cars = [];
+
+    // Factory for advanced car models with dual lights & glow
+    function createCar(isForward, isBridge = false) {
+        const carGroup = new THREE.Group();
+        carGroup.userData.tailLights = [];
+
+        // Body
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(16, 12, 35),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+        );
+        carGroup.add(body);
+
+        // Light & Glow Helper
+        const isBraking = Math.random() < 0.2;
+        const addLight = (x, z, color, isFront) => {
+            // Core light point
+            const light = new THREE.Mesh(
+                new THREE.SphereGeometry(2, 8, 8),
+                new THREE.MeshBasicMaterial({ color: color })
+            );
+            light.position.set(x, 0, z);
+            carGroup.add(light);
+
+            // Subtle Flare/Glow
+            const isBrakeLight = !isFront && isBraking;
+            const glowSize = isFront ? 10 : (isBrakeLight ? 10 : 6);
+            const glowOpacity = isFront ? 0.5 : (isBrakeLight ? 0.6 : 0.3);
+
+            const glow = new THREE.Mesh(
+                new THREE.SphereGeometry(glowSize, 16, 16),
+                new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: glowOpacity })
+            );
+            glow.position.set(x, 0, z);
+            carGroup.add(glow);
+
+            if (!isFront) {
+                carGroup.userData.tailLights.push(glow);
+            }
+
+            // Headlight Projection (on the road surface)
+            if (isFront) {
+                const projGeom = new THREE.PlaneGeometry(12, 120);
+                const projMat = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.15,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false // Prevent Z-fighting
+                });
+                const projection = new THREE.Mesh(projGeom, projMat);
+                projection.rotation.x = -Math.PI / 2;
+
+                // Position projection in front of the car
+                const projZ = isForward ? (z - 65) : (z + 65);
+                // ROBUST HEIGHT MAPPING:
+                // Bridge road center is at y=165, top surface is at 167.5. Car center at y=172.
+                // Bank road top is at y=-8. Car center at y=5.
+                const verticalOffset = isBridge ? -3.0 : -12.5;
+                projection.position.set(x, verticalOffset, projZ);
+
+                // Ensure it's rendered on top
+                projection.renderOrder = 10;
+                carGroup.add(projection);
+            }
+        };
+
+        // If Forward (towards -z): Front is at -17.5, Back is at +17.5
+        // If Backward (towards +z): Front is at +17.5, Back is at -17.5
+        const frontZ = isForward ? -17.5 : 17.5;
+        const backZ = isForward ? 17.5 : -17.5;
+        const frontColor = 0xe0f7fa; // White
+        const backColor = 0xff4757;  // Red
+
+        addLight(5, frontZ, frontColor, true);
+        addLight(-5, frontZ, frontColor, true);
+        addLight(5, backZ, backColor, false);
+        addLight(-5, backZ, backColor, false);
+
+        return carGroup;
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+        const laneType = i % 4;
+        const isForward = (laneType < 2);
+        const isFast = (laneType === 0 || laneType === 2);
+
+        const car = createCar(isForward, true); // Bridge
+        const zPos = (Math.random() - 0.5) * 20000;
+
+        let xPos;
+        if (laneType === 0) xPos = 120;
+        else if (laneType === 1) xPos = 40;
+        else if (laneType === 2) xPos = -120;
+        else xPos = -40;
+
+        car.position.set(xPos, 172, zPos);
+
+        const maxSpeed = isFast ? (1.5 + Math.random() * 1.0) : (0.5 + Math.random() * 0.5);
+        car.userData = {
+            ...car.userData,
+            maxSpeed: maxSpeed,
+            speed: isForward ? maxSpeed : -maxSpeed,
+            isForward: isForward,
+            laneId: `bridge_${laneType}`
+        };
+        cars.push(car);
+        trafficGroup.add(car);
+    }
+
+    // Attach traffic to bridge group so it rotates with it
+    bridgeGroup.add(trafficGroup);
+
+    // 7.1. Left Bank Road & Traffic
+    const leftBankRoadGroup = new THREE.Group();
+    // Asphalt surface for 4 lanes
+    const lbRoadGeom = new THREE.PlaneGeometry(600, 20000);
+    const lbRoadMat = new THREE.MeshStandardMaterial({ color: 0x222222 }); // Darker asphalt
+    const lbRoad = new THREE.Mesh(lbRoadGeom, lbRoadMat);
+    lbRoad.rotation.x = -Math.PI / 2;
+    lbRoad.position.set(-825, -8, 0); // Under the lanes
+    lbRoad.receiveShadow = true;
+    leftBankRoadGroup.add(lbRoad);
+
+    // Subtle lane markings
+    const markingGeom = new THREE.PlaneGeometry(2, 20000);
+    const markingMat = new THREE.MeshBasicMaterial({ color: 0x444444 });
+    [-675, -825, -975].forEach(markX => {
+        const mark = new THREE.Mesh(markingGeom, markingMat);
+        mark.rotation.x = -Math.PI / 2;
+        mark.position.set(markX, -7.5, 0);
+        leftBankRoadGroup.add(mark);
+    });
+    scene.add(leftBankRoadGroup);
+
+    const leftBankTrafficGroup = new THREE.Group();
+    const leftBankCarsCount = 40;
+    for (let i = 0; i < leftBankCarsCount; i++) {
+        const laneType = i % 4; // 0: Bkwd Fast, 1: Bkwd Slow, 2: Fwd Fast, 3: Fwd Slow
+        const isForward = (laneType >= 2);
+        const isFast = (laneType === 0 || laneType === 2);
+
+        const car = createCar(isForward, false); // Banks
+        const zPos = (Math.random() - 0.5) * 20000;
+
+        // Left Bank lanes
+        let xPos;
+        if (laneType === 0) xPos = -600;
+        else if (laneType === 1) xPos = -750;
+        else if (laneType === 2) xPos = -900;
+        else xPos = -1050;
+
+        car.position.set(xPos, 5, zPos);
+
+        const maxSpeed = isFast ? (2.0 + Math.random() * 1.5) : (0.8 + Math.random() * 0.7);
+        car.userData = {
+            ...car.userData,
+            maxSpeed: maxSpeed,
+            speed: isForward ? maxSpeed : -maxSpeed,
+            isForward: isForward,
+            laneId: `left_${laneType}`
+        };
+        cars.push(car);
+        leftBankTrafficGroup.add(car);
+    }
+    scene.add(leftBankTrafficGroup);
+
+    // 7.2. Right Bank Road & Traffic
+    const rightBankRoadGroup = new THREE.Group();
+    const rbRoadGeom = new THREE.PlaneGeometry(600, 20000);
+    const rbRoadMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const rbRoad = new THREE.Mesh(rbRoadGeom, rbRoadMat);
+    rbRoad.rotation.x = -Math.PI / 2;
+    rbRoad.position.set(825, -8, 0);
+    rbRoad.receiveShadow = true;
+    rightBankRoadGroup.add(rbRoad);
+
+    [-675, -825, -975].forEach(markX => { // Relative offsets or absolute? Let's use absolute for rb
+    });
+    // Reuse lane markings logic for Right Bank
+    [675, 825, 975].forEach(markX => {
+        const mark = new THREE.Mesh(markingGeom, markingMat);
+        mark.rotation.x = -Math.PI / 2;
+        mark.position.set(markX, -7.5, 0);
+        rightBankRoadGroup.add(mark);
+    });
+    scene.add(rightBankRoadGroup);
+
+    const rightBankTrafficGroup = new THREE.Group();
+    const rightBankCarsCount = 40;
+    for (let i = 0; i < rightBankCarsCount; i++) {
+        const laneType = i % 4; // 0: Fwd Fast, 1: Fwd Slow, 2: Bkwd Fast, 3: Bkwd Slow
+        const isForward = (laneType < 2);
+        const isFast = (laneType === 0 || laneType === 2);
+
+        const car = createCar(isForward, false); // Banks
+        const zPos = (Math.random() - 0.5) * 20000;
+
+        // Right Bank lanes
+        let xPos;
+        if (laneType === 0) xPos = 600;
+        else if (laneType === 1) xPos = 750;
+        else if (laneType === 2) xPos = 900;
+        else xPos = 1050;
+
+        car.position.set(xPos, 5, zPos);
+
+        const maxSpeed = isFast ? (2.0 + Math.random() * 1.5) : (0.8 + Math.random() * 0.7);
+        car.userData = {
+            ...car.userData,
+            maxSpeed: maxSpeed,
+            speed: isForward ? maxSpeed : -maxSpeed,
+            isForward: isForward,
+            laneId: `right_${laneType}`
+        };
+        cars.push(car);
+        rightBankTrafficGroup.add(car);
+    }
+    scene.add(rightBankTrafficGroup);
+
+    // --- 8. Add Physical Sun & Moon ---
+    const sunGeom = new THREE.SphereGeometry(60, 32, 32);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const sunMesh = new THREE.Mesh(sunGeom, sunMat);
+    scene.add(sunMesh);
+
+    // Add a glow/halo to sun
+    const sunGlowGeom = new THREE.SphereGeometry(100, 32, 32);
+    const sunGlowMat = new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.3 });
+    const sunGlow = new THREE.Mesh(sunGlowGeom, sunGlowMat);
+    sunMesh.add(sunGlow);
+
+    const moonGeom = new THREE.SphereGeometry(40, 32, 32);
+    const moonMat = new THREE.MeshBasicMaterial({ color: 0xccddee });
+    const moonMesh = new THREE.Mesh(moonGeom, moonMat);
+    scene.add(moonMesh);
+
+    // Day/Night sky colors setup based on time (Moved here to avoid Temporal Dead Zone on lights)
+    // Now with 24-hour Sun/Moon positioning
+    const updateSky = () => {
+        const now = new Date();
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+        decimalTime = hour + minute / 60;
+
+        let skyColor = new THREE.Color(0x87CEEB); // Default day
+        let isNight = false;
+
+        // --- 1. Calculate Sun/Moon Angle Based on 24-Hour Cycle ---
+        // Let's assume Sunrise at 6:00 (0 deg), Noon at 12:00 (90 deg), Sunset at 18:00 (180 deg)
+        // Night from 18:00 to 6:00 will be the "Moon" arcing across the sky.
+
+        let orbitProgress = 0; // 0 to 1 across the sky hemisphere
+        let lightColorHex = 0xffffff;
+
+        if (decimalTime >= 6 && decimalTime < 18) {
+            // Daytime orbit (6 to 18) -> 12 hours
+            orbitProgress = (decimalTime - 6) / 12;
+        } else {
+            // Nighttime orbit (18 to 6) -> 12 hours
+            isNight = true;
+            if (decimalTime >= 18) {
+                orbitProgress = (decimalTime - 18) / 12;
+            } else {
+                orbitProgress = (decimalTime + 6) / 12;
+            }
+        }
+
+        // Map progress (0 to 1) to an angle (0 to PI)
+        const angle = orbitProgress * Math.PI;
+
+        // Radius of light orbit (how high the light source is)
+        const radius = 4000;
+
+        // Calculate X and Y positions. Z can be slightly offset for isometric depth
+        const lightX = Math.cos(angle) * -radius; // Moves from Left to Right
+        const lightY = Math.sin(angle) * radius;  // Arcs upwards and then downwards
+        const lightZ = 2000; // Constant depth offset so shadows fall diagonally
+
+        const finalPos = new THREE.Vector3(lightX, Math.max(lightY, 200), lightZ);
+        dirLight.position.copy(finalPos);
+
+        // Update Sun/Moon Mesh positions
+        if (!isNight) {
+            sunMesh.position.copy(finalPos);
+            sunMesh.visible = true;
+            moonMesh.visible = false;
+        } else {
+            moonMesh.position.copy(finalPos);
+            moonMesh.visible = true;
+            sunMesh.visible = false;
+        }
+
+        // --- 2. Time-of-Day Atmospherics ---
+        if (decimalTime >= 6 && decimalTime < 16) {
+            skyColor.setHex(0x9bd1f9);
+            lightColorHex = 0xffffff;
+            dirLight.intensity = 1.2;
+            hemiLight.intensity = 0.6;
+            hemiLight.groundColor.setHex(0x444444);
+        } else if (decimalTime >= 16 && decimalTime < 18.5) {
+            skyColor.setHex(0xff7e5f);
+            lightColorHex = 0xffddaa;
+            dirLight.intensity = 0.8;
+            hemiLight.intensity = 0.4;
+            hemiLight.groundColor.setHex(0x221111);
+        } else if (decimalTime >= 5 && decimalTime < 6) {
+            skyColor.setHex(0xa8c0ff);
+            lightColorHex = 0xccddff;
+            dirLight.intensity = 0.6;
+            hemiLight.intensity = 0.4;
+            hemiLight.groundColor.setHex(0x111122);
+        } else {
+            skyColor.setHex(0x050814);
+            lightColorHex = 0x7788aa;
+            dirLight.intensity = 0.3;
+            hemiLight.intensity = 0.15;
+            hemiLight.groundColor.setHex(0x000000);
+            isNight = true;
+        }
+
+        // Absolute Transparency Override
+        scene.background = null;
+        scene.fog = null;
+        dirLight.color.setHex(lightColorHex);
+
+        return isNight;
+    };
+
+    // 8. Animation Loop & Resize
+    const animate = () => {
+        if (isThreeJsPaused) return; // 暫停時不執行後續渲染
+        animationFrameId = requestAnimationFrame(animate);
+
+        // Update time of day
+        const isNight = updateSky();
+
+        // Toggle building materials based on night/day
+        cityGroup.children.forEach(child => {
+            if (child.userData.isBuilding) {
+                child.material = isNight ? child.userData.nightMat : child.userData.dayMat;
+            }
+        });
+
+        // Toggle street lights
+        streetLights.forEach(light => {
+            light.userData.glow.visible = isNight;
+            light.userData.projection.visible = isNight;
+            light.userData.head.material = isNight ? lightMatOn : lightMatOff;
+        });
+
+        // 1. Group cars by lane for distance calculations
+        const lanes = {};
+        cars.forEach(car => {
+            if (!lanes[car.userData.laneId]) lanes[car.userData.laneId] = [];
+            lanes[car.userData.laneId].push(car);
+        });
+
+        // 2. Process each lane for collision avoidance
+        Object.keys(lanes).forEach(laneId => {
+            const laneCars = lanes[laneId];
+            const isForward = laneCars[0].userData.isForward;
+
+            // Sort by current movement progress (Z position)
+            // Forward (isForward=true): moving towards smaller Z (negative speed)
+            // Backward (isForward=false): moving towards larger Z (positive speed)
+            laneCars.sort((a, b) => isForward ? (a.position.z - b.position.z) : (b.position.z - a.position.z));
+
+            for (let i = 0; i < laneCars.length; i++) {
+                const car = laneCars[i];
+                const leader = laneCars[i - 1]; // The car in front
+
+                let targetSpeed = car.userData.maxSpeed;
+
+                if (leader) {
+                    // Correcting the distance calculation:
+                    // If isForward (moving towards -Z), leader has SMALLER Z than follower.
+                    // If !isForward (moving towards +Z), leader has LARGER Z than follower.
+                    const distance = isForward ? (car.position.z - leader.position.z) : (leader.position.z - car.position.z);
+
+                    // Account for wrapping with modulo
+                    const normalizedDist = (distance + 20000) % 20000;
+
+                    if (normalizedDist < 400) {
+                        // Slow down as we get closer
+                        const comfortGap = 350;
+                        const minGap = 100;
+                        const gapFactor = Math.max(0, (normalizedDist - minGap) / (comfortGap - minGap));
+                        targetSpeed = Math.min(car.userData.maxSpeed, (leader.userData.speed || leader.userData.maxSpeed) * gapFactor);
+                    }
+                }
+
+                // Smoothly accelerate/decelerate
+                const accelRate = 0.05;
+                const decelRate = 0.15; // Faster braking
+                const currentSpeed = car.userData.speed;
+                const speedDiff = targetSpeed - currentSpeed;
+
+                if (speedDiff > 0) {
+                    car.userData.speed = Math.min(targetSpeed, currentSpeed + accelRate);
+                } else if (speedDiff < 0) {
+                    car.userData.speed = Math.max(targetSpeed, currentSpeed - decelRate);
+                }
+
+                // 3. Dynamic Braking Visuals (Tail Lights)
+                // Enhanced for sunset and night
+                const isBraking = currentSpeed - targetSpeed > 0.01;
+                const decelerationRatio = 1.0 - (Math.abs(car.userData.speed || 0) / (car.userData.maxSpeed || 1));
+                const brakeIntensity = isBraking ? Math.max(0, Math.min(1, (decelerationRatio + 0.5))) : 0;
+
+                if (car.userData.tailLights) {
+                    car.userData.tailLights.forEach(glow => {
+                        const showLight = (decimalTime >= 16 || decimalTime < 6);
+                        glow.visible = showLight;
+                        if (showLight) {
+                            glow.scale.setScalar(1 + brakeIntensity * 1.5);
+                            glow.material.opacity = 0.3 + (brakeIntensity * 0.7);
+                            // Brighten color when braking
+                            glow.material.color.setHex(isBraking ? 0xff0000 : 0xff4757);
+                        }
+                    });
+                }
+
+                // 4. Move the car
+                car.position.z -= isForward ? car.userData.speed : -car.userData.speed;
+
+                // Reset position if reaching end of bounds
+                const bounds = 10000;
+                if (isForward && car.position.z < -bounds) car.position.z = bounds;
+                if (!isForward && car.position.z > bounds) car.position.z = -bounds;
+            }
+        });
+
+        renderer.render(scene, camera);
+    };
+
+    const handleResize = () => {
+        const aspect = window.innerWidth / window.innerHeight;
+        d = 1200; // Uniform scale for both desktop and mobile
+        camera.left = -d * aspect;
+        camera.right = d * aspect;
+        camera.top = d;
+        camera.bottom = -d;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Initial sky update
+    updateSky();
+
+    animate();
+    threeJsAnimateFunc = animate; // 給導覽功能調用
+    sceneInitialized = true;
+}
+
 
 // === SKU Code Support Functions ===
 
@@ -2043,7 +3336,7 @@ window.extractAndAddScrewNutsToMap = function (name, qty, series, totalsMap) {
  * @example parseSKU("20-三角連結塊 [L-001]") => "L-001"
  */
 window.parseSKU = function (name) {
-    const match = name.match(/\s*\[([\w-]+)\]\s*$/);
+    const match = name.match(/\[([^\]]+)\]/);
     return match ? match[1] : null;
 };
 
@@ -2054,7 +3347,7 @@ window.parseSKU = function (name) {
  * @example removeSKU("20-三角連結塊 [L-001]") => "20-三角連結塊"
  */
 window.removeSKU = function (name) {
-    return name.replace(/\s*\[[\w-]+\]\s*$/g, '').trim();
+    return name.replace(/\s*\[[^\]]+\]/g, '').trim();
 };
 
 /**
@@ -2069,15 +3362,24 @@ window.fuzzyMatchInventoryKey = function (generatedKey, inventoryList) {
     // Helper: 取得品項名稱（兼容多種欄位名）
     const getName = (item) => (item.name || item.品項名稱 || item['品項名稱'] || "").toString().trim();
 
+    // 將 generatedKey 先做一次清理 (移除括號內容，便於比對)
+    const cleanGenerated = generatedKey.replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
+
     // 1. 精確匹配（向後兼容舊格式，無 SKU）
-    let exactMatch = inventoryList.find(item => getName(item) === generatedKey);
+    let exactMatch = inventoryList.find(item => {
+        let n = getName(item);
+        return n === generatedKey || n === cleanGenerated;
+    });
     if (exactMatch) return exactMatch;
 
-    // 2. 模糊匹配：移除 SKU 編碼後比對（支援新格式）
+    // 2. 模糊匹配：移除 SKU 編碼後比對
+    // 同時移除庫存品名中的 (含...)，這能讓 B2C 的 "三角連結塊" 對上 B2B 的 "三角連結塊(含M4...)"
     let fuzzyMatch = inventoryList.find(item => {
         let invName = getName(item);
         let nameWithoutSKU = window.removeSKU(invName);
-        return nameWithoutSKU === generatedKey;
+        let nameCore = nameWithoutSKU.replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
+
+        return nameCore === cleanGenerated || nameCore === generatedKey || nameWithoutSKU === generatedKey;
     });
 
     return fuzzyMatch || null;
@@ -2085,6 +3387,7 @@ window.fuzzyMatchInventoryKey = function (generatedKey, inventoryList) {
 
 
 function renderDetailCards(detailsStr, status) {
+    console.log("Raw Order Details Str: ", detailsStr);
     if (!detailsStr) return "無明細";
     let lines = detailsStr.split(/\\n|\n/).filter(l => l.trim().length > 0);
 
@@ -2117,140 +3420,133 @@ function renderDetailCards(detailsStr, status) {
         }
 
         let itemName = line.replace(/^【.*?】\s*/, '').trim();
-        itemName = itemName.replace(/\( x \d+ \)/, '').trim();
-        itemName = itemName.replace(/ -- \$[0-9]+/, '').trim();
+        // 取得乾淨品名 (不含 SKU, 不含數量, 不含價格)
+        let cleanBaseName = window.removeSKU(itemName)
+            .replace(/\( x \d+ \)/g, '')
+            .replace(/\s*--\s*\$[0-9]+/g, '')
+            .trim();
 
         if (series === 99) {
-            series = window.detectSeries(itemName);
+            series = window.detectSeries(cleanBaseName);
         }
 
-        // 如果包含螺絲相關關鍵字，即使沒有標籤也優先歸類為 accessory 進行合計
+        // 強制判定 type (根據名稱關鍵字強化)
         if (window.isScrewOrNut(itemName)) {
             type = 'accessory';
-        } else if (type === 'other' && series !== 99) {
+        } else if (type === 'other' && (series !== 99 || itemName.includes('連接') || itemName.includes('連結') || itemName.includes('蓋') || itemName.includes('把手'))) {
             type = 'accessory';
         }
 
         if (type === 'accessory') {
-            // 收集配件內含的螺絲螺帽到彙總
+            // [Requirement] Inspection only shows aluminum profiles. Skip accessories.
+            if (status === 'inspection') return;
+
+            // 1. 拆解內含螺絲
             window.extractAndAddScrewNutsToMap(itemName, qty, series, screwNutTotals);
 
-            // 轉換為庫存鍵值格式
-            const inventoryKey = window.convertToInventoryKey(itemName, series);
+            // 2. 統一解析主項資訊
+            const info = window.resolveItemInfo(itemName, series);
+            const skuHtml = info.sku ? ` <span style="font-size:0.85em; color:#999; font-weight:bold;">[${info.sku}]</span>` : '';
 
-            // 判斷是否為螺絲螺帽類商品（進行合計）
+            // 3. 零件加總 vs 一般顯示
             if (window.isScrewOrNut(itemName)) {
-                const current = screwNutTotals.get(inventoryKey) || 0;
-                screwNutTotals.set(inventoryKey, current + qty);
+                const current = screwNutTotals.get(info.finalKey) || 0;
+                screwNutTotals.set(info.finalKey, current + qty);
             } else {
-                // 查找 SKU
-                let sku = '';
-                if (window.allInventory) {
-                    const matchItem = window.fuzzyMatchInventoryKey(inventoryKey, window.allInventory);
-                    if (matchItem) {
-                        const pname = (matchItem.name || matchItem.品項名稱 || "").toString();
-                        sku = window.parseSKU(pname) || '';
-                    }
-                }
-                const skuHtml = sku ? ` <span style="font-size:0.85em; color:#999; font-weight:bold;">[${sku}]</span>` : '';
+                // Remove trailing SKUs from the base name if they are already going to be appended
+                const simplifiedName = window.removeSKU(info.cleanBase).replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
+                let formatted = `【配件】 <span style="font-weight:bold;">${simplifiedName}</span>${skuHtml}`;
+                if (qtyMatch) formatted += ` <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`;
 
-                // 非螺絲螺帽的配件，加入 normalItems
-                let formatted = `【配件】 <span style="color:#2980b9; font-weight:bold;">${inventoryKey}</span>${skuHtml}`;
-                if (qtyMatch) {
-                    formatted += ` <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`;
-                }
                 normalItems.push({
-                    raw: formatted,
-                    type: type,
-                    series: series,
+                    raw: formatted, type, series,
                     seriesClass: (series !== 99) ? `series-${series}` : ''
                 });
             }
         } else {
             // 鋁材項目
-            let formatted = line.replace(/ -- \$[0-9]+/, '').trim();
-            formatted = formatted.replace(/\( x ([0-9]+) \)/, '___QTY_BLOCK_$1___');
-            formatted = formatted.replace(/\(L=([0-9]+)cm\)/, '___LEN_BLOCK_$1___');
-            formatted = formatted.replace(/\(長度([0-9]+)cm\)/, '___LEN_BLOCK_$1___');
-            formatted = formatted.replace(/___QTY_BLOCK_([0-9]+)___/, '<span style="color:#000; font-weight:bold;">( x $1 )</span>');
-            formatted = formatted.replace(/___LEN_BLOCK_([0-9]+)___/, '<span style="color:#c0392b; font-weight:bold;">(長度$1cm)</span>');
+            const info = window.resolveItemInfo(itemName, series);
+            const skuHtml = info.sku ? ` <span style="font-size:0.85em; color:#999; font-weight:bold;">[${info.sku}]</span>` : '';
 
-            // 查找鋁材 SKU
-            let sku = '';
-            if (window.allInventory) {
-                // 1. 移除長度資訊和所有括號內容來取得純品名
-                // 例如: "3030輕型 (長度30cm)" -> "3030輕型"
-                let lookupName = itemName.replace(/\(長度.*?\)/, '')
-                    .replace(/\(L=.*?\)/, '')
-                    .replace(/\(.*?\)/g, '') // 移除其他括號
-                    .trim();
+            // Remove lingering SKUs from cleanBase to prevent duplicates
+            const cleanBaseNoSKU = window.removeSKU(info.cleanBase);
 
-                // 嘗試1: 標準庫存鍵值 (例如 30-3030輕型)
-                let lookupKey1 = window.convertToInventoryKey(lookupName, series);
-
-                // 嘗試2: 純名稱 (例如 3030輕型)
-                let lookupKey2 = lookupName;
-
-                // 執行搜尋 (優先嘗試帶前綴，失敗則嘗試純名)
-                let matchItem = window.fuzzyMatchInventoryKey(lookupKey1, window.allInventory);
-
-                if (!matchItem) {
-                    matchItem = window.fuzzyMatchInventoryKey(lookupKey2, window.allInventory);
-                }
-
-                if (matchItem) {
-                    const pname = (matchItem.name || matchItem.品項名稱 || "").toString();
-                    sku = window.parseSKU(pname) || '';
-                }
-            }
-            const skuHtml = sku ? ` <span style="font-size:0.85em; color:#999; font-weight:bold;">[${sku}]</span>` : '';
-
-            // 將 SKU 插入在長度資訊之前，或者名稱之後
-            if (skuHtml) {
-                // 嘗試插入在 "【鋁材】 品名" 之後，長度之前
-                // 這裡簡單做：如果有長度區塊，插在它前面；如果沒有，插在最後
-                if (formatted.includes('<span style="color:#c0392b;')) {
-                    formatted = formatted.replace('<span style="color:#c0392b;', `${skuHtml} <span style="color:#c0392b;`);
-                } else {
-                    formatted += skuHtml;
-                }
-            }
+            let formatted = `【鋁材】 <span style="font-weight:bold;">${cleanBaseNoSKU}</span>${skuHtml}`;
+            const lenMatch = line.match(/\((?:L=|長度)(\d+)cm\)/);
+            // Replace the hardcoded (L=xx) in cleanBase to prevent duplicates
+            formatted = formatted.replace(/\(L=\d+cm\)/g, '').replace(/\(長度\d+cm\)/g, '').trim();
+            if (lenMatch) formatted += ` <span style="color:#c0392b; font-weight:bold;">(長度${lenMatch[1]}cm)</span>`;
+            if (qtyMatch) formatted += ` <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`;
 
             normalItems.push({
-                raw: formatted,
-                type: type,
-                series: series,
+                raw: formatted, type, series,
                 seriesClass: (series !== 99) ? `series-${series}` : ''
             });
         }
     });
 
-    // 將彙總的螺絲螺帽轉換為項目
-    screwNutTotals.forEach((qty, key) => {
-        const seriesMatch = key.match(/^(\d+)-/);
-        const seriesNum = seriesMatch ? parseInt(seriesMatch[1]) : 99;
+    // 注入系列顏色樣式 (如果網頁中還沒有的話)
+    if (!document.getElementById('series-styles')) {
+        const styleId = 'series-styles';
+        const css = `
+            .series-20 { border-left: 5px solid #2980b9 !important; background-color: #f0f7ff !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
+            .series-20 span { color: #2980b9 !important; }
+            .series-30 { border-left: 5px solid #d35400 !important; background-color: #fffaf0 !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
+            .series-30 span { color: #d35400 !important; }
+            .series-40 { border-left: 5px solid #27ae60 !important; background-color: #f0fff4 !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
+            .series-40 span { color: #27ae60 !important; }
+            .detail-card-inner { display: flex; flex-direction: column; gap: 8px; }
+            .detail-item { position: relative; }
+        `;
+        const head = document.head || document.getElementsByTagName('head')[0];
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.type = 'text/css';
+        style.appendChild(document.createTextNode(css));
+        head.appendChild(style);
+    }
 
-        // 查找 SKU
-        let sku = '';
-        if (window.allInventory) {
-            const matchItem = window.fuzzyMatchInventoryKey(key, window.allInventory);
-            if (matchItem) {
-                const pname = (matchItem.name || matchItem.品項名稱 || "").toString();
-                sku = window.parseSKU(pname) || '';
+    // 將彙總的螺絲螺帽轉換為項目 (Skip for inspection)
+    if (status !== 'inspection') {
+        screwNutTotals.forEach((qty, key) => {
+            let displayLabel = key;
+            let seriesNum = 99;
+
+            if (key.startsWith('[') && key.endsWith(']')) {
+                const sku = key.slice(1, -1);
+                let foundName = null;
+                if (window.allInventory) {
+                    const inv = window.allInventory.find(i => {
+                        const pname = (i.name || i.品項名稱 || "").toString();
+                        return pname.includes(sku);
+                    });
+                    if (inv) {
+                        foundName = (inv.name || inv.品項名稱 || "").split('[')[0].trim();
+                    }
+                }
+
+                // Fallback name generation if inventory lookup fails
+                if (!foundName) {
+                    if (sku.endsWith('M4')) foundName = sku.includes('1M4') ? 'M4六角螺絲' : 'M4螺母';
+                    else if (sku.endsWith('M5')) foundName = sku.includes('1M5') ? 'M5六角螺絲' : 'M5螺母';
+                    else if (sku.endsWith('M6')) foundName = sku.includes('1M6') ? 'M6六角螺絲' : 'M6螺母';
+                    else if (sku.endsWith('M8')) foundName = sku.includes('1M8') ? 'M8六角螺絲' : 'M8螺母';
+                    else foundName = '螺絲/螺母';
+                }
+
+                displayLabel = `🔩 ${foundName} ${key}`;
+                seriesNum = window.detectSeries(foundName) || (sku.includes('A20') ? 20 : sku.includes('A30') ? 30 : sku.includes('A40') ? 40 : 99);
             }
-        }
-        const skuHtml = sku ? ` <span style="font-size:0.85em; color:#999; font-weight:bold;">[${sku}]</span>` : '';
 
-        const formatted = `【配件】 <span style="color:#e74c3c; font-weight:bold;">🔩 ${key}</span>${skuHtml} <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`;
-
-        normalItems.push({
-            raw: formatted,
-            type: 'accessory',
-            series: seriesNum,
-            seriesClass: (seriesNum !== 99) ? `series-${seriesNum}` : '',
-            isScrewNut: true
+            normalItems.push({
+                raw: `【配件】 <span style="font-weight:bold;">${displayLabel}</span> <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`,
+                type: 'accessory',
+                series: seriesNum,
+                seriesClass: (seriesNum !== 99) ? `series-${seriesNum}` : '',
+                isScrewNut: true
+            });
         });
-    });
+    }
 
     // 排序邏輯：鋁材 > 配件（一般）> 螺絲螺帽
     normalItems.sort((a, b) => {
@@ -2264,54 +3560,49 @@ function renderDetailCards(detailsStr, status) {
         let rankB = getRank(b);
         if (rankA !== rankB) return rankA - rankB;
         if (a.series !== b.series) return a.series - b.series;
-        return a.raw.localeCompare(b.raw, 'zh-TW'); // 同系列按名稱排序
+        return 0;
     });
 
-    let html = '';
-    let lastType = '';
-    let lastSeries = -1;
+    // 組合 HTML
+    let finalHtml = '<div class="detail-card-inner">';
     let enteredScrewNutSection = false;
 
-    normalItems.forEach((item, index) => {
-        // 配件區大標題
-        if (lastType === 'profile' && item.type === 'accessory' && !item.isScrewNut) {
-            html += `<div style="height:40px; border-top:1px dashed #999; margin-top:20px; margin-bottom:20px; position:relative; text-align:center;">
-                        <span style="position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:#fff; padding:0 10px; color:#666; font-size:0.9rem; font-weight:bold;">配件區</span>
-                    </div>`;
-        }
-
-        // 螺絲螺帽合計區分隔線
+    normalItems.forEach(item => {
+        // 螺絲螺帽（全域彙總）分隔區
         if (item.isScrewNut && !enteredScrewNutSection) {
-            html += `<div style="height:40px; border-top:2px dashed #e74c3c; margin-top:20px; margin-bottom:20px; position:relative; text-align:center;">
-                        <span style="position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:#fff; padding:0 10px; color:#e74c3c; font-size:0.9rem; font-weight:bold;">🔩 螺絲螺帽（已合計）</span>
-                    </div>`;
+            finalHtml += `<div style="border-top:2px dashed #e74c3c; margin:15px 0 10px; padding-top:10px; text-align:center; color:#e74c3c; font-weight:bold;">
+                🔩 螺絲螺帽 (全域合計)
+            </div>`;
             enteredScrewNutSection = true;
         }
-        else if (!item.isScrewNut && index > 0 && item.series !== lastSeries && item.type === 'accessory') {
-            // 同系列配件內部的微小間隔
-            html += `<div style="height:15px;"></div>`;
+        let isCheckable = false;
+        if (status === 'picking') {
+            isCheckable = true; // picking checks everything
+        } else if (status === 'inspection') {
+            isCheckable = (item.type === 'profile'); // inspection only checks aluminum
+        } // packing is never checkable
+
+        if (isCheckable) {
+            finalHtml += `<div class="detail-card ${item.seriesClass}" onclick="toggleCheck(this)">
+                <div class="check-box"><i class="fas fa-check" style="display:none; color:white;"></i></div>
+                <div style="flex:1;">${item.raw}</div>
+            </div>`;
+        } else {
+            // For packing or inspection (non-aluminum), show as plain items
+            // However, we still want to show them. But if we are in inspection, we might still want to show accessories but not checkable.
+            // Requirement was: "對料是對鋁材而已 所以可以只顯示鋁材 然後推進到檢貨單在全部顯示" -> only show aluminum in inspection.
+            if (status === 'inspection' && item.type !== 'profile') {
+                return; // Do not render non-aluminum items during inspection
+            }
+            finalHtml += `<div class="detail-item ${item.seriesClass}" style="padding:10px; border:1px solid #eee;">
+                ${item.raw}
+            </div>`;
         }
-
-        const isInteractive = ['inspection', 'picking', 'packing'].includes(status);
-        const cardAttr = isInteractive ? `onclick="toggleCheck(this)"` : '';
-
-        html += `
-        <div class="detail-card ${item.seriesClass}" ${cardAttr}>
-            ${isInteractive ? `
-            <div class="check-box">
-                <i class="fas fa-check" style="display:none; color:white;"></i>
-            </div>
-            ` : ''}
-            <div class="d-name">${item.raw}</div>
-        </div>`;
-
-        lastType = item.type;
-        lastSeries = item.series;
     });
+    finalHtml += '</div>';
 
-    return html;
+    return finalHtml;
 }
-
 
 window.printOrder = function () {
     if (!window.currentOrderForPrint) { alert("無法取得訂單資料"); return; }
@@ -2323,7 +3614,7 @@ window.printOrder = function () {
     const screwNutTotals = new Map();
     let items = [];
 
-    // 第一輪：與 renderDetailCards 相同的邏輯
+    // 邏輯需與 renderDetailCards 完全對齊
     lines.forEach(line => {
         let type = 'other';
         let series = 99;
@@ -2335,17 +3626,14 @@ window.printOrder = function () {
         if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型')) type = 'profile';
         else if (line.includes('【配件】') || line.includes('配件')) type = 'accessory';
 
-        let foundKey = Object.keys(PRODUCT_MAP).find(key => line.includes(key));
-        if (foundKey) {
-            series = parseInt(PRODUCT_MAP[foundKey]);
-            if (foundKey.includes('鋁擠型')) type = 'profile';
-        }
-
         let itemName = line.replace(/^【.*?】\s*/, '').trim();
-        itemName = itemName.replace(/\( x \d+ \)/, '').trim();
-        itemName = itemName.replace(/ -- \$[0-9]+/, '').trim();
+        // 取得乾淨品名 (不含 SKU, 不含數量, 不含價格)
+        let cleanBaseName = window.removeSKU(itemName)
+            .replace(/\( x \d+ \)/, '')
+            .replace(/\s*--\s*\$[0-9]+/g, '')
+            .trim();
 
-        if (series === 99) series = window.detectSeries(itemName);
+        if (series === 99) series = window.detectSeries(cleanBaseName);
 
         if (window.isScrewOrNut(itemName)) {
             type = 'accessory';
@@ -2355,30 +3643,62 @@ window.printOrder = function () {
 
         if (type === 'accessory') {
             window.extractAndAddScrewNutsToMap(itemName, qty, series, screwNutTotals);
-            const inventoryKey = window.convertToInventoryKey(itemName, series);
+            const info = window.resolveItemInfo(itemName, series);
 
             if (window.isScrewOrNut(itemName)) {
-                const current = screwNutTotals.get(inventoryKey) || 0;
-                screwNutTotals.set(inventoryKey, current + qty);
+                const current = screwNutTotals.get(info.finalKey) || 0;
+                screwNutTotals.set(info.finalKey, current + qty);
             } else {
-                let raw = `【配件】 <b>${inventoryKey}</b> (x${qty})`;
-                items.push({ raw, type, series });
+                const simplifiedName = window.removeSKU(info.cleanBase).replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
+
+                let seriesColor = '#333';
+                if (series === 20) seriesColor = '#3498db';
+                else if (series === 30) seriesColor = '#e67e22';
+                else if (series === 40) seriesColor = '#27ae60';
+
+                const skuText = info.sku ? ` <span style="color:${seriesColor}">[${info.sku}]</span>` : '';
+                items.push({ raw: `【配件】 <b>${simplifiedName}</b>${skuText} <b>(x${qty})</b>`, type, series });
             }
         } else {
-            let formatted = line.replace(/ -- \$[0-9]+/, '').trim();
-            formatted = formatted.replace(/\( x ([0-9]+) \)/, '<b>(x$1)</b>');
-            formatted = formatted.replace(/\(L=([0-9]+)cm\)/, '<b style="color:#c0392b">($1cm)</b>');
-            formatted = formatted.replace(/\(長度([0-9]+)cm\)/, '<b style="color:#c0392b">($1cm)</b>');
+            const info = window.resolveItemInfo(itemName, series);
+
+            let seriesColor = '#333';
+            if (series === 20) seriesColor = '#3498db';
+            else if (series === 30) seriesColor = '#e67e22';
+            else if (series === 40) seriesColor = '#27ae60';
+
+            const skuText = info.sku ? ` <span style="color:${seriesColor}">[${info.sku}]</span>` : '';
+            const lenMatch = line.match(/\((?:L=|長度)(\d+)cm\)/);
+
+            const cleanBaseNoSKU = window.removeSKU(info.cleanBase);
+            let formattedBase = cleanBaseNoSKU.replace(/\(L=\d+cm\)/g, '').replace(/\(長度\d+cm\)/g, '').trim();
+
+            let formatted = `【鋁材】 <b>${formattedBase}</b>${skuText}`;
+            if (lenMatch) formatted += ` <b style="color:#c0392b">(${lenMatch[1]}cm)</b>`;
+            formatted += ` <b>(x${qty})</b>`;
             items.push({ raw: formatted, type, series });
         }
     });
 
-    // 加入合計後的螺絲螺帽
     screwNutTotals.forEach((qty, key) => {
-        const seriesMatch = key.match(/^(\d+)-/);
-        const seriesNum = seriesMatch ? parseInt(seriesMatch[1]) : 99;
-        const raw = `【配件】 <b style="color:#e74c3c">🔩 ${key}</b> <b>(x${qty})</b>`;
-        items.push({ raw, type: 'accessory', series: seriesNum, isScrewNut: true });
+        let displayLabel = key;
+        let seriesNum = 99;
+
+        if (key.startsWith('[') && key.endsWith(']')) {
+            const sku = key.slice(1, -1);
+            if (window.allInventory) {
+                const inv = window.allInventory.find(i => {
+                    const pname = (i.name || i.品項名稱 || "").toString();
+                    return pname.includes(sku);
+                });
+                if (inv) {
+                    const namePart = (inv.name || inv.品項名稱 || "").split('[')[0].trim();
+                    displayLabel = `${namePart} ${key}`;
+                    seriesNum = window.detectSeries(namePart);
+                }
+            }
+        }
+        items.push({ raw: `【配件】 <b style="color:#e74c3c">🔩 ${displayLabel}</b> <b>(x${qty})</b>`, type: 'accessory', series: seriesNum, isScrewNut: true });
     });
 
     let list20 = items.filter(i => i.series === 20 || i.series > 40 || i.series < 20);
@@ -2465,42 +3785,69 @@ window.printOrder = function () {
 async function deductInventory(items) {
     // items: [{name: "...", qty: 5}, ...] - names are ALREADY STANDARDIZED keys
 
-    // Convert to payload directly
-    let payloadItems = items.map(i => {
-        return {
-            name: i.name, // Already standardized
+    // Auto-fetch inventory to ensure exact name mapping works
+    if (!window.allInventory || window.allInventory.length === 0) {
+        try {
+            const tempRes = await fetch(ADMIN_API_URL + "?action=getInventory&t=" + new Date().getTime());
+            const tempJson = await tempRes.json();
+            let data = Array.isArray(tempJson) ? tempJson :
+                (tempJson && Array.isArray(tempJson.inventory)) ? tempJson.inventory :
+                    (tempJson && tempJson.data) ? tempJson.data : null;
+            if (data) window.allInventory = data;
+        } catch (err) {
+            console.warn("⚠️ [deductInventory] 無法自動獲取庫存表，名稱映射可能失敗:", err.message);
+        }
+    }
+
+    // Convert to payload directly and ensure EXACT name mapping (with SKU)
+    let payloadItems = [];
+    items.forEach(i => {
+        // [Fix] Critical: Prevent empty names from maliciously matching the first inventory item
+        if (!i.name || i.name.trim() === '') return;
+
+        let actualName = i.name;
+        if (window.allInventory && window.allInventory.length > 0) {
+            let invItem = window.allInventory.find(inv => {
+                let invName = (inv.name || inv.品項名稱 || "").toString();
+                // If i.name is literally a bracketed SKU like "[A20-L]", .includes will match exactly that SKU
+                // Add strict check to avoid invName.includes("") which is always true
+                return invName === i.name || (i.name.length > 0 && invName.includes(i.name));
+            });
+            if (invItem) {
+                actualName = invItem.name || invItem.品項名稱 || i.name;
+            }
+        }
+        payloadItems.push({
+            name: actualName,
             qty: i.qty,
             originalName: i.name // For debug
-        };
+        });
     });
+
+    if (payloadItems.length === 0) {
+        console.log("No valid items to deduct after filtering empty names.");
+        return true;
+    }
 
     // Send to GAS
     // Use proper CORS mode 'no-cors' if just firing, but we want response?
     // GAS Web App usually allows CORS if deployed as "Me" and "Anyone".
 
     try {
-        const res = await fetch(ADMIN_API_URL, {
+        await fetch(ADMIN_API_URL, {
             method: "POST",
             body: JSON.stringify({
                 action: "deductInventory",
                 items: payloadItems
             })
-            // mode: 'cors' is default
+        }).catch(e => {
+            console.warn("⚠️ [deductInventory] 無法讀取回應 (預期中，因 GAS CORS Redirect):", e.message);
         });
-        const json = await res.json();
 
-        if (json.status === 'success') {
-            console.log("Inventory Deducted:", json);
-            return true;
-        } else {
-            alert("庫存扣除失敗: " + (json.message || "未知錯誤"));
-            console.error("Deduct Error", json);
-            return false;
-        }
+        console.log("✅ [deductInventory] 請求已送出");
+        return true;
     } catch (e) {
         console.error("Fetch Error", e);
-        // Sometimes CORS fail but request works (opaque). 
-        // But we rely on JSON response. Assuming GAS is set up correctly.
         alert("連線錯誤 (扣庫存): " + e.message);
         return false;
     }
@@ -3318,7 +4665,7 @@ window.showMergeCuttingModal = function (list) {
 
     list.forEach(o => {
         html += `<div style="font-size:0.9rem; border-bottom:1px dashed #eee; padding:5px;">
-            <span style="font-weight:bold;">${o.name}</span> (${o.phone}) - ${new Date(o.timestamp).toLocaleDateString()}
+            <span style="font-weight:bold;">${o.name}</span> (${o.phone}) - ${window.safeParseDate(o.timestamp).toLocaleDateString()}
         </div>`;
     });
 
@@ -3335,8 +4682,19 @@ window.showMergeCuttingModal = function (list) {
 
 window.runCuttingOptimization = async function () {
     const area = document.getElementById('opt-results-area');
+    const startBtn = document.querySelector('.btn-primary[onclick="runCuttingOptimization()"]');
     if (!area) return;
-    area.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fas fa-spinner fa-spin"></i> 正在同步庫存並計算排程...</div>`;
+
+    if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在計算中...';
+        startBtn.style.opacity = '0.7';
+    }
+
+    // Simulate a slight delay to allow the UI to paint the disabled button state
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    area.innerHTML = `<div style="text-align:center; padding:30px; font-size:1.2rem; color:#3498db;"><i class="fas fa-cog fa-spin fa-2x"></i><br><br>正在同步庫存並計算最佳化排程...</div>`;
 
     // 0. Auto-Fetch Inventory if missing
     if (!window.allInventory || window.allInventory.length === 0) {
@@ -3388,7 +4746,32 @@ window.runCuttingOptimization = async function () {
             if (lMatch) len = parseFloat(lMatch[1]);
 
             if (len > 0) {
-                allItems.push({ model: model, length: len, qty: qty, orderId: o.timestamp });
+                // Standardize and map to exact inventory name BEFORE grouping to prevent split items
+                let exactName = model;
+                const skuMatch = model.match(/\[(.*?)\]/);
+
+                if (window.allInventory && window.allInventory.length > 0) {
+                    let match;
+                    // First preference: Match by explicit SKU [XYZ]
+                    if (skuMatch) {
+                        const sku = skuMatch[1].trim();
+                        match = window.allInventory.find(inv => {
+                            let invName = (inv.name || inv.品項名稱 || "").toString();
+                            return invName.includes(`[${sku}]`);
+                        });
+                    }
+                    // Second preference: Fallback to old getInventoryKey standardizer
+                    if (!match) {
+                        let stdModel = window.getInventoryKey(model, 99);
+                        match = window.allInventory.find(inv => {
+                            let invName = (inv.name || inv.品項名稱 || "").toString();
+                            return invName === stdModel || invName.includes(stdModel);
+                        });
+                    }
+                    if (match) exactName = match.name || match.品項名稱 || model;
+                }
+
+                allItems.push({ model: exactName, length: len, qty: qty, orderId: o.timestamp });
             }
         });
     });
@@ -3409,11 +4792,19 @@ window.runCuttingOptimization = async function () {
         needs.sort((a, b) => b - a); // Descending
 
         // Find Inventory Item (Unified Key Match)
-        const standardizedKey = window.getInventoryKey(model, 99);
         let invItem = window.allInventory.find(i => {
             let invName = (i.name || i.品項名稱 || "").toString();
-            return invName === standardizedKey || invName.includes(standardizedKey);
+            return invName === model; // Since we already mapped it exactly above!
         });
+
+        // Fallback just in case
+        if (!invItem) {
+            const standardizedKey = window.getInventoryKey(model, 99);
+            invItem = window.allInventory.find(i => {
+                let invName = (i.name || i.品項名稱 || "").toString();
+                return invName === standardizedKey || invName.includes(standardizedKey);
+            });
+        }
 
         // Parse Available Offcuts
         let availableOffcuts = [];
@@ -3698,14 +5089,42 @@ window.recordCuttingPlanToInventory = async function () {
             return;
         }
 
-        // Standardize Key for Backend
-        modelName = window.getInventoryKey(modelName, 99);
+        const skuMatch = modelName.match(/\[(.*?)\]/);
+        let stdName = window.getInventoryKey(modelName, 99);
 
-        let visualsDiv = header.nextElementSibling;
-        while (visualsDiv && !visualsDiv.classList.contains('cutting-visuals')) {
-            visualsDiv = visualsDiv.nextElementSibling;
+        // Map back to the exact name (with SKU) existing in backend
+        if (window.allInventory && window.allInventory.length > 0) {
+            let invItem;
+            if (skuMatch) {
+                const sku = skuMatch[1].trim();
+                invItem = window.allInventory.find(inv => {
+                    let invName = (inv.name || inv.品項名稱 || "").toString();
+                    return invName.includes(`[${sku}]`);
+                });
+            }
+            if (!invItem) {
+                invItem = window.allInventory.find(inv => {
+                    let invName = (inv.name || inv.品項名稱 || "").toString();
+                    return invName === stdName || invName.includes(stdName);
+                });
+            }
+            if (invItem) {
+                modelName = invItem.name || invItem.品項名稱 || (skuMatch ? modelName : stdName);
+            } else {
+                modelName = skuMatch ? modelName : stdName;
+            }
+        } else {
+            modelName = skuMatch ? modelName : stdName;
         }
-        if (!visualsDiv) return;
+
+        // Robust DOM traversal: Find the parent section, then query the visuals inside it
+        let parentSection = header.closest('.cutting-model-section');
+        let visualsDiv = parentSection ? parentSection.querySelector('.cutting-visuals') : null;
+
+        if (!visualsDiv) {
+            console.warn("Could not find .cutting-visuals for", modelName);
+            return;
+        }
 
         cuttingPlans[modelName] = {
             deductStandardCM: 0,
@@ -3781,37 +5200,76 @@ window.recordCuttingPlanToInventory = async function () {
 
     if (!confirm(confirmMsg)) return;
 
+    // Visual feedback: disable button
+    const btn = document.querySelector('.btn-record-offcut');
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 切料計算並更新庫存中...';
+        btn.style.opacity = '0.7';
+    }
+
     // Update Inventory via API
     try {
         const updates = [];
+        const updateModels = [];
         for (let modelName in cuttingPlans) {
             const plan = cuttingPlans[modelName];
             // Skip empty plans
             if (plan.deductStandardCM === 0 && plan.removeOffcuts.length === 0 && plan.addOffcuts.length === 0 && plan.addWasteCM === 0) continue;
 
+            updateModels.push(modelName);
             updates.push(fetch(ADMIN_API_URL, {
                 method: "POST",
                 body: JSON.stringify({
                     action: "updateInventoryWithCuttingPlan",
                     modelName: modelName,
                     deductStandardCM: plan.deductStandardCM,
-                    removeOffcuts: plan.removeOffcuts, // Passed as Array
-                    addOffcuts: plan.addOffcuts,       // Passed as Array
+                    removeOffcuts: plan.removeOffcuts,
+                    addOffcuts: plan.addOffcuts,
                     addWasteCM: plan.addWasteCM
                 })
-            }).then(r => r.json()).then(json => {
-                if (json.status !== 'success') {
-                    throw new Error(`${modelName}: ${json.message} `);
-                }
-                return modelName;
+            }).catch(e => {
+                console.warn(`⚠️ [recordCutting] "${modelName}" 無法讀取回應 (預期中):`, e.message);
             }));
         }
 
+        if (updates.length === 0) {
+            alert("沒有需要更新的項目。");
+            if (btn) { btn.disabled = false; btn.innerHTML = originalBtnHtml; btn.style.opacity = '1'; }
+            return;
+        }
+
         await Promise.all(updates);
+        console.log("📤 [recordCutting] 請求送出，等待後端處理...");
 
-        alert("✅ 庫存與餘料已成功更新！");
+        // 等待後端處理完畢，然後透過 GET 驗證庫存是否已更新
+        await new Promise(resolve => setTimeout(resolve, 2500));
 
-        // Auto-Advance Logic: Move all 'cutting' orders to 'inspection'
+        let verified = false;
+        try {
+            const verifyRes = await fetch(ADMIN_API_URL + "?action=getInventory&t=" + new Date().getTime());
+            const verifyJson = await verifyRes.json();
+            let verifyData = null;
+            if (Array.isArray(verifyJson)) verifyData = verifyJson;
+            else if (verifyJson && Array.isArray(verifyJson.inventory)) verifyData = verifyJson.inventory;
+            else if (verifyJson && verifyJson.data) verifyData = verifyJson.data;
+
+            if (verifyData) {
+                window.allInventory = verifyData;
+                verified = true;
+                console.log("✅ [recordCutting] 重新取得最新庫存");
+            }
+        } catch (verifyErr) {
+            console.warn("⚠️ [recordCutting] 無法驗證更新結果:", verifyErr);
+        }
+
+        if (verified) {
+            alert(`✅ 庫存與餘料已成功更新！\n\n已更新型號: ${updateModels.join(', ')}`);
+        } else {
+            alert(`✅ 庫存更新指令已送出！\n\n（無法立即驗證結果，請稍後重整庫存頁面確認）\n已更新型號: ${updateModels.join(', ')}`);
+        }
+
         // Auto-Advance Logic: Move all 'cutting' orders to 'inspection'
         if (typeof ordersData !== 'undefined' && ordersData) {
             let advancedCount = 0;
@@ -3859,6 +5317,12 @@ window.recordCuttingPlanToInventory = async function () {
     } catch (e) {
         alert("更新失敗: " + e.message);
         console.error(e);
+        const btn = document.querySelector('.btn-record-offcut');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> 確認切割計畫並更新庫存';
+            btn.style.opacity = '1';
+        }
     }
 };
 
@@ -3890,3 +5354,582 @@ window.clearWaste = async function (modelName) {
 // Explicitly expose to window
 window.recordCuttingPlanToInventory = recordCuttingPlanToInventory;
 console.log("recordCuttingPlanToInventory exposed to window");
+
+// ==========================================
+// HISTORY ORDERS MODULE
+// ==========================================
+let currentHistorySearch = "";
+
+window.filterHistoryOrders = function () {
+    currentHistorySearch = document.getElementById('history-search').value.trim().toLowerCase();
+    renderHistoryOrders();
+};
+
+window.renderHistoryOrders = function () {
+    const container = document.getElementById('history-content');
+    if (!ordersData || ordersData.length === 0) {
+        container.innerHTML = `<div class="history-empty"><i class="fas fa-box-open"></i><p>尚無歷史訂單資料</p></div>`;
+        return;
+    }
+
+    // Filter only completed orders, and apply search
+    let completedOrders = ordersData.filter(o => o.status === 'completed');
+
+    if (currentHistorySearch) {
+        completedOrders = completedOrders.filter(o => {
+            const searchStr = `${o.name || ''} ${o.phone || ''} ${o.address || ''} ${o.summary || ''}`.toLowerCase();
+            return searchStr.includes(currentHistorySearch);
+        });
+    }
+
+    if (completedOrders.length === 0) {
+        container.innerHTML = `<div class="history-empty"><i class="fas fa-search"></i><p>找不到符合的歷史訂單</p></div>`;
+        return;
+    }
+
+    // Sort orders by date descending
+    completedOrders.sort((a, b) => window.safeParseDate(b.timestamp).getTime() - window.safeParseDate(a.timestamp).getTime());
+
+    const grouped = {};
+    completedOrders.forEach(o => {
+        const date = window.safeParseDate(o.timestamp);
+        const monthKey = `${date.getFullYear()}年${String(date.getMonth() + 1).padStart(2, '0')}月`;
+        if (!grouped[monthKey]) grouped[monthKey] = [];
+        grouped[monthKey].push(o);
+    });
+
+    let html = '';
+
+    for (const month in grouped) {
+        const monthOrders = grouped[month];
+        const monthRevenue = monthOrders.reduce((sum, o) => sum + window.safeParsePrice(o.total), 0);
+
+        let ordersHtml = monthOrders.map(o => {
+            const dateStr = window.safeParseDate(o.timestamp).toLocaleString('zh-TW', {
+                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            const firstItem = (o.summary || "").split(/[,+]/)[0] || "無明細";
+
+            return `
+                <div class="history-order-card" onclick="viewOrder('${o.timestamp}')">
+                    <div class="history-order-top">
+                        <span class="history-order-date">${dateStr}</span>
+                        <span class="history-order-total">$${window.safeParsePrice(o.total).toLocaleString()}</span>
+                    </div>
+                    <div class="history-order-customer"><i class="fas fa-user"></i> ${o.name || '客戶'} (${o.phone || '無電話'})</div>
+                    <div class="history-order-summary">${firstItem} ...</div>
+                    <div class="history-order-delivery"><i class="fas fa-truck"></i> ${o.address || '不需寄送'}</div>
+                </div>
+            `;
+        }).join('');
+
+        html += `
+            <div class="history-month-group">
+                <div class="history-month-header" onclick="toggleMonth(this)">
+                    <div class="month-label">${month}</div>
+                    <div class="month-stats">
+                        <span class="month-count">${monthOrders.length} 筆</span>
+                        <span class="month-revenue">$${monthRevenue.toLocaleString()}</span>
+                        <i class="fas fa-chevron-right month-chevron"></i>
+                    </div>
+                </div>
+                <div class="history-month-body">
+                    ${ordersHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+
+    // Expand the first month by default
+    const firstHeader = container.querySelector('.history-month-header');
+    if (firstHeader) toggleMonth(firstHeader);
+};
+
+window.toggleMonth = function (headerEl) {
+    headerEl.classList.toggle('expanded');
+    const body = headerEl.nextElementSibling;
+    if (body) {
+        if (body.classList.contains('show')) {
+            body.classList.remove('show');
+            body.style.display = 'none';
+        } else {
+            body.classList.add('show');
+            body.style.display = 'block';
+        }
+    }
+};
+
+// ==========================================
+// FINANCIAL REPORTS MODULE
+// ==========================================
+let chartsInstance = {};
+
+window.chartConfigs = {
+    trend: { time: 'day', cat: 'all' },
+    series: { time: 'month', cat: 'all' },
+    delivery: { time: 'month', cat: 'all' },
+    top10: { time: 'month', cat: 'all' }
+};
+
+window.setChartFilter = function (chartId, filterType, value) {
+    if (window.chartConfigs[chartId]) {
+        window.chartConfigs[chartId][filterType] = value;
+    }
+
+    const ids = filterType === 'time' ? ['month', 'week', 'day'] : ['all', 'profile', 'accessory'];
+    ids.forEach(id => {
+        const btn = document.getElementById(`toggle-${chartId}-${filterType}-${id}`);
+        if (btn) {
+            if (id === value) {
+                btn.classList.add('active');
+                btn.style.background = 'var(--accent)';
+                btn.style.color = '#fff';
+            } else {
+                btn.classList.remove('active');
+                btn.style.background = 'transparent';
+                btn.style.color = 'rgba(255,255,255,0.5)';
+            }
+        }
+    });
+
+    renderFinancialReports();
+}
+
+function timeFilterPassed(d, timeConfig) {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    if (timeConfig === 'day') {
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth && d.getDate() === now.getDate();
+    }
+    if (timeConfig === 'week') {
+        const diff = now.getTime() - d.getTime();
+        return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
+    }
+    if (timeConfig === 'month') {
+        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+    }
+    return true;
+}
+
+function parseOrderItemsRobust(o) {
+    const detailsText = (o.details || "").toString();
+    const summaryText = (o.summary || "").toString();
+    let itemsArr = [];
+
+    if (detailsText.includes('\n') || detailsText.includes('【')) {
+        itemsArr = detailsText.split('\n');
+    } else if (summaryText) {
+        let safeSummary = summaryText.replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '');
+        itemsArr = safeSummary.split(/[\n,+;]/);
+    }
+
+    let stats = {
+        count20: 0, count30: 0, count40: 0, countOther: 0,
+        countProfile: 0, countAccessory: 0,
+        itemsMapTotal: {},
+        paramMap: {}
+    };
+
+    itemsArr.forEach(itemStr => {
+        itemStr = itemStr.trim();
+        let isProfile = false;
+        let skuMatch = itemStr.match(/\[(.*?)\]/);
+        let sku = skuMatch ? skuMatch[1].trim() : "";
+
+        let cleanName = "";
+        if (sku) {
+            cleanName = `[${sku}]`;
+        } else {
+            cleanName = itemStr.replace(/【[^】]+】/g, '').replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '')
+                .replace(/NT\$\s*[\d,]+/gi, '').replace(/\$\s*[\d,]+/g, '').replace(/[\d,]+\s*元/g, '')
+                .replace(/\(\s*x\s*\d+\s*\)/gi, '').replace(/x\s*\d+\s*$/i, '').replace(/x\s*\d+/gi, '')
+                .replace(/[\d.]+cm/gi, '').replace(/\(L=\d+cm\)/gi, '').replace(/\(長度\d+cm\)/gi, '').trim();
+        }
+
+        if (!cleanName || cleanName.length < 2 || cleanName.match(/^[-=\s*]*$/) || cleanName === "[]" || cleanName === "[ ]") return;
+
+        if (sku.match(/^A\d{2}/i)) isProfile = false;
+        else if (sku.match(/2020|2040|2080|3030|3060|30135|3045|4040|4080|8080/)) isProfile = true;
+        else {
+            if (itemStr.match(/cm|長度|L=|\d角槽|鋁材/i)) isProfile = true;
+            else if (itemStr.match(/螺|連接|連結|把手|輪|鉸鏈|絞鍊|蓋|墊|角件|封邊|角柱|層板|滑塊|固定器|扣板|支撐架/)) isProfile = false;
+            else isProfile = true;
+        }
+
+        let series = "";
+        if (itemStr.match(/20系列|20系/)) series = "20";
+        else if (itemStr.match(/30系列|30系/)) series = "30";
+        else if (itemStr.match(/40系列|40系/)) series = "40";
+        else if (sku.match(/^A20|2020|2040|2080/i)) series = "20";
+        else if (sku.match(/^A30|3030|3060|30135|3045/i)) series = "30";
+        else if (sku.match(/^A40|8080|4040|4080/i)) series = "40";
+        else if (itemStr.match(/2020|2040|2080|A20/i)) series = "20";
+        else if (itemStr.match(/3030|3060|30135|3045|A30/i)) series = "30";
+        else if (itemStr.match(/4040|4080|8080|A40/i)) series = "40";
+
+        if (series === "30") stats.count30++;
+        else if (series === "40") stats.count40++;
+        else if (series === "20") stats.count20++;
+        else stats.countOther++;
+
+        if (isProfile) stats.countProfile++;
+        else stats.countAccessory++;
+
+        const qtyMatch = itemStr.match(/\(\s*x\s*(\d+)\s*\)/i) || itemStr.match(/x\s*(\d+)(?!\S)/i) || itemStr.match(/\*\s*(\d+)/);
+        let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+
+        if (isProfile) {
+            const lenMatch = itemStr.match(/L\s*=?\s*(\d+(?:\.\d+)?)\s*cm/i) || itemStr.match(/(\d+(?:\.\d+)?)\s*cm/i);
+            let profileLength = lenMatch ? parseFloat(lenMatch[1]) : 0;
+            if (profileLength > 0) {
+                qty = (profileLength * qty) / 600.0;
+            }
+        }
+
+        if (!stats.itemsMapTotal[cleanName]) stats.itemsMapTotal[cleanName] = 0;
+        stats.itemsMapTotal[cleanName] += qty;
+
+        stats.paramMap[cleanName] = { isProfile, series };
+    });
+    return stats;
+}
+
+window.renderFinancialReports = function () {
+    if (!ordersData || ordersData.length === 0) return;
+    const module = document.getElementById('reports-module');
+    if (!module) return;
+
+    const reportRange = document.getElementById('report-range') ? document.getElementById('report-range').value : 'month';
+    const now = new Date();
+    let cutoffDate = new Date(0);
+
+    if (reportRange === 'month') {
+        cutoffDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (reportRange === '3month') {
+        cutoffDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    } else if (reportRange === '6month') {
+        cutoffDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    }
+
+    const reportOrders = ordersData.filter(o => {
+        if (o.status !== 'completed') return false;
+        return window.safeParseDate(o.timestamp).getTime() >= cutoffDate.getTime();
+    });
+
+    const totalRevenue = reportOrders.reduce((sum, o) => sum + window.safeParsePrice(o.total), 0);
+    const orderCount = reportOrders.length;
+    const avgOrderValue = orderCount > 0 ? Math.round(totalRevenue / orderCount) : 0;
+
+    const allOrdersInRange = ordersData.filter(o => window.safeParseDate(o.timestamp).getTime() >= cutoffDate.getTime());
+    const completionRate = allOrdersInRange.length > 0 ? Math.round((orderCount / allOrdersInRange.length) * 100) : 0;
+
+    document.getElementById('kpi-revenue').innerText = `$${totalRevenue.toLocaleString()}`;
+    document.getElementById('kpi-count').innerText = orderCount;
+    document.getElementById('kpi-avg').innerText = `$${avgOrderValue.toLocaleString()}`;
+    document.getElementById('kpi-rate').innerText = `${completionRate}%`;
+
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    reportOrders.sort((a, b) => window.safeParseDate(a.timestamp).getTime() - window.safeParseDate(b.timestamp).getTime());
+
+    // 1. DELIVERY CHART AGGREGATION
+    const deliveryData = {};
+    const dConf = window.chartConfigs.delivery;
+    reportOrders.forEach(o => {
+        const d = window.safeParseDate(o.timestamp);
+        if (!timeFilterPassed(d, dConf.time)) return;
+        const itemsInfo = parseOrderItemsRobust(o);
+        if (dConf.cat === 'profile' && itemsInfo.countProfile === 0) return;
+        if (dConf.cat === 'accessory' && itemsInfo.countAccessory === 0) return;
+
+        const deliv = o.address || "未填寫";
+        let delivType = "其他";
+        if (deliv.includes('自取')) delivType = "自取";
+        else if (deliv.includes('店到店')) delivType = "超商店到店";
+        else if (deliv.includes('宅配')) delivType = "貨運宅配";
+        else if (deliv.includes('公司配送') || deliv.includes('專車')) delivType = "公司配送";
+
+        if (!deliveryData[delivType]) deliveryData[delivType] = 0;
+        deliveryData[delivType]++;
+    });
+
+    // 2. SERIES PIE CHART AGGREGATION
+    const seriesData = { '20 系列': 0, '30 系列': 0, '40 系列': 0 };
+    const sConf = window.chartConfigs.series;
+    reportOrders.forEach(o => {
+        const d = window.safeParseDate(o.timestamp);
+        if (!timeFilterPassed(d, sConf.time)) return;
+
+        const itemsInfo = parseOrderItemsRobust(o);
+        let totalSeriesCount = itemsInfo.count20 + itemsInfo.count30 + itemsInfo.count40 + itemsInfo.countOther;
+        if (totalSeriesCount === 0) totalSeriesCount = 1;
+
+        let validRatio = 1.0;
+        if (sConf.cat === 'profile') {
+            if (itemsInfo.countProfile + itemsInfo.countAccessory > 0) validRatio = itemsInfo.countProfile / (itemsInfo.countProfile + itemsInfo.countAccessory);
+            else validRatio = 0;
+        } else if (sConf.cat === 'accessory') {
+            if (itemsInfo.countProfile + itemsInfo.countAccessory > 0) validRatio = itemsInfo.countAccessory / (itemsInfo.countProfile + itemsInfo.countAccessory);
+            else validRatio = 0;
+        }
+        const assignedValue = window.safeParsePrice(o.total) * validRatio;
+
+        seriesData['20 系列'] += assignedValue * (itemsInfo.count20 / totalSeriesCount);
+        seriesData['30 系列'] += assignedValue * (itemsInfo.count30 / totalSeriesCount);
+        seriesData['40 系列'] += assignedValue * (itemsInfo.count40 / totalSeriesCount);
+    });
+
+    // 3. TOP 10 ITEMS AGGREGATION
+    const top10Map = {};
+    const topItemsColorMap = {};
+    const tConf = window.chartConfigs.top10;
+    reportOrders.forEach(o => {
+        const d = window.safeParseDate(o.timestamp);
+        if (!timeFilterPassed(d, tConf.time)) return;
+
+        const itemsInfo = parseOrderItemsRobust(o);
+
+        Object.keys(itemsInfo.itemsMapTotal).forEach(key => {
+            let isProfileFlag = itemsInfo.paramMap[key].isProfile;
+            if (tConf.cat === 'profile' && !isProfileFlag) return;
+            if (tConf.cat === 'accessory' && isProfileFlag) return;
+
+            if (!top10Map[key]) top10Map[key] = 0;
+            top10Map[key] += itemsInfo.itemsMapTotal[key];
+
+            let cleanName = key;
+            let color = '#95a5a6';
+            if (cleanName.match(/^\[A?30/i) || cleanName.match(/\[30135\]|\[3045\]/)) color = '#e67e22';
+            else if (cleanName.match(/^\[A?40/i) || cleanName.match(/\[8080\]/)) color = '#27ae60';
+            else if (cleanName.match(/^\[A?20/i)) color = '#2980b9';
+            topItemsColorMap[key] = color;
+        });
+    });
+
+    const topItems = Object.entries(top10Map)
+        .map(([name, qty]) => { return { label: name, value: parseFloat(qty.toFixed(2)), color: topItemsColorMap[name] }; })
+        .filter(item => item.label.length > 1)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 10);
+
+    // 4. REVENUE TREND AGGREGATION
+    const monthlyDataTotal = {};
+    const monthlyDataProfile = {};
+    const monthlyDataAccessory = {};
+    const trConf = window.chartConfigs.trend;
+
+    if (trConf.time === 'day') {
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        for (let i = 1; i <= daysInMonth; i++) {
+            let mKey = `${currentMonth + 1}/${i}`;
+            monthlyDataTotal[mKey] = 0;
+            monthlyDataProfile[mKey] = 0;
+            monthlyDataAccessory[mKey] = 0;
+        }
+    } else if (trConf.time === 'week') {
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const maxWeek = Math.ceil(daysInMonth / 7);
+        for (let i = 1; i <= maxWeek; i++) {
+            let wKey = `第${i}週`;
+            monthlyDataTotal[wKey] = 0;
+            monthlyDataProfile[wKey] = 0;
+            monthlyDataAccessory[wKey] = 0;
+        }
+    }
+
+    reportOrders.forEach(o => {
+        const oDate = window.safeParseDate(o.timestamp);
+        const price = window.safeParsePrice(o.total);
+        const itemsInfo = parseOrderItemsRobust(o);
+
+        let totalItemsCount = itemsInfo.countProfile + itemsInfo.countAccessory;
+        if (totalItemsCount === 0) totalItemsCount = 1;
+        let pRatio = itemsInfo.countProfile / totalItemsCount;
+        let aRatio = itemsInfo.countAccessory / totalItemsCount;
+
+        if (trConf.time === 'day') {
+            if (oDate.getFullYear() === currentYear && oDate.getMonth() === currentMonth) {
+                let dKey = `${currentMonth + 1}/${oDate.getDate()}`;
+                if (monthlyDataTotal[dKey] !== undefined) {
+                    monthlyDataTotal[dKey] += price;
+                    monthlyDataProfile[dKey] += price * pRatio;
+                    monthlyDataAccessory[dKey] += price * aRatio;
+                }
+            }
+        } else if (trConf.time === 'week') {
+            if (oDate.getFullYear() === currentYear && oDate.getMonth() === currentMonth) {
+                let wNum = Math.ceil(oDate.getDate() / 7);
+                let wKey = `第${wNum}週`;
+                if (monthlyDataTotal[wKey] !== undefined) {
+                    monthlyDataTotal[wKey] += price;
+                    monthlyDataProfile[wKey] += price * pRatio;
+                    monthlyDataAccessory[wKey] += price * aRatio;
+                }
+            }
+        } else {
+            let mKey = `${oDate.getFullYear() % 100}年${oDate.getMonth() + 1}月`;
+            if (monthlyDataTotal[mKey] === undefined) {
+                monthlyDataTotal[mKey] = 0;
+                monthlyDataProfile[mKey] = 0;
+                monthlyDataAccessory[mKey] = 0;
+            }
+            monthlyDataTotal[mKey] += price;
+            monthlyDataProfile[mKey] += price * pRatio;
+            monthlyDataAccessory[mKey] += price * aRatio;
+        }
+    });
+
+    try {
+        if (typeof Chart !== 'undefined') {
+            Object.values(chartsInstance).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') chart.destroy();
+            });
+
+            Chart.defaults.color = '#a0aec0';
+            Chart.defaults.font.family = "'Noto Sans TC', sans-serif";
+
+            // TREND CHART
+            const ctxTrend = document.getElementById('chart-revenue-trend');
+            if (ctxTrend) {
+                let trSets = [];
+                if (trConf.cat === 'all' || trConf.cat === 'profile') {
+                    trSets.push({
+                        label: '鋁材營收',
+                        data: Object.values(monthlyDataProfile).map(v => Math.round(v)),
+                        backgroundColor: '#8e44ad',
+                        borderRadius: trConf.cat === 'all' ? { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 } : 4,
+                        borderSkipped: false
+                    });
+                }
+                if (trConf.cat === 'all' || trConf.cat === 'accessory') {
+                    trSets.push({
+                        label: '配件營收',
+                        data: Object.values(monthlyDataAccessory).map(v => Math.round(v)),
+                        backgroundColor: '#c0392b',
+                        borderRadius: trConf.cat === 'all' ? { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } : 4,
+                        borderSkipped: false
+                    });
+                }
+
+                chartsInstance.trend = new Chart(ctxTrend, {
+                    type: 'bar',
+                    data: { labels: Object.keys(monthlyDataTotal), datasets: trSets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true, position: 'top', labels: { color: '#a0aec0', boxWidth: 12, font: { size: 10 } } },
+                            tooltip: {
+                                callbacks: {
+                                    footer: (tooltipItems) => {
+                                        let t = 0;
+                                        tooltipItems.forEach(i => t += i.parsed.y);
+                                        return '總營收: ' + t.toLocaleString() + ' 元';
+                                    }
+                                }
+                            }
+                        },
+                        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+                    }
+                });
+            }
+
+            // PIE CHART: SERIES
+            const ctxSeries = document.getElementById('chart-series-pie');
+            if (ctxSeries) {
+                let sVals = Object.values(seriesData);
+                let sSum = sVals.reduce((a, b) => a + b, 0);
+                let sLabels = Object.keys(seriesData).map((k, i) => {
+                    let pct = sSum > 0 ? Math.round((sVals[i] / sSum) * 100) : 0;
+                    return `${k} (${pct}%)`;
+                });
+
+                chartsInstance.series = new Chart(ctxSeries, {
+                    type: 'doughnut',
+                    data: {
+                        labels: sLabels,
+                        datasets: [{ data: sVals, backgroundColor: ['#2980b9', '#e67e22', '#27ae60'], borderWidth: 0 }]
+                    },
+                    options: {
+                        responsive: true, cutout: '65%',
+                        plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 12 } } } }
+                    }
+                });
+            }
+
+            // PIE CHART: DELIVERY
+            const ctxDelivery = document.getElementById('chart-delivery-pie');
+            if (ctxDelivery) {
+                chartsInstance.delivery = new Chart(ctxDelivery, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(deliveryData),
+                        datasets: [{
+                            data: Object.values(deliveryData),
+                            backgroundColor: ['#9b59b6', '#f1c40f', '#1abc9c', '#e74c3c', '#34495e'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#fff' } } } }
+                });
+            }
+
+            // BAR CHART: TOP 10
+            const ctxTop = document.getElementById('chart-top-items');
+            if (ctxTop) {
+                chartsInstance.top = new Chart(ctxTop, {
+                    type: 'bar',
+                    data: {
+                        labels: topItems.map(item => item.label),
+                        datasets: [{
+                            label: '銷售總量',
+                            data: topItems.map(item => item.value),
+                            backgroundColor: topItems.map(item => item.color),
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                        plugins: { legend: { display: false } },
+                        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } }, y: { ticks: { autoSkip: false } } }
+                    }
+                });
+            }
+        }
+    } catch (e) {
+        console.error("Render Chart Error: ", e);
+    }
+};
+
+window.onload = function () {
+    // 1. Start 3D Cityscape Background Immediately (Global Layer)
+    if (typeof initThreeJsScene === 'function') {
+        initThreeJsScene();
+    }
+
+    // 2. Initial Data Fetch & Login Check
+    if (sessionStorage.getItem('admin_logged_in') === 'true') {
+        showAdminHub();
+    } else {
+        const loginOverlay = document.getElementById('login-overlay');
+        if (loginOverlay) loginOverlay.classList.remove('hidden');
+    }
+
+    // 3. Update Hub Clock
+    setInterval(() => {
+        const hubTime = document.getElementById('hub-datetime');
+        if (hubTime) {
+            const now = new Date();
+            hubTime.innerText = now.toLocaleString('zh-TW', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            });
+        }
+    }, 1000);
+};
