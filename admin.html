@@ -64,7 +64,7 @@
                         <h3>歷史訂單</h3>
                         <p>已完成訂單歸檔 · 月份分類 · 查詢明細</p>
                         <div class="hub-card-stat" id="hub-stat-history">
-                            <i class="fas fa-check-circle"></i> 載入中...
+                            <i class="fas fa-check-circle"></i> 累計完成 0 筆
                         </div>
                     </div>
                     <div class="hub-card-arrow"><i class="fas fa-chevron-right"></i></div>
@@ -77,12 +77,50 @@
                         <h3>財務報表</h3>
                         <p>營收分析 · 圖表統計 · 經營數據</p>
                         <div class="hub-card-stat" id="hub-stat-reports">
-                            <i class="fas fa-dollar-sign"></i> 載入中...
+                            <i class="fas fa-dollar-sign"></i> 本月營收 $0
                         </div>
                     </div>
                     <div class="hub-card-arrow"><i class="fas fa-chevron-right"></i></div>
                 </div>
 
+                <!-- 今日工單 Shortcut -->
+                <div class="hub-card hub-card-shortcut hub-card-work" onclick="navigateTo('orders', 'work')">
+                    <div class="hub-card-icon"><i class="fas fa-tools"></i></div>
+                    <div class="hub-card-content">
+                        <h3>今日工單</h3>
+                        <p>直接進行切料與生產排程</p>
+                        <div class="hub-card-stat" id="hub-stat-shortcut-work">
+                            <i class="fas fa-tasks"></i> 剩餘 0 筆
+                        </div>
+                    </div>
+                    <div class="hub-card-arrow"><i class="fas fa-chevron-right"></i></div>
+                </div>
+
+                <!-- 今日出貨 Shortcut -->
+                <div class="hub-card hub-card-shortcut hub-card-shipment" onclick="navigateTo('orders', 'shipment')">
+                    <div class="hub-card-icon"><i class="fas fa-shipping-fast"></i></div>
+                    <div class="hub-card-content">
+                        <h3>今日出貨</h3>
+                        <p>檢查待包裝與準備出貨清單</p>
+                        <div class="hub-card-stat" id="hub-stat-shortcut-shipment">
+                            <i class="fas fa-box"></i> 待出 0 筆
+                        </div>
+                    </div>
+                    <div class="hub-card-arrow"><i class="fas fa-chevron-right"></i></div>
+                </div>
+
+                <!-- 庫存查詢 Shortcut -->
+                <div class="hub-card hub-card-shortcut hub-card-inventory" onclick="navigateTo('orders', 'inventory')">
+                    <div class="hub-card-icon"><i class="fas fa-warehouse"></i></div>
+                    <div class="hub-card-content">
+                        <h3>庫存查詢</h3>
+                        <p>鋁材餘料與配件庫存即時監控</p>
+                        <div class="hub-card-stat">
+                            <i class="fas fa-search"></i> 點擊查詢
+                        </div>
+                    </div>
+                    <div class="hub-card-arrow"><i class="fas fa-chevron-right"></i></div>
+                </div>
             </div>
         </div>
     </div>
@@ -307,28 +345,28 @@
                     <h4 style="margin:0;">營收趨勢</h4>
                     <div style="display:flex; gap: 10px; flex-wrap: wrap;">
                         <div class="trend-toggle-group"
-                            style="display:flex; background:rgba(255,255,255,0.06); border-radius:20px; padding:2px; border:1px solid rgba(255,255,255,0.1);">
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-trend-time-month" onclick="setChartFilter('trend', 'time', 'month')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
                             <button id="toggle-trend-time-week" onclick="setChartFilter('trend', 'time', 'week')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
                             <button id="toggle-trend-time-day" onclick="setChartFilter('trend', 'time', 'day')"
                                 class="trend-toggle-btn active"
-                                style="background:var(--accent); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
                         </div>
                         <div class="trend-toggle-group"
-                            style="display:flex; background:rgba(255,255,255,0.06); border-radius:20px; padding:2px; border:1px solid rgba(255,255,255,0.1);">
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-trend-cat-all" onclick="setChartFilter('trend', 'cat', 'all')"
                                 class="trend-toggle-btn active"
-                                style="background:var(--accent); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">全部</button>
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">全部</button>
                             <button id="toggle-trend-cat-profile" onclick="setChartFilter('trend', 'cat', 'profile')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">鋁材</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">鋁材</button>
                             <button id="toggle-trend-cat-accessory"
                                 onclick="setChartFilter('trend', 'cat', 'accessory')" class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">配件</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">配件</button>
                         </div>
                     </div>
                 </div>
@@ -341,28 +379,28 @@
                     <h4 style="margin:0;">系列營收占比</h4>
                     <div style="display:flex; gap: 10px; flex-wrap: wrap;">
                         <div class="trend-toggle-group"
-                            style="display:flex; background:rgba(255,255,255,0.06); border-radius:20px; padding:2px; border:1px solid rgba(255,255,255,0.1);">
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-series-time-month" onclick="setChartFilter('series', 'time', 'month')"
                                 class="trend-toggle-btn active"
-                                style="background:var(--accent); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
                             <button id="toggle-series-time-week" onclick="setChartFilter('series', 'time', 'week')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
                             <button id="toggle-series-time-day" onclick="setChartFilter('series', 'time', 'day')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
                         </div>
                         <div class="trend-toggle-group"
-                            style="display:flex; background:rgba(255,255,255,0.06); border-radius:20px; padding:2px; border:1px solid rgba(255,255,255,0.1);">
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-series-cat-all" onclick="setChartFilter('series', 'cat', 'all')"
                                 class="trend-toggle-btn active"
-                                style="background:var(--accent); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">全部</button>
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">全部</button>
                             <button id="toggle-series-cat-profile" onclick="setChartFilter('series', 'cat', 'profile')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">鋁材</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">鋁材</button>
                             <button id="toggle-series-cat-accessory"
                                 onclick="setChartFilter('series', 'cat', 'accessory')" class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">配件</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">配件</button>
                         </div>
                     </div>
                 </div>
@@ -373,28 +411,28 @@
                     <h4 style="margin:0;">配送方式分布</h4>
                     <div style="display:flex; gap: 10px; flex-wrap: wrap;">
                         <div class="trend-toggle-group"
-                            style="display:flex; background:rgba(255,255,255,0.06); border-radius:20px; padding:2px; border:1px solid rgba(255,255,255,0.1);">
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-delivery-time-month"
                                 onclick="setChartFilter('delivery', 'time', 'month')" class="trend-toggle-btn active"
-                                style="background:var(--accent); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
                             <button id="toggle-delivery-time-week" onclick="setChartFilter('delivery', 'time', 'week')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
                             <button id="toggle-delivery-time-day" onclick="setChartFilter('delivery', 'time', 'day')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
                         </div>
                         <div class="trend-toggle-group"
-                            style="display:flex; background:rgba(255,255,255,0.06); border-radius:20px; padding:2px; border:1px solid rgba(255,255,255,0.1);">
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-delivery-cat-all" onclick="setChartFilter('delivery', 'cat', 'all')"
                                 class="trend-toggle-btn active"
-                                style="background:var(--accent); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">全部</button>
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">全部</button>
                             <button id="toggle-delivery-cat-profile"
                                 onclick="setChartFilter('delivery', 'cat', 'profile')" class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">鋁材</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">鋁材</button>
                             <button id="toggle-delivery-cat-accessory"
                                 onclick="setChartFilter('delivery', 'cat', 'accessory')" class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">配件</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">配件</button>
                         </div>
                     </div>
                 </div>
@@ -405,28 +443,28 @@
                     <h4 style="margin:0;">Top 10 熱銷品項</h4>
                     <div style="display:flex; gap: 10px; flex-wrap: wrap;">
                         <div class="trend-toggle-group"
-                            style="display:flex; background:rgba(255,255,255,0.06); border-radius:20px; padding:2px; border:1px solid rgba(255,255,255,0.1);">
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-top10-time-month" onclick="setChartFilter('top10', 'time', 'month')"
                                 class="trend-toggle-btn active"
-                                style="background:var(--accent); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
                             <button id="toggle-top10-time-week" onclick="setChartFilter('top10', 'time', 'week')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
                             <button id="toggle-top10-time-day" onclick="setChartFilter('top10', 'time', 'day')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
                         </div>
                         <div class="trend-toggle-group"
-                            style="display:flex; background:rgba(255,255,255,0.06); border-radius:20px; padding:2px; border:1px solid rgba(255,255,255,0.1);">
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-top10-cat-all" onclick="setChartFilter('top10', 'cat', 'all')"
                                 class="trend-toggle-btn active"
-                                style="background:var(--accent); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">全部</button>
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">全部</button>
                             <button id="toggle-top10-cat-profile" onclick="setChartFilter('top10', 'cat', 'profile')"
                                 class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">鋁材</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">鋁材</button>
                             <button id="toggle-top10-cat-accessory"
                                 onclick="setChartFilter('top10', 'cat', 'accessory')" class="trend-toggle-btn"
-                                style="background:transparent; color:rgba(255,255,255,0.5); border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">配件</button>
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">配件</button>
                         </div>
                     </div>
                 </div>

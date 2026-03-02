@@ -85,12 +85,15 @@ window.showPriceModal = function (order, nextStatus) {
 
     modalBody.innerHTML = `
         <div style="padding:20px; text-align:center;">
-            <h3 style="color:#e67e22;"><i class="fas fa-calculator"></i> 準備移至「已報價」</h3>
-            <p>請輸入運費金額 (若免運請填0)：</p>
-            <input type="number" id="quote-shipping-input" value="0" style="font-size:1.5rem; padding:10px; width:200px; text-align:center; border:2px solid #ddd; border-radius:8px;">
-            <div style="margin-top:20px; display:flex; justify-content:center; gap:10px;">
-                 <button class="btn-secondary" onclick="closeModal()">取消</button>
-                 <button class="btn-primary" onclick="confirmQuotePrice('${order.timestamp}', '${nextStatus}')" style="background:#e67e22;">確認並與報價</button>
+            <h3 style="color:var(--accent-30);"><i class="fas fa-calculator"></i> 準備移至「已報價」</h3>
+            <p style="color:var(--text); opacity:0.8;">請輸入運費金額 (若免運請填0)：</p>
+            <input type="number" id="quote-shipping-input" value="0" style="font-size:1.5rem; padding:12px; width:220px; text-align:center; border:2px solid var(--border); border-radius:12px; background:#f9fafb; color:var(--text); outline:none; transition:border-color 0.2s;">
+            <div style="margin-top:25px; display:flex; justify-content:center; gap:12px;">
+                 <button class="btn-secondary" onclick="closeModal()" style="padding:10px 20px; border-radius:8px;">取消</button>
+                 <button id="btn-confirm-price" onclick="confirmQuotePrice('${order.timestamp}', '${nextStatus}')" 
+                    style="flex:1; padding:12px; background:var(--accent-30); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">
+                確認報價並發送郵件
+            </button>
             </div>
         </div>
     `;
@@ -103,8 +106,12 @@ window.showPriceModal = function (order, nextStatus) {
 
 // [New] Helper for detailed email body
 window.generateMailBody = function (name, total, shippingFee, details, truncate = false) {
-    let feeStr = (shippingFee > 0) ? `(含運費 ${shippingFee} 元)` : "(免運費)";
-    if (shippingFee === 0 && (total === 0 || total === "0")) feeStr = ""; // Edge case
+    let parsedTotal = parseInt(String(total).replace(/[^0-9]/g, '') || 0);
+    let parsedShipping = parseInt(String(shippingFee).replace(/[^0-9]/g, '') || 0);
+    let itemTotal = parsedTotal - parsedShipping;
+    if (itemTotal < 0) itemTotal = 0;
+
+    let shippingDisplay = (parsedShipping > 0) ? formatPrice(parsedShipping) : "免運費";
 
     let formattedDetails = (details || "無詳細明細");
 
@@ -125,7 +132,11 @@ window.generateMailBody = function (name, total, shippingFee, details, truncate 
 訂單明細如下：
 ${formattedDetails}
 
-目前為您報價總金額為： ${formatPrice(total)} ${feeStr}
+-------------------
+商品小計： ${formatPrice(itemTotal)}
+運費金額： ${shippingDisplay}
+總計金額： ${formatPrice(parsedTotal)}
+-------------------
 
 匯款資訊如下：
 銀行代碼：xxx
@@ -144,7 +155,10 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
     let target = ordersData.find(o => String(o.timestamp) === String(orderId));
     if (target) {
         let currentTotal = parseInt(String(target.total).replace(/[^0-9]/g, '') || 0);
-        let newTotal = currentTotal + val;
+        let existingShippingFee = parseInt(String(target.shippingFee || 0).replace(/[^0-9]/g, '') || 0);
+
+        // Remove existing shipping fee before adding the new one to prevent double counting
+        let newTotal = currentTotal - existingShippingFee + val;
 
         target.total = newTotal;
         target.shippingFee = val; // [Fix] Ensure shipping fee is updated locally
@@ -294,21 +308,21 @@ const customStyles = `
     .detail-card.checked { opacity: 0.7; }
     .detail-card.checked .check-box i { display: block !important; color: #fff; font-size: 14px; }
     
-    /* 20系列 - 藍色 */
+    /* 20系列 - 藍板岩 */
     .detail-card.series-20.checked { background: #eff6ff; border-color: #93c5fd; }
-    .detail-card.series-20.checked .check-box { background: #2980b9; border-color: #2980b9; }
+    .detail-card.series-20.checked .check-box { background: var(--accent-20); border-color: var(--accent-20); }
     
-    /* 30系列 - 橙色 */
+    /* 30系列 - 暖茶色 */
     .detail-card.series-30.checked { background: #fff7ed; border-color: #fdba74; }
-    .detail-card.series-30.checked .check-box { background: #d35400; border-color: #d35400; }
+    .detail-card.series-30.checked .check-box { background: var(--accent-30); border-color: var(--accent-30); }
     
-    /* 40系列 - 綠色 */
+    /* 40系列 - 鼠尾草綠 */
     .detail-card.series-40.checked { background: #f0fdf4; border-color: #86efac; }
-    .detail-card.series-40.checked .check-box { background: #27ae60; border-color: #27ae60; }
+    .detail-card.series-40.checked .check-box { background: var(--accent-40); border-color: var(--accent-40); }
     
-    /* 其他/未分類 - 預設灰色 */
+    /* 其他/未分類 - 預設莫蘭迪灰 */
     .detail-card.checked:not([class*="series-"]) { background: #f8f9fa; border-color: #d1d5db; }
-    .detail-card.checked:not([class*="series-"]) .check-box { background: #6b7280; border-color: #6b7280; }
+    .detail-card.checked:not([class*="series-"]) .check-box { background: var(--ash-gray); border-color: var(--ash-gray); }
     
     .detail-card .d-name { flex: 1; line-height: 1.4; font-size: 0.95rem; }
 
@@ -321,25 +335,28 @@ const customStyles = `
     .progress-pill.complete { background: #27ae60; color: #fff; }
     
     .btn-finish-check {
-        width: 100%; padding: 12px; background: #ccc; color: #fff; border: none;
-        border-radius: 6px; font-size: 1.1em; margin-top: 10px; cursor: pointer;
+        width: 100%; padding: 12px; background: #e2e8f0; color: #64748b; border: none;
+        border-radius: 6px; font-size: 1.1em; margin-top: 10px; cursor: pointer; transition: 0.2s;
     }
-    .btn-finish-check.active { background: #27ae60; cursor: pointer; }
+    .btn-finish-check.active { background: var(--accent-warehouse); color: #fff; cursor: pointer; }
+    .btn-finish-check.active:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
 
     .btn-print {
-        background: #3498db; color: white; border: none; padding: 6px 12px;
-        border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 5px;
+        background: var(--ash-gray); color: white; border: none; padding: 6px 15px;
+        border-radius: 6px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 6px;
+        transition: 0.2s;
     }
-    .btn-print:hover { background: #2980b9; }
+    .btn-print:hover { background: var(--primary); }
 
     .btn-close-inline {
         background: #eee; color: #555; border: none; padding: 6px 12px;
         border-radius: 4px; cursor: pointer; font-size: 0.9em;
     }
 
-    /* Email Reply Button - Customer Service Orange - FORCE OVERRIDE */
+    /* Email Reply Button - Muted Rose - Morandi Palette */
     .kanban-card .btn-gmail, a.btn-gmail {
-        background: #F39C12 !important; /* CS Orange */
+        background: var(--accent-mail) !important; /* Muted Rose */
         color: white !important;
         border: none;
         padding: 6px 12px;
@@ -352,23 +369,20 @@ const customStyles = `
         text-decoration: none;
         box-shadow: none;
     }
-    .kanban-card .btn-gmail:hover, a.btn-gmail:hover { background: #E67E22 !important; }
+    .kanban-card .btn-gmail:hover, a.btn-gmail:hover { filter: brightness(0.9); }
     
     /* Column Header Colors for Work Flow */
-    /* Factory Flow (Blue) */
-    .status-cutting { background: #5DADE2; color: #fff; border: none; } /* Solid Blue */
+    /* Factory Flow (Slate Blue) */
+    .status-cutting { background: var(--accent-20); color: #fff; border: none; } 
 
-    /* Warehouse & Logistics Flow (Continuous 5-Step Green Gradient) */
-    .status-inspection { background: #A9DFBF; color: #fff; border: none; } /* Step 1: Very Light Green */
-    .status-picking { background: #82E0AA; color: #fff; border: none; }    /* Step 2: Light Green */
-    .status-packing { background: #52BE80; color: #fff; border: none; }    /* Step 3: Medium Green */
-    .status-shipping { background: #27AE60; color: #fff; border: none; }   /* Step 4: Dark Green */
-    .status-dispatched { background: #196F3D; color: #fff; border: none; } /* Step 5: Very Dark Green */
+    /* Warehouse & Logistics Flow (Smoky Purple) */
+    .status-inspection, .status-picking, .status-packing { background: var(--accent-warehouse); color: #fff; border: none; } 
 
-    /* Customer Service Flow (Orange Gradient) */
-    .status-unquoted { background: #FFB74D; color: #fff; border: none; } /* Light Orange */
-    .status-quoted { background: #F39C12; color: #fff; border: none; }   /* Medium Orange */
-    .status-paid { background: #E67E22; color: #fff; border: none; }     /* Dark Orange */
+    /* Logistics Flow (Moss Green) */
+    .status-shipping, .status-dispatched { background: var(--accent-40); color: #fff; border: none; } 
+
+    /* Customer Service Flow (Warm Tea) */
+    .status-unquoted, .status-quoted, .status-paid { background: var(--accent-30); color: #fff; border: none; } 
 
     /* --- Kanban Grouping Styles --- */
     .kanban-board {
@@ -397,7 +411,7 @@ const customStyles = `
     
     .group-header {
         font-size: 1.1em;
-        font-weight: bold;
+        font-weight: 400;
         color: #fff; /* White text for colored headers */
         text-align: left; /* Aligned left for flex */
         padding: 10px 15px;
@@ -416,7 +430,7 @@ const customStyles = `
         padding: 4px 10px;
         border-radius: 20px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        font-weight: normal;
+        font-weight: 300;
         white-space: nowrap;
         margin-left: 10px;
     }
@@ -429,7 +443,7 @@ const customStyles = `
         padding: 6px 14px;
         border-radius: 20px;
         font-size: 0.9em;
-        font-weight: bold;
+        font-weight: 400;
         cursor: pointer;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         margin-left: 10px;
@@ -437,6 +451,15 @@ const customStyles = `
         transition: transform 0.2s;
     }
     .btn-merge-cut:hover { transform: scale(1.05); background: #c0392b !important; }
+        .btn-prev {
+        background: #f1f5f9 !important;
+        color: #94a3b8 !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    .btn-prev:hover {
+        background: #e2e8f0 !important;
+        color: #64748b !important;
+    }
     
 </style>
 `;
@@ -444,6 +467,9 @@ document.head.insertAdjacentHTML("beforeend", customStyles);
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    // [Visual Test] Confirm script is updated
+    console.log("Admin Logic v2 loaded");
+
     if (sessionStorage.getItem('admin_logged_in') === 'true') {
         showDashboard();
     }
@@ -532,62 +558,140 @@ function showAdminHub() {
     }
 }
 
-function navigateTo(module) {
-    document.getElementById('admin-hub').classList.add('hidden');
+function navigateTo(module, subView) {
+    const hub = document.getElementById('admin-hub');
+    const TRANSITION_MS = 400;
 
-    if (module === 'orders') {
-        document.getElementById('dashboard').classList.remove('hidden');
-        if (!ordersData.length) {
-            fetchOrders();
-        } else {
-            // 資料已存在，直接觸發渲染並選中「全部訂單」導航項
-            const navBtn = document.getElementById('nav-all-orders');
-            if (typeof showAllOrders === 'function') {
-                showAllOrders(navBtn);
+    // Step 1: Fade out the hub
+    hub.style.transition = `opacity ${TRANSITION_MS}ms ease`;
+    hub.style.opacity = '0';
+
+    // Step 2: After fade out, hide hub and show target with fade in
+    setTimeout(() => {
+        hub.classList.add('hidden');
+        hub.style.opacity = '';
+        hub.style.transition = '';
+
+        // Determine the target element
+        let targetEl;
+        if (module === 'orders') {
+            targetEl = document.getElementById('dashboard');
+        } else if (module === 'history') {
+            targetEl = document.getElementById('history-module');
+        } else if (module === 'reports') {
+            targetEl = document.getElementById('reports-module');
+        }
+
+        // Prepare fade-in: set opacity 0, remove hidden, then animate to 1
+        if (targetEl) {
+            targetEl.style.opacity = '0';
+            targetEl.classList.remove('hidden');
+            targetEl.style.transition = `opacity ${TRANSITION_MS}ms ease`;
+            // Force reflow so the transition triggers
+            void targetEl.offsetWidth;
+            targetEl.style.opacity = '1';
+            // Clean up inline styles after transition
+            setTimeout(() => {
+                targetEl.style.opacity = '';
+                targetEl.style.transition = '';
+            }, TRANSITION_MS);
+        }
+
+        // Module-specific logic
+        if (module === 'orders') {
+            const performRouting = () => {
+                if (subView === 'work' && typeof window.showWorkOrders === 'function') {
+                    window.showWorkOrders(document.querySelector('.nav-btn i.fa-tools')?.parentElement);
+                } else if (subView === 'shipment' && typeof window.showWarehouseShipment === 'function') {
+                    window.showWarehouseShipment(document.querySelector('.nav-btn i.fa-shipping-fast')?.parentElement);
+                } else if (subView === 'inventory' && typeof window.showInventory === 'function') {
+                    window.showInventory(document.querySelector('.nav-btn i.fa-warehouse')?.parentElement);
+                } else {
+                    const navBtn = document.getElementById('nav-all-orders');
+                    if (typeof showAllOrders === 'function') {
+                        showAllOrders(navBtn);
+                    } else {
+                        applyFilter();
+                    }
+                }
+            };
+            if (!ordersData.length) {
+                fetchOrders().then(performRouting);
             } else {
-                applyFilter();
+                performRouting();
             }
+        } else if (module === 'history') {
+            if (!ordersData.length) {
+                fetchOrders().then(() => renderHistoryOrders());
+            } else {
+                renderHistoryOrders();
+            }
+        } else if (module === 'reports') {
+            if (ordersData.length > 0) renderFinancialReports();
+            fetchOrders().then(() => renderFinancialReports());
         }
-    } else if (module === 'history') {
-        document.getElementById('history-module').classList.remove('hidden');
-        if (!ordersData.length) {
-            fetchOrders().then(() => renderHistoryOrders());
-        } else {
-            renderHistoryOrders();
-        }
-    } else if (module === 'reports') {
-        document.getElementById('reports-module').classList.remove('hidden');
-        // Always fetch fresh data to avoid stale reports, but render immediately if we have some data
-        if (ordersData.length > 0) renderFinancialReports();
-        fetchOrders().then(() => renderFinancialReports());
-    }
 
-    // [優化] 改用透明度控制 3D 背景，並暫停動畫釋放資源
-    const bg = document.getElementById('three-canvas-container');
-    if (bg) {
-        bg.classList.add('three-bg-hidden');
-        isThreeJsPaused = true;
-        if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    }
+        // [優化] 改用透明度控制 3D 背景，並暫停動畫釋放資源
+        const bg = document.getElementById('three-canvas-container');
+        if (bg) {
+            bg.classList.add('three-bg-hidden');
+            isThreeJsPaused = true;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        }
+    }, TRANSITION_MS);
 }
 
 function backToHub() {
-    document.getElementById('dashboard').classList.add('hidden');
-    document.getElementById('history-module').classList.add('hidden');
-    document.getElementById('reports-module').classList.add('hidden');
-    document.getElementById('admin-hub').classList.remove('hidden');
+    const TRANSITION_MS = 400;
+    const dashboard = document.getElementById('dashboard');
+    const historyMod = document.getElementById('history-module');
+    const reportsMod = document.getElementById('reports-module');
+    const hub = document.getElementById('admin-hub');
 
-    // [優化] 恢復 3D 背景顯示與動畫
+    // Find which module is currently visible
+    const activeModule = [dashboard, historyMod, reportsMod].find(el => el && !el.classList.contains('hidden'));
+
+    // [Step 0] Start restoring 3D background IMMEDIATELY so it fades in during module fade-out
     const bg = document.getElementById('three-canvas-container');
     if (bg) {
-        bg.classList.remove('three-bg-hidden');
+        // Resume animation first so there's content to show
         if (isThreeJsPaused && threeJsAnimateFunc) {
             isThreeJsPaused = false;
             threeJsAnimateFunc();
         }
+        // Then remove the hidden class to trigger the CSS opacity transition (0.5s ease)
+        bg.classList.remove('three-bg-hidden');
     }
 
-    updateHubStats();
+    // [Step 1] Fade out the active module
+    if (activeModule) {
+        activeModule.style.transition = `opacity ${TRANSITION_MS}ms ease`;
+        activeModule.style.opacity = '0';
+    }
+
+    setTimeout(() => {
+        // Hide all modules
+        dashboard.classList.add('hidden');
+        historyMod.classList.add('hidden');
+        reportsMod.classList.add('hidden');
+        if (activeModule) {
+            activeModule.style.opacity = '';
+            activeModule.style.transition = '';
+        }
+
+        // [Step 2] Show hub with fade in (3D background is already visible behind it)
+        hub.style.opacity = '0';
+        hub.classList.remove('hidden');
+        hub.style.transition = `opacity ${TRANSITION_MS}ms ease`;
+        void hub.offsetWidth;
+        hub.style.opacity = '1';
+        setTimeout(() => {
+            hub.style.opacity = '';
+            hub.style.transition = '';
+        }, TRANSITION_MS);
+
+        updateHubStats();
+    }, activeModule ? TRANSITION_MS : 0);
 }
 
 // 供其他地方刷新 Hub 數字用
@@ -621,9 +725,20 @@ function updateHubStats() {
         const statHistory = document.getElementById('hub-stat-history');
         const statReports = document.getElementById('hub-stat-reports');
 
+        // New Shortcut Stats
+        const statWork = document.getElementById('hub-stat-shortcut-work');
+        const statShipment = document.getElementById('hub-stat-shortcut-shipment');
+
+        // Logic for shortcuts
+        const workCount = ordersData.filter(o => ['paid', 'cutting', 'inspection', 'picking', 'packing'].includes(o.status)).length;
+        const shipmentCount = ordersData.filter(o => ['shipping', 'dispatched'].includes(o.status)).length;
+
         if (statOrders) statOrders.innerHTML = `<i class="fas fa-play-circle"></i> 進行中 ${activeOrders} 筆`;
         if (statHistory) statHistory.innerHTML = `<i class="fas fa-check-circle"></i> 累計完成 ${historyOrders} 筆`;
         if (statReports) statReports.innerHTML = `<i class="fas fa-dollar-sign"></i> 本月營收 $${monthlyRevenue.toLocaleString()}`;
+
+        if (statWork) statWork.innerHTML = `<i class="fas fa-tasks"></i> 剩餘 ${workCount} 筆`;
+        if (statShipment) statShipment.innerHTML = `<i class="fas fa-box"></i> 待出 ${shipmentCount} 筆`;
     } catch (e) {
         console.error("Update Hub Stats Error:", e);
     }
@@ -850,13 +965,13 @@ function renderKanban(data) {
             {
                 title: "廠務權責區 <span class='header-tag'>13:00對單切料</span>",
                 cols: ['cutting'],
-                headerStyle: "background: #3498db;",
+                headerStyle: "background: var(--accent-20);",
                 actionBtn: `<button onclick="generateConsolidatedCuttingList()" class="btn-merge-cut">合併切料</button>`
             },
             {
                 title: "倉儲包裝區 <span class='header-tag'>13:00-17:00對料 品檢 包裝</span>",
                 cols: ['inspection', 'picking', 'packing'],
-                headerStyle: "background: #27ae60;"
+                headerStyle: "background: var(--accent-warehouse);"
             }
         ];
     } else if (window.currentPrimaryView === 'shipment') {
@@ -864,7 +979,7 @@ function renderKanban(data) {
             {
                 title: "倉儲出貨區 <span class='header-tag'>8:00-12:00 出昨日訂單</span>",
                 cols: ['shipping', 'dispatched'],
-                headerStyle: "background: #16a085;"
+                headerStyle: "background: var(--accent-40);"
             }
         ];
     } else {
@@ -872,23 +987,23 @@ function renderKanban(data) {
             {
                 title: "客服權責區 <span class='header-tag'>8:00-17:00 每日12:00收單</span>",
                 cols: ['unquoted', 'quoted', 'paid'],
-                headerStyle: "background: #e67e22;"
+                headerStyle: "background: var(--accent-30);"
             },
             {
                 title: "廠務權責區 <span class='header-tag'>13:00對單切料</span>",
                 cols: ['cutting'],
-                headerStyle: "background: #3498db;",
+                headerStyle: "background: var(--accent-20);",
                 actionBtn: `<button onclick="generateConsolidatedCuttingList()" class="btn-merge-cut" style="font-size:0.8rem; padding:4px 8px;">合併切料</button>`
             },
             {
                 title: "倉儲包裝區 <span class='header-tag'>13:00-17:00對料 品檢 包裝</span>",
                 cols: ['inspection', 'picking', 'packing'],
-                headerStyle: "background: #27ae60;"
+                headerStyle: "background: var(--accent-warehouse);"
             },
             {
                 title: "倉儲出貨區 <span class='header-tag'>8:00-12:00 出昨日訂單</span>",
                 cols: ['shipping', 'dispatched'],
-                headerStyle: "background: #16a085;"
+                headerStyle: "background: var(--accent-40);"
             }
         ];
     }
@@ -1203,17 +1318,17 @@ async function generateConsolidatedCuttingList() {
     // UI Structure: Tabs for [List View] and [Cutting View]
     const renderTable = () => {
         let tableRows = list.map(item => {
-            let seriesColor = '#3498db';
-            if (item.series === 30) seriesColor = '#e67e22';
-            if (item.series === 40) seriesColor = '#27ae60';
+            let seriesColor = 'var(--accent-20)'; // Series 20 (Slate Blue)
+            if (item.series === 30) seriesColor = 'var(--accent-30)'; // Series 30 (Warm Tea)
+            if (item.series === 40) seriesColor = 'var(--accent-40)'; // Series 40 (Moss Green)
 
             return `
-    <tr style="border-bottom:1px solid #ddd;">
-                    <td style="padding:8px; font-weight:bold; color:${seriesColor};">${item.series}系列</td>
-                    <td style="padding:8px;">${item.name}</td>
-                    <td style="padding:8px; font-weight:bold; color:#c0392b;">${item.length} cm</td>
-                    <td style="padding:8px; font-weight:bold; font-size:1.1em;">${item.qty} 支</td>
-                    <td style="padding:8px; font-size:0.8em; color:#7f8c8d;">${item.orders.join(', ')}</td>
+    <tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:12px 8px; font-weight:bold; color:${seriesColor};">${item.series}系列</td>
+                    <td style="padding:12px 8px;">${item.name}</td>
+                    <td style="padding:12px 8px; font-weight:bold; color:var(--text);">${item.length} cm</td>
+                    <td style="padding:12px 8px; font-weight:bold; font-size:1.1em; color:var(--accent-30);">${item.qty} 支</td>
+                    <td style="padding:12px 8px; font-size:0.8em; color:var(--ash-gray);">${item.orders.join(', ')}</td>
                 </tr>
     `;
         }).join('');
@@ -1399,9 +1514,9 @@ window.switchCutTab = function (tab) {
             const item = list.find(i => i.name === model);
             const series = item ? item.series : 99;
             let seriesColor = '#2c3e50';
-            if (series === 20) seriesColor = '#3498db';
-            if (series === 30) seriesColor = '#e67e22';
-            if (series === 40) seriesColor = '#27ae60';
+            if (series === 20) seriesColor = '#6b8db0';
+            if (series === 30) seriesColor = '#b08850';
+            if (series === 40) seriesColor = '#5e8a5e';
 
             const cleanModelName = model.replace(/^\u3010.*?\u3011\s*/, '').trim();
             let autoOffcuts = "";
@@ -1511,12 +1626,12 @@ window.runCuttingOptimization = function () {
         let bins = modelCutter.solve(modelReqs);
 
         // 6. Render result header and visuals
-        let sColor = '#3498db';
-        const modelSeries = (modelReqs && modelReqs.length > 0) ? modelReqs[0].series : 99;
-        if (modelSeries === 30) sColor = '#e67e22';
-        if (modelSeries === 40) sColor = '#27ae60';
+        const modelSeries = modelReqs[0] ? modelReqs[0].series : 99;
+        let sColor = 'var(--accent-20)';
+        if (modelSeries === 30) sColor = 'var(--accent-30)';
+        if (modelSeries === 40) sColor = 'var(--accent-40)';
 
-        html += `<h3 style="border-left:5px solid ${sColor}; padding-left:10px; margin-top:30px; color:${sColor};">【${modelName}】 切割計畫 <span style="font-size:0.75em; color:#888; font-weight:normal;">(原料:${stockLen} cm, 餘料:${offcuts.length}支)</span></h3>`;
+        html += `<h3 style="border-left:5px solid ${sColor}; padding-left:10px; margin-top:30px; color:${sColor}; font-weight:bold;">【${modelName}】 切割計畫 <span style="font-size:0.75em; color:var(--ash-gray); font-weight:normal;">(原料:${stockLen} cm, 餘料:${offcuts.length}支)</span></h3>`;
         html += renderCuttingVisuals(bins, stockLen);
     }
 
@@ -1546,9 +1661,9 @@ function renderCuttingVisuals(bins, stockLen) {
 
         bin.cuts.forEach(cut => {
             let widthPerc = (cut.length / originalLen) * 100;
-            let bgColor = '#3498db'; // Default blue (20)
-            if (cut.series === 30) bgColor = '#e67e22'; // Orange
-            if (cut.series === 40) bgColor = '#27ae60'; // Green
+            let bgColor = 'var(--accent-20)'; // Default Slate Blue (20)
+            if (cut.series === 30) bgColor = 'var(--accent-30)'; // Warm Tea
+            if (cut.series === 40) bgColor = 'var(--accent-40)'; // Moss Green
 
             cutsHtml += `
     <div class="cut-block" style="width:${widthPerc}%; background-color:${bgColor};" title="${cut.name} (${cut.length}cm)">
@@ -1577,7 +1692,7 @@ function renderCuttingVisuals(bins, stockLen) {
         }
 
         let label = isOffcut ? `餘料 #${idx + 1}` : `新料 #${idx + 1}`;
-        let bgStyle = isOffcut ? 'background:#fff3e0; border-color:#e67e22;' : 'background:#e8f8f5; border-color:#2ecc71;';
+        let bgStyle = isOffcut ? 'background:#fdf6ed; border-color:#b08850;' : 'background:#f0f4f8; border-color:#6b8db0;';
 
         html += `
     <div class="cut-row" style="${bgStyle}">
@@ -1631,6 +1746,13 @@ window.triggerGmailReply = function (orderId) {
     }
 
     window.openGmail(target.email, mailSubject, mailBody);
+
+    // [New] Auto-Advance Logic: For S2S orders, jump directly to picking (skip confirmation per user request)
+    let isStoreOrder = (target.address || "").includes("店到店") || parseInt(target.shippingFee) === 60;
+    if (target.status === 'unquoted' && isStoreOrder) {
+        // Auto-advance without confirm() to make it "Directly jump"
+        window.advanceStatus(orderId, 'picking');
+    }
 };
 
 function createCard(order, index, currentStatus) {
@@ -1648,33 +1770,44 @@ function createCard(order, index, currentStatus) {
     let isSelfPickup = false;
     let isStore = false;
 
-    if ((order.address || "").includes("宅配")) tag = "宅配";
+    if ((order.address || "").includes("宅配")) tag = `<span class="card-tag">宅配</span>`;
     if ((order.address || "").includes("自取")) {
-        tag = "自取";
+        tag = `<span class="card-tag">自取</span>`;
         isSelfPickup = true;
     }
-    if ((order.address || "").includes("店到店")) {
-        tag = "店到店";
+    // [Fix] Most robust Store-to-Store detection mapping using window.safeParsePrice
+    let addrStr = (order.address || "");
+    let s2sKeywords = ["店到店", "超商", "7-11", "全家", "[店到店]"];
+    let hasS2SKeyword = s2sKeywords.some(k => addrStr.includes(k));
+    let parsedShipFee = window.safeParsePrice(order.shippingFee);
+
+    if (hasS2SKeyword || parsedShipFee === 60) {
+        tag = `<span class="card-tag">店到店</span>`;
         isStore = true;
+        isSelfPickup = false;
     }
-    if ((order.address || "").includes("公司配送")) tag = "公司配送";
+    if (addrStr.includes("公司配送")) tag = `<span class="card-tag">公司配送</span>`;
 
     // Determine Next Step Logic
     let nextStatus = null;
     let prevStatus = null;
 
-    let flow = STANDARD_FLOW;
-    if (WORK_FLOW.includes(currentStatus)) flow = WORK_FLOW;
-
-    let currIdx = flow.indexOf(currentStatus);
-
-    if (currIdx !== -1) {
-        if (currIdx < flow.length - 1) nextStatus = flow[currIdx + 1];
-        if (currIdx > 0) prevStatus = flow[currIdx - 1];
+    // [Crucial Fix] For Store-to-Store orders at 'unquoted' or 'quoted', next step IS ALWAYS 'picking'
+    if (isStore && (currentStatus === 'unquoted' || currentStatus === 'quoted')) {
+        nextStatus = 'picking';
+    } else {
+        let flow = STANDARD_FLOW;
+        if (WORK_FLOW.includes(currentStatus)) flow = WORK_FLOW;
+        let currIdx = flow.indexOf(currentStatus);
+        if (currIdx !== -1) {
+            if (currIdx < flow.length - 1) nextStatus = flow[currIdx + 1];
+            if (currIdx > 0) prevStatus = flow[currIdx - 1];
+        }
     }
 
     if (currentStatus === 'paid') {
-        nextStatus = 'cutting';
+        if (isStore) nextStatus = 'picking';
+        else nextStatus = 'cutting';
     }
 
     if (currentStatus === 'packing') {
@@ -1686,26 +1819,36 @@ function createCard(order, index, currentStatus) {
         let nextLabel = STATUS_LABELS[nextStatus];
         let btnText = nextLabel;
 
-        if (currentStatus === 'unquoted' && nextStatus === 'quoted') {
-            // Need quoting for Home Delivery and Company Delivery
-            let needsQuote = !isSelfPickup && !isStore;
-            btnText = needsQuote ? "輸入報價金額" : "已報價";
+        // [Final Logic Enforcement] Ensure text and status are correct for S2S
+        if (isStore && (currentStatus === 'unquoted' || currentStatus === 'quoted')) {
+            nextStatus = 'picking';
+            btnText = "開始撿貨 (店到店)";
+        } else if (currentStatus === 'unquoted') {
+            if (!isSelfPickup) {
+                btnText = "輸入報價金額";
+            } else {
+                btnText = "已報價";
+            }
         }
-        if (currentStatus === 'paid' && nextStatus === 'cutting') btnText = "開始工單流程";
+
+        if (currentStatus === 'paid') {
+            if (nextStatus === 'cutting') btnText = "開始工單流程";
+            if (nextStatus === 'picking') btnText = "開始撿貨 (入庫)";
+        }
         if (currentStatus === 'packing' && nextStatus === 'shipping') btnText = "完成包裝 (移至待出貨)";
 
         let btnClass = 'btn-to-' + nextStatus;
 
-        // Define Target Colors for Buttons
+        // Define Target Colors for Buttons (Morandi Variables)
         const STATUS_COLORS = {
-            'quoted': '#F39C12',
-            'paid': '#E67E22',
-            'cutting': '#5DADE2',      // Factory Blue
-            'inspection': '#A9DFBF',   // Green Step 1
-            'picking': '#82E0AA',      // Green Step 2
-            'packing': '#52BE80',      // Green Step 3
-            'shipping': '#27AE60',     // Green Step 4
-            'dispatched': '#196F3D'    // Green Step 5
+            'quoted': 'var(--accent-30)',
+            'paid': 'var(--accent-30)',
+            'cutting': 'var(--accent-20)',
+            'inspection': 'var(--accent-warehouse)',
+            'picking': 'var(--accent-warehouse)',
+            'packing': 'var(--accent-warehouse)',
+            'shipping': 'var(--accent-40)',
+            'dispatched': 'var(--accent-40)'
         };
 
         let style = '';
@@ -1745,11 +1888,11 @@ function createCard(order, index, currentStatus) {
     <div class="card-info" style="font-size:0.85em; color:#666; margin-top:3px; word-break:break-all;">
         <i class="far fa-envelope"></i> ${order.email || "無 Email"}
     </div>
-    ${tag ? `<span class="card-tag">${tag}</span>` : ''}
+    ${tag}
     <div class="card-price">
         ${formatPrice(order.total)}
-        ${(currentStatus === 'unquoted' && !isSelfPickup && !isStore) ? '<span style="font-size:0.7em; color:#e67e22; margin-left:5px; font-weight:normal;">(待報價)</span>' : ''}
-        ${(order.shippingFee && order.shippingFee > 0) ? `<div style="font-size:0.75rem; color:#888; font-weight:normal; margin-top:2px;">(含運費 $${order.shippingFee})</div>` : ''}
+        ${(currentStatus === 'unquoted' && !isSelfPickup && !isStore) ? '<span style="font-size:0.7em; color:var(--accent-delivery); margin-left:5px; font-weight:normal;">(待報價)</span>' : ''}
+        ${(order.shippingFee && order.shippingFee > 0) ? `<div style="font-size:0.75rem; color:var(--accent-delivery); font-weight:normal; margin-top:2px; opacity:0.8;">(含運費 $${order.shippingFee})</div>` : ''}
     </div>
 
     <div class="card-actions">
@@ -1812,62 +1955,51 @@ window.advanceStatus = function (orderId, nextStatus) {
         return;
     }
 
+    // [Fix] Local status update should only happen after guards
+    // But for S2S or Self-Pickup 'unquoted' jump, we handle it inside the specific block.
+
     // --- 1. Quoted Safety Check (Modal + Self-Pickup Skip) ---
+    // [Fix] If nextStatus is already 'picking' (from S2S logic), skip this block
     if (target.status === 'unquoted' && nextStatus === 'quoted') {
         const addr = (target.address || "").toLowerCase();
-        // Smart Skip: Self-Pickup implies 0 shipping
-        if (addr.includes("自取") || addr.includes("店到店")) {
-            // Apply 0 shipping for Pickup, 60 for S2S
-            let fee = addr.includes("店到店") ? 60 : 0;
+        let isS2S = addr.includes("店到店") || parseInt(target.shippingFee) === 60 || addr.includes("[店到店]");
+
+        // Smart Skip: Self-Pickup implies 0 shipping. 
+        // Note: For S2S, we usually want to jump to 'picking', not 'quoted'. 
+        // If we somehow get here for S2S and nextStatus is 'quoted', redirect to 'picking' logic.
+        if (isS2S) {
+            nextStatus = 'picking';
+            target.status = 'picking'; // Update locally for S2S jump
+        } else if (addr.includes("自取") || addr.includes("[自取]")) {
+            // Self-Pickup remains 'quoted' (price confirmed)
             let currentTotal = parseInt(String(target.total).replace(/[^0-9]/g, '') || 0);
+            target.total = currentTotal;
+            target.shippingFee = 0;
+            target.status = nextStatus; // Update locally
 
-            // Only add fee if not already included (simple check)
-            // Actually, for old orders, we should just assume we need to add it if it's S2S? 
-            // Or maybe just re-calculate total. 
-            // Let's assume currentTotal excludes fee if it was unquoted.
-            let newTotal = currentTotal + fee;
-
-            target.total = newTotal;
-            target.shippingFee = fee;
-            target.status = nextStatus;
-
-            // [New] Auto-open Gmail for Self-Pickup/S2S (SOP) - Moved before fetch for better popup behavior
+            // ... rest of logic ...
             if (target.email) {
                 let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name}`);
                 let rawBody = window.generateMailBody(target.name, target.total, 0, target.details);
                 let mailBody = encodeURIComponent(rawBody);
-
-                // Safety truncation
-                if (mailBody.length > 1800) {
-                    rawBody = window.generateMailBody(target.name, target.total, 0, target.details, true);
-                    mailBody = encodeURIComponent(rawBody);
-                }
                 window.openGmail(target.email, mailSubject, mailBody);
             }
 
-            // [Fix] Persist to Backend!
-            fetch(API_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    action: 'updateOrderPrice',
-                    orderId: orderId,
-                    newTotal: newTotal,
-                    shippingFee: fee,
-                    status: nextStatus
-                })
-            }).then(() => console.log('Auto-advance status saved')).catch(console.error);
+            // Persist
+            fetch(ADMIN_API_URL, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({ action: 'updateOrderPrice', orderId: orderId, newTotal: target.total, shippingFee: 0, status: nextStatus })
+            });
 
             applyFilter();
             window.lastActiveOrderId = orderId;
-            closeModal(); // [Fix] Ensure modal closes on auto-advance
+            closeModal();
+            return;
+        } else {
+            // Show Modal for Shipping Fee (Default Delivery)
+            showPriceModal(target, nextStatus);
             return;
         }
-
-        // Show Modal for Shipping Fee
-        showPriceModal(target, nextStatus);
-        return; // Stop here, wait for modal callback
     }
 
     // --- 1.5. Quoted -> Paid Safety Check (Payment Confirmation) ---
@@ -2070,24 +2202,24 @@ window.advanceStatus = function (orderId, nextStatus) {
             body = encodeURIComponent(bodyText);
         }
 
-        window.openGmail(target.email, subject, body);
     }
 
-    // [Fix] Persist 'completed' status to backend
-    if (nextStatus === 'completed') {
-        fetch(API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-                action: 'updateOrderPrice',
-                orderId: orderId,
-                newTotal: target.total, // Keep existing total
-                shippingFee: target.shippingFee || 0, // Keep existing fee
-                status: 'completed'
-            })
-        }).then(() => console.log('Completed status saved to backend')).catch(console.error);
-    }
+    // [Fix] Update status locally for ALL other confirmed transitions
+    target.status = nextStatus;
+
+    // [Fix] Persist ALL status transitions to backend universally
+    fetch(ADMIN_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+            action: 'updateOrderPrice',
+            orderId: orderId,
+            newTotal: target.total || 0, // Keep existing total
+            shippingFee: target.shippingFee || 0, // Keep existing fee
+            status: nextStatus // Use the new status for all transitions
+        })
+    }).then(() => console.log(`Status ${nextStatus} saved to backend`)).catch(console.error);
 
     applyFilter();
     window.lastActiveOrderId = orderId;
@@ -2167,7 +2299,7 @@ window.viewOrder = function (order) {
 
     // Add explicit shipping fee info if it has been quoted
     if (order.status !== 'unquoted' && typeof order.shippingFee !== 'undefined') {
-        note += `<br><span style="color:#e67e22; font-weight:bold;">[系統紀錄: 實際運費已核定為 NT$ ${order.shippingFee}]</span>`;
+        note += `<br><span style="color:#b08850; font-weight:bold;">[系統紀錄: 實際運費已核定為 NT$ ${order.shippingFee}]</span>`;
     }
 
     window.currentOrderForPrint = order;
@@ -2194,7 +2326,7 @@ window.viewOrder = function (order) {
         <div style="display:flex; gap:10px;">
             <div class="detail-group" style="flex:1;">
                 <div class="detail-label">配送方式</div>
-                <div class="detail-value" style="color:#2980b9; font-weight:bold;">${(() => {
+                <div class="detail-value" style="color:var(--accent-delivery); font-weight:400;">${(() => {
             let addr = order.address || "";
             if (addr.includes("宅配")) return "宅配寄送";
             if (addr.includes("自取")) return "客戶自取";
@@ -2213,9 +2345,9 @@ window.viewOrder = function (order) {
             <div class="detail-value" style="color:#666;">${note}</div>
         </div>
 
-        <div class="detail-group" style="background: #fff3e0; padding:10px; border-radius:6px; border:1px solid #ffe0b2;">
-            <div class="detail-label" style="color:#e65100;">訂單總額 (含運)</div>
-            <div class="detail-value" style="font-size:1.4rem; color:#e65100; font-weight:bold;">${formatPrice(order.total)}</div>
+        <div class="detail-group" style="background: #f8fafc; padding:15px; border-radius:12px; border:1px solid var(--border);">
+            <div class="detail-label" style="color:var(--text); opacity:0.6;">訂單總額 (含運)</div>
+            <div class="detail-value" style="font-size:1.6rem; color:var(--accent-delivery); font-weight:400;">${formatPrice(order.total)}</div>
         </div>
         
         <hr style="border:0; border-top:1px dashed #ddd; margin: 15px 0;">
@@ -2257,16 +2389,20 @@ window.viewOrder = function (order) {
                      <button onclick="window.closeModal()" style="flex:1; padding:12px; background:#e74c3c; border:none; border-radius:6px; color:#fff; cursor:pointer;">
                         ✖ 關閉視窗
                      </button>
-                     ${order.status === 'inspection' ? `
-                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:#27ae60;">
+                     ${order.status === 'cutting' ? `
+                     <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse);">
+                         ✓ 切割完成 → 前進至品檢
+                     </button>
+                     ` : order.status === 'inspection' ? `
+                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse);">
                          ✓ 核對完成 → 前進至撿貨單
                      </button>
                      ` : order.status === 'picking' ? `
-                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:#27ae60;">
+                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse);">
                          ✓ 核對完成 → 前進至包裝
                      </button>
                      ` : order.status === 'packing' ? `
-                     <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:#27ae60;">
+                     <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-40);">
                          ✓ 確認無誤 → 前進至待出貨
                      </button>
                      ` : ''}
@@ -2494,7 +2630,7 @@ function buildScene() {
     const scene = new THREE.Scene();
 
     const aspect = window.innerWidth / window.innerHeight;
-    let d = window.innerWidth < 768 ? 2500 : 1200; // Increased 'd' for mobile to zoom out
+    let d = 1200; // Unified scale for all devices
     const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 15000);
 
     // Position camera for strict isometric projection (30 degrees down, 45 degrees rotated)
@@ -2531,9 +2667,9 @@ function buildScene() {
     // 4. Base Plane (River / Water) - Deep stylized ocean
     const riverGeometry = new THREE.PlaneGeometry(20000, 20000);
     const riverMaterial = new THREE.MeshStandardMaterial({
-        color: 0x0a192f, // Deep tech-blue
-        roughness: 0.05, // Glossy water
-        metalness: 0.9,
+        color: 0xb2d8d8, // Light Morandi Blue-Green
+        roughness: 0.2, // Softer water reflection
+        metalness: 0.3,
     });
     const riverPlane = new THREE.Mesh(riverGeometry, riverMaterial);
     riverPlane.rotation.x = -Math.PI / 2;
@@ -2543,8 +2679,8 @@ function buildScene() {
 
     // Banks - Sleek dark landscaping instead of bright toy green
     const bankMaterial = new THREE.MeshStandardMaterial({
-        color: 0x212121, // Neutral dark gray base
-        roughness: 0.9,
+        color: 0x94a3b8, // Morandi Ash Gray base
+        roughness: 0.8,
         metalness: 0.1
     });
 
@@ -2866,6 +3002,105 @@ function buildScene() {
         createStreetLight(scene, 1000, -10, z, Math.PI);
     }
 
+    // --- 6.2 Tree System (Lush Morandi Forest) ---
+    const treeTrunkMat = new THREE.MeshStandardMaterial({ color: 0x8b7d6b }); // Muted Brown
+    const treeLeavesMat = new THREE.MeshStandardMaterial({ color: 0x8ca38c }); // Sage Green
+    const treeLeavesDarkMat = new THREE.MeshStandardMaterial({ color: 0x7a9a7a }); // Darker Sage (variation)
+
+    function createTree(x, y, z, scale) {
+        const s = scale || 1.0;
+        const group = new THREE.Group();
+
+        // Trunk (2x base size, scaled further by parameter)
+        const trunkGeom = new THREE.CylinderGeometry(4 * s, 8 * s, 50 * s, 8);
+        const trunk = new THREE.Mesh(trunkGeom, treeTrunkMat);
+        trunk.position.y = 25 * s;
+        trunk.castShadow = true;
+        trunk.receiveShadow = true;
+        group.add(trunk);
+
+        // Leaves - Round Sphere canopy (2x base size, scaled further)
+        const leavesGeom = new THREE.SphereGeometry(30 * s, 8, 6);
+        const leavesMat = Math.random() > 0.5 ? treeLeavesMat : treeLeavesDarkMat;
+        const leaves = new THREE.Mesh(leavesGeom, leavesMat);
+        leaves.position.y = 65 * s;
+        leaves.castShadow = true;
+        leaves.receiveShadow = true;
+        group.add(leaves);
+
+        // Optional secondary canopy for fuller look
+        if (s > 0.8 && Math.random() > 0.4) {
+            const leaves2Geom = new THREE.SphereGeometry(22 * s, 8, 6);
+            const leaves2 = new THREE.Mesh(leaves2Geom, treeLeavesMat);
+            leaves2.position.set(15 * s, 55 * s, 10 * s);
+            leaves2.castShadow = true;
+            group.add(leaves2);
+        }
+
+        group.position.set(x, y, z);
+        scene.add(group);
+    }
+
+    // Place dense trees ON the levees - Row 1 (X = +/- 500, Y = 30 on top of levee)
+    for (let z = -9000; z <= 9000; z += 150) {
+        // Avoid bridge area
+        if (Math.abs(z) < 350) continue;
+
+        // High density: 85% chance per position
+        if (Math.random() > 0.15) {
+            const offsetX = (Math.random() - 0.5) * 20;
+            const scale = 0.9 + Math.random() * 0.4;
+            createTree(-500 + offsetX, 30, z + (Math.random() - 0.5) * 60, scale);
+        }
+        if (Math.random() > 0.15) {
+            const offsetX = (Math.random() - 0.5) * 20;
+            const scale = 0.9 + Math.random() * 0.4;
+            createTree(500 + offsetX, 30, z + (Math.random() - 0.5) * 60, scale);
+        }
+    }
+
+    // Place dense trees ON the levees - Row 2 (slight offset for depth)
+    for (let z = -9000; z <= 9000; z += 200) {
+        if (Math.abs(z) < 350) continue;
+
+        if (Math.random() > 0.25) {
+            const offsetX = (Math.random() - 0.5) * 25;
+            const scale = 0.7 + Math.random() * 0.5;
+            createTree(-500 + offsetX, 30, z + (Math.random() - 0.5) * 80, scale);
+        }
+        if (Math.random() > 0.25) {
+            const offsetX = (Math.random() - 0.5) * 25;
+            const scale = 0.7 + Math.random() * 0.5;
+            createTree(500 + offsetX, 30, z + (Math.random() - 0.5) * 80, scale);
+        }
+    }
+
+    // Place trees along row houses (behind the houses, X = +/- 1250)
+    for (let z = -8500; z <= 8500; z += 250) {
+        if (Math.abs(z) < 350) continue;
+
+        if (Math.random() > 0.3) {
+            const offsetX = (Math.random() - 0.5) * 30;
+            const scale = 0.7 + Math.random() * 0.5;
+            createTree(-1250 + offsetX, -10, z + (Math.random() - 0.5) * 80, scale);
+        }
+        if (Math.random() > 0.3) {
+            const offsetX = (Math.random() - 0.5) * 30;
+            const scale = 0.7 + Math.random() * 0.5;
+            createTree(1250 + offsetX, -10, z + (Math.random() - 0.5) * 80, scale);
+        }
+    }
+
+    // Place trees scattered around city clusters - 200 total
+    for (let i = 0; i < 200; i++) {
+        const side = Math.random() > 0.5 ? 1 : -1;
+        const x = (1500 + Math.random() * 3000) * side;
+        const z = (Math.random() - 0.5) * 17000;
+        if (Math.abs(z) < 500) continue;
+        const scale = 0.6 + Math.random() * 0.6;
+        createTree(x, -10, z, scale);
+    }
+
     // 7. Animated Traffic on the bridge
     const trafficGroup = new THREE.Group();
     const particleCount = 80; // Reduced traffic density by 60%
@@ -3169,7 +3404,7 @@ function buildScene() {
             lightColorHex = 0xffffff;
             dirLight.intensity = 1.2;
             hemiLight.intensity = 0.6;
-            hemiLight.groundColor.setHex(0x444444);
+            hemiLight.groundColor.setHex(0x94a3b8);
         } else if (decimalTime >= 16 && decimalTime < 18.5) {
             skyColor.setHex(0xff7e5f);
             lightColorHex = 0xffddaa;
@@ -3489,12 +3724,12 @@ function renderDetailCards(detailsStr, status) {
     if (!document.getElementById('series-styles')) {
         const styleId = 'series-styles';
         const css = `
-            .series-20 { border-left: 5px solid #2980b9 !important; background-color: #f0f7ff !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
-            .series-20 span { color: #2980b9 !important; }
-            .series-30 { border-left: 5px solid #d35400 !important; background-color: #fffaf0 !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
-            .series-30 span { color: #d35400 !important; }
-            .series-40 { border-left: 5px solid #27ae60 !important; background-color: #f0fff4 !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
-            .series-40 span { color: #27ae60 !important; }
+            .series-20 { border-left: 5px solid #6b8db0 !important; background-color: #f0f4f8 !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
+            .series-20 span { color: #6b8db0 !important; }
+            .series-30 { border-left: 5px solid #b08850 !important; background-color: #fdf6ed !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
+            .series-30 span { color: #b08850 !important; }
+            .series-40 { border-left: 5px solid #5e8a5e !important; background-color: #f4f7f6 !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
+            .series-40 span { color: #5e8a5e !important; }
             .detail-card-inner { display: flex; flex-direction: column; gap: 8px; }
             .detail-item { position: relative; }
         `;
@@ -3570,7 +3805,7 @@ function renderDetailCards(detailsStr, status) {
     normalItems.forEach(item => {
         // 螺絲螺帽（全域彙總）分隔區
         if (item.isScrewNut && !enteredScrewNutSection) {
-            finalHtml += `<div style="border-top:2px dashed #e74c3c; margin:15px 0 10px; padding-top:10px; text-align:center; color:#e74c3c; font-weight:bold;">
+            finalHtml += `<div style="border-top:2px dashed #b08850; margin:15px 0 10px; padding-top:10px; text-align:center; color:#b08850; font-weight:bold;">
                 🔩 螺絲螺帽 (全域合計)
             </div>`;
             enteredScrewNutSection = true;
@@ -3652,9 +3887,9 @@ window.printOrder = function () {
                 const simplifiedName = window.removeSKU(info.cleanBase).replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
 
                 let seriesColor = '#333';
-                if (series === 20) seriesColor = '#3498db';
-                else if (series === 30) seriesColor = '#e67e22';
-                else if (series === 40) seriesColor = '#27ae60';
+                if (series === 20) seriesColor = '#6b8db0';
+                else if (series === 30) seriesColor = '#b08850';
+                else if (series === 40) seriesColor = '#5e8a5e';
 
                 const skuText = info.sku ? ` <span style="color:${seriesColor}">[${info.sku}]</span>` : '';
                 items.push({ raw: `【配件】 <b>${simplifiedName}</b>${skuText} <b>(x${qty})</b>`, type, series });
@@ -3663,9 +3898,9 @@ window.printOrder = function () {
             const info = window.resolveItemInfo(itemName, series);
 
             let seriesColor = '#333';
-            if (series === 20) seriesColor = '#3498db';
-            else if (series === 30) seriesColor = '#e67e22';
-            else if (series === 40) seriesColor = '#27ae60';
+            if (series === 20) seriesColor = '#6b8db0';
+            else if (series === 30) seriesColor = '#b08850';
+            else if (series === 40) seriesColor = '#5e8a5e';
 
             const skuText = info.sku ? ` <span style="color:${seriesColor}">[${info.sku}]</span>` : '';
             const lenMatch = line.match(/\((?:L=|長度)(\d+)cm\)/);
@@ -3730,9 +3965,9 @@ window.printOrder = function () {
         return html;
     };
 
-    let html20 = renderList(list20, "20 系列", "#3498db");
-    let html30 = renderList(list30, "30 系列", "#e67e22");
-    let html40 = renderList(list40, "40 系列", "#27ae60");
+    let html20 = renderList(list20, "20 系列", "#6b8db0");
+    let html30 = renderList(list30, "30 系列", "#b08850");
+    let html40 = renderList(list40, "40 系列", "#5e8a5e");
 
     let printWindow = window.open('', '', 'width=1100,height=800');
     // ULTRA COMPACT CSS
@@ -4168,9 +4403,9 @@ function renderInventory(inventory, isPartial = false) {
             // 插入配件分隔標題（只在第一個配件組時）
             if (lastType !== 'accessory') {
                 html += `
-                <div class="inventory-section-header" style="grid-column: 1 / -1; margin: 30px 0 20px; padding: 18px 25px; background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%); border-left: 6px solid #0891b2; border-radius: 12px; box-shadow: 0 2px 8px rgba(8,145,178,0.1);">
-                    <h2 style="margin: 0; color: #0e7490; font-size: 1.4rem; font-weight: 700; display: flex; align-items: center;">
-                        <i class="fas fa-cubes" style="margin-right: 12px; color: #06b6d4; font-size: 1.3rem;"></i>配件總覽
+                <div class="inventory-section-header" style="grid-column: 1 / -1; margin: 30px 0 20px; padding: 18px 25px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-left: 6px solid var(--accent-20); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                    <h2 style="margin: 0; color: var(--primary); font-size: 1.4rem; font-weight: 700; display: flex; align-items: center;">
+                        <i class="fas fa-cubes" style="margin-right: 12px; color: var(--accent-20); font-size: 1.3rem;"></i>配件總覽
                     </h2>
                 </div>`;
                 lastType = 'accessory';
@@ -4237,9 +4472,9 @@ function renderInventory(inventory, isPartial = false) {
                 const statusColor = '#64748b'; // 統一灰色
 
                 const seriesColors = {
-                    '20': { bg: '#ffffff', border: '#3b82f6', text: '#3b82f6' },
-                    '30': { bg: '#ffffff', border: '#f97316', text: '#f97316' },
-                    '40': { bg: '#ffffff', border: '#22c55e', text: '#22c55e' }
+                    '20': { bg: '#ffffff', border: 'var(--accent-20)', text: 'var(--accent-20)' },
+                    '30': { bg: '#ffffff', border: 'var(--accent-30)', text: 'var(--accent-30)' },
+                    '40': { bg: '#ffffff', border: 'var(--accent-40)', text: 'var(--accent-40)' }
                 };
                 const colors = seriesColors[series] || seriesColors['20'];
 
@@ -4306,9 +4541,9 @@ function renderInventory(inventory, isPartial = false) {
             if (currentSeries && (currentSeries !== lastSeries || currentType !== lastType)) {
                 const typeLabel = isActuallyAluminum ? '鋁材' : '配件';
                 const seriesColors = {
-                    20: '#2980b9',
-                    30: '#d35400',
-                    40: '#27ae60'
+                    20: 'var(--accent-20)',
+                    30: 'var(--accent-30)',
+                    40: 'var(--accent-40)'
                 };
                 const color = seriesColors[currentSeries] || '#666';
 
@@ -4380,23 +4615,23 @@ function renderInventory(inventory, isPartial = false) {
                 let numberColor = "#d35400";
 
                 if (seriesClass === "series-20") {
-                    barGradient = "linear-gradient(90deg, #3b82f6, #2563eb)";
-                    bgGradient = "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)";
-                    borderColor = "#93c5fd";
-                    labelColor = "#1d4ed8";
-                    numberColor = "#1e3a8a";
+                    barGradient = "var(--accent-20)";
+                    bgGradient = "rgba(179, 199, 217, 0.1)";
+                    borderColor = "var(--accent-20)";
+                    labelColor = "var(--primary)";
+                    numberColor = "var(--primary)";
                 } else if (seriesClass === "series-30") {
-                    barGradient = "linear-gradient(90deg, #f97316, #ea580c)";
-                    bgGradient = "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)";
-                    borderColor = "#fdba74";
-                    labelColor = "#c2410c";
-                    numberColor = "#9a3412";
+                    barGradient = "var(--accent-30)";
+                    bgGradient = "rgba(198, 166, 130, 0.1)";
+                    borderColor = "var(--accent-30)";
+                    labelColor = "var(--primary)";
+                    numberColor = "var(--primary)";
                 } else if (seriesClass === "series-40") {
-                    barGradient = "linear-gradient(90deg, #22c55e, #16a34a)";
-                    bgGradient = "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)";
-                    borderColor = "#86efac";
-                    labelColor = "#15803d";
-                    numberColor = "#14532d";
+                    barGradient = "var(--accent-40)";
+                    bgGradient = "rgba(184, 204, 184, 0.1)";
+                    borderColor = "var(--accent-40)";
+                    labelColor = "var(--primary)";
+                    numberColor = "var(--primary)";
                 }
 
                 let offcutsHtml = '';
@@ -4493,30 +4728,30 @@ function renderInventory(inventory, isPartial = false) {
             } else {
                 // === ACCESSORY CARD TEMPLATE (Simple) ===
                 // Determine color theme based on series
-                let bgGradient = "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)";
-                let borderColor = "#bae6fd";
-                let iconColor = "#0284c7";
-                let textColor = "#0369a1";
-                let numberColor = "#0c4a6e";
+                let bgGradient = "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)";
+                let borderColor = "var(--border)";
+                let iconColor = "var(--accent-20)";
+                let textColor = "var(--primary)";
+                let numberColor = "var(--primary)";
 
                 if (seriesClass === "series-20") {
-                    bgGradient = "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)";
-                    borderColor = "#93c5fd";
-                    iconColor = "#2563eb";
-                    textColor = "#1d4ed8";
-                    numberColor = "#1e3a8a";
+                    bgGradient = "rgba(179, 199, 217, 0.1)";
+                    borderColor = "var(--accent-20)";
+                    iconColor = "var(--accent-20)";
+                    textColor = "var(--primary)";
+                    numberColor = "var(--primary)";
                 } else if (seriesClass === "series-30") {
-                    bgGradient = "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)";
-                    borderColor = "#fdba74";
-                    iconColor = "#ea580c";
-                    textColor = "#c2410c";
-                    numberColor = "#9a3412";
+                    bgGradient = "rgba(198, 166, 130, 0.1)";
+                    borderColor = "var(--accent-30)";
+                    iconColor = "var(--accent-30)";
+                    textColor = "var(--primary)";
+                    numberColor = "var(--primary)";
                 } else if (seriesClass === "series-40") {
-                    bgGradient = "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)";
-                    borderColor = "#86efac";
-                    iconColor = "#16a34a";
-                    textColor = "#15803d";
-                    numberColor = "#14532d";
+                    bgGradient = "rgba(184, 204, 184, 0.1)";
+                    borderColor = "var(--accent-40)";
+                    iconColor = "var(--accent-40)";
+                    textColor = "var(--primary)";
+                    numberColor = "var(--primary)";
                 }
 
 
@@ -4694,7 +4929,7 @@ window.runCuttingOptimization = async function () {
     // Simulate a slight delay to allow the UI to paint the disabled button state
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    area.innerHTML = `<div style="text-align:center; padding:30px; font-size:1.2rem; color:#3498db;"><i class="fas fa-cog fa-spin fa-2x"></i><br><br>正在同步庫存並計算最佳化排程...</div>`;
+    area.innerHTML = `<div style="text-align:center; padding:30px; font-size:1.2rem; color:var(--accent-20);"><i class="fas fa-cog fa-spin fa-2x"></i><br><br>正在同步庫存並計算最佳化排程...</div>`;
 
     // 0. Auto-Fetch Inventory if missing
     if (!window.allInventory || window.allInventory.length === 0) {
@@ -4978,10 +5213,10 @@ window.runCuttingOptimization = async function () {
 
     // Add Action Buttons (Print + Confirm)
     visualsHtml += `<div class="no-print" style="text-align:center; margin-top:30px; border-top:1px solid #eee; padding-top:20px; display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
-        <button onclick="window.printCuttingList()" style="background:#3498db; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <button onclick="window.printCuttingList()" style="background:var(--accent-20); color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
             <i class="fas fa-print"></i> 列印切料表
         </button>
-        <button class="btn-record-offcut" onclick="try{window.recordCuttingPlanToInventory()}catch(e){alert('Error: '+e.message)}" style="background:#e74c3c; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <button class="btn-record-offcut" onclick="try{window.recordCuttingPlanToInventory()}catch(e){alert('Error: '+e.message)}" style="background:var(--accent-20); color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
             <i class="fas fa-save"></i> 確認切割計畫並更新庫存
         </button>
     </div>`;
@@ -5418,7 +5653,7 @@ window.renderHistoryOrders = function () {
                     </div>
                     <div class="history-order-customer"><i class="fas fa-user"></i> ${o.name || '客戶'} (${o.phone || '無電話'})</div>
                     <div class="history-order-summary">${firstItem} ...</div>
-                    <div class="history-order-delivery"><i class="fas fa-truck"></i> ${o.address || '不需寄送'}</div>
+                    <div class="history-order-delivery"><i class="fas fa-truck"></i> <span class="card-tag" style="margin-top:0; font-size:0.7rem;">${o.address || '不需寄送'}</span></div>
                 </div>
             `;
         }).join('');
@@ -5484,12 +5719,14 @@ window.setChartFilter = function (chartId, filterType, value) {
         if (btn) {
             if (id === value) {
                 btn.classList.add('active');
-                btn.style.background = 'var(--accent)';
+                btn.style.background = 'var(--accent-mail)';
                 btn.style.color = '#fff';
+                btn.style.opacity = '1';
             } else {
                 btn.classList.remove('active');
                 btn.style.background = 'transparent';
-                btn.style.color = 'rgba(255,255,255,0.5)';
+                btn.style.color = '#888'; // Visible grey
+                btn.style.opacity = '0.8';
             }
         }
     });
@@ -5703,10 +5940,10 @@ window.renderFinancialReports = function () {
             top10Map[key] += itemsInfo.itemsMapTotal[key];
 
             let cleanName = key;
-            let color = '#95a5a6';
-            if (cleanName.match(/^\[A?30/i) || cleanName.match(/\[30135\]|\[3045\]/)) color = '#e67e22';
-            else if (cleanName.match(/^\[A?40/i) || cleanName.match(/\[8080\]/)) color = '#27ae60';
-            else if (cleanName.match(/^\[A?20/i)) color = '#2980b9';
+            let color = '#94a3b8'; // Standard Gray
+            if (cleanName.match(/^\[A?30/i) || cleanName.match(/\[30135\]|\[3045\]/)) color = '#c6a682'; // var(--accent-30)
+            else if (cleanName.match(/^\[A?40/i) || cleanName.match(/\[8080\]/)) color = '#b8ccb8'; // var(--accent-40)
+            else if (cleanName.match(/^\[A?20/i)) color = '#b3c7d9'; // var(--accent-20)
             topItemsColorMap[key] = color;
         });
     });
@@ -5790,7 +6027,9 @@ window.renderFinancialReports = function () {
                 if (chart && typeof chart.destroy === 'function') chart.destroy();
             });
 
-            Chart.defaults.color = '#a0aec0';
+            // Global Chart.js Defaults for Light Theme
+            Chart.defaults.color = '#545454';
+            Chart.defaults.borderColor = '#e5e5e5';
             Chart.defaults.font.family = "'Noto Sans TC', sans-serif";
 
             // TREND CHART
@@ -5801,7 +6040,7 @@ window.renderFinancialReports = function () {
                     trSets.push({
                         label: '鋁材營收',
                         data: Object.values(monthlyDataProfile).map(v => Math.round(v)),
-                        backgroundColor: '#8e44ad',
+                        backgroundColor: '#b3c7d9', // Morandi Slate Blue
                         borderRadius: trConf.cat === 'all' ? { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 } : 4,
                         borderSkipped: false
                     });
@@ -5810,7 +6049,7 @@ window.renderFinancialReports = function () {
                     trSets.push({
                         label: '配件營收',
                         data: Object.values(monthlyDataAccessory).map(v => Math.round(v)),
-                        backgroundColor: '#c0392b',
+                        backgroundColor: '#ba8181', // Morandi Rose
                         borderRadius: trConf.cat === 'all' ? { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } : 4,
                         borderSkipped: false
                     });
@@ -5853,11 +6092,11 @@ window.renderFinancialReports = function () {
                     type: 'doughnut',
                     data: {
                         labels: sLabels,
-                        datasets: [{ data: sVals, backgroundColor: ['#2980b9', '#e67e22', '#27ae60'], borderWidth: 0 }]
+                        datasets: [{ data: sVals, backgroundColor: ['#b3c7d9', '#c6a682', '#b8ccb8'], borderWidth: 0 }]
                     },
                     options: {
                         responsive: true, cutout: '65%',
-                        plugins: { legend: { position: 'right', labels: { color: '#fff', font: { size: 12 } } } }
+                        plugins: { legend: { position: 'right', labels: { color: '#545454', font: { size: 12 } } } }
                     }
                 });
             }
@@ -5871,11 +6110,11 @@ window.renderFinancialReports = function () {
                         labels: Object.keys(deliveryData),
                         datasets: [{
                             data: Object.values(deliveryData),
-                            backgroundColor: ['#9b59b6', '#f1c40f', '#1abc9c', '#e74c3c', '#34495e'],
+                            backgroundColor: ['#a3a3c2', '#c2a3a3', '#8ca3a3', '#94a3b8', '#bcaaa4'],
                             borderWidth: 0
                         }]
                     },
-                    options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#fff' } } } }
+                    options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: '#545454' } } } }
                 });
             }
 
