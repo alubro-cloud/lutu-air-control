@@ -127,48 +127,19 @@
 
     <!-- ========== Main Dashboard (Orders) ========== -->
     <div class="dashboard-container hidden" id="dashboard">
-        <aside class="sidebar">
-            <div class="brand" onclick="backToHub()" style="cursor:pointer;" title="返回主選單">
-                <i class="fas fa-cube"></i> LUTU 後台
-            </div>
-            <nav class="nav-menu">
-                <button class="nav-btn hub-back-btn" onclick="backToHub()"><i class="fas fa-th-large"></i>
-                    返回主選單</button>
-                <div class="nav-separator"></div>
-                <div class="nav-label">訂單分類</div>
-                <button id="nav-all-orders" class="nav-btn active" onclick="showAllOrders(this)"><i
-                        class="fas fa-list"></i> 全部訂單</button>
-
-                <!-- Delivery Sub-filters (Sidebar) -->
-                <div id="sidebar-filters" class="sidebar-sub-menu">
-                    <button class="sub-nav-btn active" onclick="filterByDelivery('all', this)">全部</button>
-                    <button class="sub-nav-btn" onclick="filterByDelivery('宅配', this)">宅配</button>
-                    <button class="sub-nav-btn" onclick="filterByDelivery('公司配送', this)">公司配送</button>
-                    <button class="sub-nav-btn" onclick="filterByDelivery('自取', this)">自取</button>
-                    <button class="sub-nav-btn" onclick="filterByDelivery('店到店', this)">店到店</button>
-                </div>
-
-                <button class="nav-btn" onclick="showWorkOrders(this)"><i class="fas fa-tools"></i> 今日工單</button>
-                <button class="nav-btn" onclick="showWarehouseShipment(this)"><i class="fas fa-shipping-fast"></i>
-                    今日出貨</button>
-                <button class="nav-btn" onclick="showInventory(this)"><i class="fas fa-warehouse"></i> 庫存查詢</button>
-
-                <div class="nav-separator"></div>
-                <button class="nav-btn logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> 登出</button>
-            </nav>
-        </aside>
-
         <main class="main-content">
-            <header class="top-bar">
-                <h1 id="page-title">全部訂單</h1>
-                <div class="actions">
-                    <button class="btn-refresh" onclick="fetchOrders()"><i class="fas fa-sync-alt"></i> 重新整理</button>
-                    <span id="last-update">最後更新: --</span>
+            <div class="module-topbar">
+                <div class="module-topbar-left">
+                    <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-th-large"></i> 主選單</button>
+                    <h2 id="page-title">全部訂單</h2>
                 </div>
-            </header>
+                <div class="module-topbar-right">
+                    <span id="last-update" style="font-size: 0.8rem; opacity: 0.6;">最後更新: --</span>
+                </div>
+            </div>
 
             <!-- Status Swimlanes (Kanban) -->
-            <div class="kanban-board">
+            <div class="kanban-board" id="kanban-board">
 
                 <div class="kanban-columns">
                     <!-- 1. 未報價 -->
@@ -238,36 +209,17 @@
 
                 <!-- Inventory Details (Shown after selecting category) -->
                 <div id="inventory-details" class="hidden">
-                    <div
-                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; flex-wrap: wrap; gap:15px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
-                        <div style="display:flex; align-items:center; gap:15px;">
-                            <button class="btn-back-hub" onclick="backToInventoryHub()"><i
+                    <div class="module-topbar">
+                        <div class="module-topbar-left">
+                            <button class="btn-back-hub-top" onclick="backToInventoryHub()"><i
                                     class="fas fa-arrow-left"></i> 返回類別</button>
-                            <h2 style="margin:0;" id="inventory-view-title"><i class="fas fa-warehouse"></i> 鋁材庫存監視</h2>
+                            <h2 id="inventory-view-title"><i class="fas fa-warehouse"></i> 鋁材庫存監視</h2>
                         </div>
-                        <div
-                            style="display:flex; flex-direction:column; gap:10px; flex:1; min-width:300px; max-width: 600px;">
-                            <div style="display:flex; gap:10px; align-items:center;">
-                                <input type="text" id="inventory-search" placeholder="搜尋項目名稱..."
-                                    style="padding:8px 15px; border-radius:20px; border:1px solid #ddd; width:220px; font-size:0.9rem;"
-                                    oninput="filterInventory()">
-                                <div id="aluminum-series-filters" class="inventory-type-filters"
-                                    style="display:flex; gap:5px;">
-                                    <button class="filter-pill active" onclick="filterBySeries('all', this)">全部</button>
-                                    <button class="filter-pill" onclick="filterBySeries('20', this)">20系</button>
-                                    <button class="filter-pill" onclick="filterBySeries('30', this)">30系</button>
-                                    <button class="filter-pill" onclick="filterBySeries('40', this)">40系</button>
-                                </div>
-                            </div>
+                        <div class="module-topbar-right">
+                            <!-- Optional actions could go here -->
                         </div>
-                        <button class="btn-refresh" onclick="fetchInventoryData()"><i class="fas fa-sync-alt"></i>
-                            刷新</button>
                     </div>
 
-                    <div id="inventory-stats"
-                        style="margin-bottom:20px; display:flex; gap:15px; animation: fadeIn 0.3s ease-in-out;">
-                        <!-- Stats pills will be injected here -->
-                    </div>
 
                     <div id="inventory-content">
                         <!-- Dynamic inventory table/cards injected here -->
@@ -287,8 +239,7 @@
             </div>
             <div class="module-topbar-right">
                 <input type="text" id="history-search" placeholder="搜尋客戶姓名或電話..." oninput="filterHistoryOrders()">
-                <button class="btn-refresh" onclick="fetchOrders().then(() => renderHistoryOrders())"><i
-                        class="fas fa-sync-alt"></i> 刷新</button>
+                <!-- Refresh removed per user request -->
             </div>
         </div>
         <div id="history-content" class="history-content">

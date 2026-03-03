@@ -267,132 +267,28 @@ body {
     display: none !important;
 }
 
-/* Dashboard Layout */
+/* Dashboard Layout - Simplified for Full Width */
 .dashboard-container {
-    display: flex;
+    display: block;
     height: 100vh;
-}
-
-.sidebar {
-    width: 240px;
-    background: #f8fafc;
-    /* Light Grey/Slate */
-    color: var(--text);
-    display: flex;
-    flex-direction: column;
-    box-shadow: none;
-    border-right: 1px solid var(--border);
-}
-
-.brand {
-    font-size: 1.5rem;
-    font-weight: 300;
-    padding: 25px 20px;
-    border-bottom: 1px solid var(--border);
-    background: #f1f5f9;
-    /* Slightly darker grey for brand area */
-    color: var(--text);
-    letter-spacing: 2px;
-}
-
-.nav-menu {
-    padding: 20px;
-    flex: 1;
-}
-
-.nav-label {
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    color: #94a3b8;
-    margin-bottom: 10px;
-    padding-left: 10px;
-    font-weight: 400;
-}
-
-.nav-separator {
-    height: 1px;
-    background: var(--border);
-    margin: 10px 0;
-}
-
-.nav-btn {
     width: 100%;
-    padding: 12px 15px;
-    text-align: left;
-    background: transparent;
-    color: var(--text);
-    border: none;
-    font-size: 0.95rem;
-    cursor: pointer;
-    border-radius: 6px;
-    margin-bottom: 5px;
-    transition: 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 300;
 }
 
-.nav-btn:hover {
-    background: var(--hover);
-    color: var(--accent-20);
-    /* Slate Blue instead of neutral */
-}
 
-.nav-btn.active {
-    background: #ffffff;
-    /* Contrast against grey sidebar */
-    color: var(--primary);
-    /* Neutral dark grey instead of series blue */
-    font-weight: 500;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    /* Subtle lift */
-    border-left: 3px solid var(--accent-20);
-    /* Slate Blue accent */
-}
-
+/* Main Content Area - Full Width */
 .main-content {
-    flex: 1;
+    width: 100%;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    /* Allow vertical scroll for inventory */
     overflow-x: hidden;
 }
 
-/* Sidebar Sub-menu Styling */
-.sidebar-sub-menu {
-    display: flex;
-    flex-direction: column;
-    padding-left: 20px;
-    margin-bottom: 10px;
-}
-
-.sub-nav-btn {
-    background: transparent;
-    border: none;
-    color: var(--text);
-    /* Visible grey instead of white */
-    padding: 6px 15px;
-    text-align: left;
-    font-size: 0.85rem;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: 0.2s;
-    margin-bottom: 2px;
-}
-
-.sub-nav-btn:hover {
-    color: var(--text);
-    background: rgba(0, 0, 0, 0.03);
-}
-
-.sub-nav-btn.active {
-    color: var(--text);
-    /* Standard text color */
-    font-weight: 500;
-    background: rgba(0, 0, 0, 0.05);
-    /* Neutral background */
+.main-content h1,
+.main-content h2,
+.main-content h3 {
+    font-weight: 300 !important;
 }
 
 .module-topbar {
@@ -462,15 +358,17 @@ body {
 }
 
 /* Kanban Board */
+/* Kanban Board - Wider and Full Screen */
 .kanban-board {
     flex: 1;
     background: #eef2f5;
-    /* Original solid background */
     padding: 20px 30px;
     overflow-x: auto;
     overflow-y: hidden;
     display: flex;
-    gap: 20px;
+    gap: 25px;
+    /* Increased gap */
+    width: 100%;
 }
 
 .kanban-column {
@@ -556,8 +454,10 @@ body {
 .kanban-card {
     background: white;
     border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 12px;
+    padding: 12px;
+    /* Reduced from 15px */
+    margin-bottom: 10px;
+    /* Reduced from 12px */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
     border: 1px solid transparent;
     cursor: pointer;
@@ -566,54 +466,169 @@ body {
     border-left: 3px solid transparent;
 }
 
+.card-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-mail);
+    /* Default */
+    color: #fff !important;
+    /* Changed to white as requested */
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    min-width: 52px;
+    height: 18px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Status-based Dynamic Colors for Number/Date and Pickup Tags */
+/* 客服區 (unquoted / quoted / paid) → 暖茶色 --accent-30 */
+.status-unquoted .card-no,
+.status-unquoted .card-tag,
+.status-quoted .card-no,
+.status-quoted .card-tag,
+.status-paid .card-no,
+.status-paid .card-tag {
+    background: var(--accent-30) !important;
+}
+
+.status-cutting .card-no,
+.status-cutting .card-tag {
+    background: var(--accent-20) !important;
+}
+
+.status-inspection .card-no,
+.status-inspection .card-tag,
+.status-picking .card-no,
+.status-picking .card-tag,
+.status-packing .card-no,
+.status-packing .card-tag {
+    background: var(--accent-warehouse) !important;
+}
+
+.status-shipping .card-no,
+.status-shipping .card-tag,
+.status-dispatched .card-no,
+.status-dispatched .card-tag {
+    background: var(--accent-40) !important;
+}
+
+.status-completed .card-no,
+.status-completed .card-tag {
+    background: var(--status-completed) !important;
+}
+
 .kanban-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
-.card-top {
+.card-header {
     display: flex;
     justify-content: space-between;
-    font-size: 0.8rem;
-    color: #999;
-    margin-bottom: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed #eee;
+    /* Synchronize with mobile aesthetic */
+}
+
+.card-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.card-body {
+    padding: 0 4px;
+    /* Tighten internal spacing on desktop too */
 }
 
 .card-title {
-    font-weight: 400;
+    font-weight: 500;
     font-size: 1rem;
-    color: #333;
-    margin-bottom: 5px;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+/* Global/Desktop Side-by-Side Layout */
+.card-main-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 8px;
+    width: 100%;
+}
+
+.card-contact {
+    flex: 1;
+    min-width: 0;
 }
 
 .card-info {
-    font-size: 0.9rem;
-    color: #666;
-    margin-bottom: 3px;
+    font-size: 0.8rem;
+    /* Reduced from 0.85rem as requested */
+    color: #64748b;
+    margin-bottom: 1px;
     display: flex;
     align-items: center;
     gap: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.email-info {
+    font-size: 0.75rem;
+    /* Email even smaller for clarity */
+    opacity: 0.8;
+}
+
+.card-price-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex-shrink: 0;
 }
 
 .card-price {
-    margin-top: 10px;
-    font-weight: 400;
+    font-weight: 300;
     color: var(--accent-delivery);
     font-size: 1.1rem;
     text-align: right;
+    line-height: 1;
 }
 
 .card-tag {
     display: inline-block;
     padding: 2px 10px;
     border-radius: 12px;
-    background: var(--accent-delivery);
+    background: var(--accent-mail);
+    /* Default */
     color: #fff !important;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 330;
+    /* Keep it light */
     margin-top: 5px;
     border: 1px solid rgba(0, 0, 0, 0.05);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.status-pending-hint {
+    font-size: 0.75rem;
+    color: var(--accent-delivery);
+    margin-left: 5px;
+    font-weight: normal;
+}
+
+.shipping-fee-hint {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    font-weight: normal;
+    margin-top: 2px;
 }
 
 /* Modal styling same as before */
@@ -693,7 +708,7 @@ body {
 .detail-value {
     font-size: 1.1rem;
     color: #333;
-    font-weight: 400;
+    font-weight: 300;
 }
 
 .detail-pre {
@@ -911,7 +926,7 @@ body {
 
 .category-name {
     font-size: 1.8rem;
-    font-weight: 300;
+    font-weight: 400;
     color: #2c3e50;
     margin-bottom: 10px;
     letter-spacing: 1px;
@@ -931,6 +946,7 @@ body {
     cursor: pointer;
     transition: 0.2s;
     font-size: 0.9rem;
+    font-weight: 400;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1018,7 +1034,7 @@ body {
 
 .stat-value {
     font-size: 1.1rem;
-    font-weight: bold;
+    font-weight: 400;
     color: var(--primary);
 }
 
@@ -1076,7 +1092,7 @@ body {
 }
 
 .inventory-title {
-    font-weight: bold;
+    font-weight: 300;
     font-size: 1.2rem;
 }
 
@@ -1086,7 +1102,7 @@ body {
     padding: 4px 12px;
     border-radius: 6px;
     font-size: 0.9rem;
-    font-weight: bold;
+    font-weight: 300;
 }
 
 .offcut-visual-list {
@@ -1288,13 +1304,23 @@ body {
         width: 100%;
     }
 
-    .top-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px !important;
+    .top-bar,
+    .module-topbar {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: center !important;
+        text-align: center !important;
+        margin-bottom: 20px !important;
         flex-wrap: wrap;
-        width: 100%;
+        width: 100% !important;
+    }
+
+    .module-topbar-left {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 10px !important;
+        width: 100% !important;
     }
 
     .top-bar h1 {
@@ -1302,68 +1328,155 @@ body {
         font-size: 1.3rem;
     }
 
-    .top-bar .actions {
-        margin-top: 5px;
+    .top-bar .actions,
+    .module-topbar-right {
+        margin-top: 10px !important;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
 
     #last-update {
-        display: none;
+        display: block !important;
+        margin-top: 5px;
+        font-size: 0.75rem !important;
+        opacity: 0.5 !important;
     }
 
     .kanban-board {
-        display: block;
+        display: flex;
+        flex-direction: column !important;
+        align-items: center !important;
         width: 100% !important;
-        padding: 0 !important;
-        overflow: visible !important;
+        padding: 10px 0 !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        gap: 20px !important;
     }
 
-    .kanban-columns-container,
-    .kanban-group,
-    .group-columns,
-    .kanban-column {
-        display: block;
+    .kanban-columns-container {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
         width: 100% !important;
-        height: auto !important;
-        min-height: 0 !important;
-        margin-bottom: 20px !important;
-        float: none !important;
-        overflow: visible !important;
+        padding: 0 !important;
+        gap: 20px !important;
+    }
+
+    .kanban-group {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 95% !important;
+        max-width: 500px !important;
+        margin: 0 auto 20px auto !important;
+        padding: 0 !important;
+        border: 1px solid #ddd !important;
+        border-radius: 12px !important;
+        background: #fdfdfd !important;
     }
 
     .group-header {
-        padding: 12px 15px !important;
-        border-radius: 10px !important;
-        /* Symmetric corners */
-        margin-bottom: 10px !important;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        align-items: flex-start !important;
+        text-align: left !important;
+        gap: 8px !important;
+        padding: 15px 20px !important;
+        border-radius: 12px 12px 0 0 !important;
+        margin-bottom: 5px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .group-title-wrapper {
+        justify-content: flex-start !important;
+        align-items: center !important;
+        /* Center text and pill vertically */
+        width: 100% !important;
+        text-align: left !important;
+        display: flex !important;
+        padding: 0 !important;
+        flex-wrap: wrap !important;
+    }
+
+    .group-columns {
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 5px !important;
+        gap: 4px !important;
+        /* Minimal gap between labels */
+        width: 100% !important;
+        box-sizing: border-box !important;
+        align-items: flex-start !important;
+        /* Kill stretch */
     }
 
     .kanban-column {
-        margin-bottom: 25px !important;
-        border-bottom: 1px solid transparent;
-        /* Force layout */
+        width: 100% !important;
+        min-width: unset !important;
+        height: auto !important;
+        /* Allow collapse to 0 */
+        min-height: 0 !important;
+        margin-bottom: 4px !important;
+        /* Compact spacing between columns */
+        display: block !important;
+        flex: none !important;
+        /* Block flex growth */
+        position: relative;
     }
 
     .column-header {
-        display: inline-flex !important;
-        /* Compact label */
-        width: fit-content !important;
-        min-width: 100px;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        text-align: left !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 12px 15px !important;
+        border-radius: 0 !important;
+        box-sizing: border-box !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .column-header::after {
+        right: 15px !important;
+    }
+
+    .header-tag,
+    .count-badge {
         margin-left: 10px !important;
-        margin-top: 5px !important;
-        margin-bottom: 0 !important;
-        padding: 8px 45px 8px 15px !important;
-        /* Right padding for chevron */
-        border-radius: 20px !important;
-        /* Pill style */
-        cursor: pointer;
-        user-select: none;
-        position: relative;
-        z-index: 10;
-        font-size: 0.85rem !important;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1) !important;
+        margin-top: 0 !important;
+        /* Remove push-down */
+        display: inline-block !important;
+    }
+
+    /* Consolidated Group Header logic above to avoid padding conflicts */
+
+    /* Redundant rule removed in consolidation */
+
+    .column-header {
+        display: flex !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 12px 45px 12px 20px !important;
+        /* Unified 20px left padding */
+        border-radius: 0 !important;
+        box-sizing: border-box !important;
+        font-size: 0.95rem !important;
+        box-shadow: none !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
+
+    .kanban-column {
+        border-bottom: 1px solid #eee;
+        background: #fff !important;
+    }
+
+    .kanban-column:last-child {
+        border-bottom: none;
     }
 
     /* Chevron indicator */
@@ -1384,33 +1497,424 @@ body {
     }
 
     .column-body {
-        /* Switch to Block layout for safest content flow */
         display: block !important;
         width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-        padding: 15px 5px !important;
+        max-height: 2000px;
+        opacity: 1;
+        visibility: visible;
+        overflow: hidden !important;
+        padding: 12px 5px !important;
         box-sizing: border-box;
-        gap: 0 !important;
-        /* Block doesn't use gap */
+        flex: none !important;
+        height: auto !important;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .column-body.collapsed {
-        display: none !important;
+        max-height: 0 !important;
+        min-height: 0 !important;
+        height: 0 !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        /* Remove from layout flow impact */
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        pointer-events: none;
     }
 
     .kanban-card {
-        display: block !important;
+        display: flex !important;
+        flex-direction: column !important;
         width: 100% !important;
         height: auto !important;
         min-height: 0 !important;
-        margin-bottom: 15px !important;
-        /* Margin for separation in Block layout */
+        margin-bottom: 8px !important;
+        /* Reduced from 12px */
+        padding: 10px 6px !important;
+        /* Reduced horizontal padding from 10px to 6px */
         box-sizing: border-box;
-        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1) !important;
         position: relative;
         z-index: 5;
+        border-radius: 12px !important;
+        background: #fff !important;
+        border: 1px solid rgba(0, 0, 0, 0.05) !important;
     }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        /* Reduced from 12px */
+        padding-bottom: 6px;
+        /* Reduced from 10px */
+        border-bottom: 1px dashed #eee;
+    }
+
+    .card-meta {
+        display: flex;
+        gap: 10px;
+        font-size: 0.75rem;
+    }
+
+    .card-no {
+        background: var(--accent-mail) !important;
+        /* Consistent rose for mobile */
+        color: #fff !important;
+        /* Changed to white */
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-weight: 500;
+        min-width: 50px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-time {
+        display: none !important;
+        /* Fully hidden as requested */
+    }
+
+    .card-body {
+        padding: 0 4px;
+        /* Reduced internal body padding */
+    }
+
+    .card-title {
+        font-size: 1.05rem !important;
+        /* Reduced from 1.15rem */
+        font-weight: 500 !important;
+        color: #1e293b !important;
+        margin-bottom: 6px !important;
+        /* Slightly more space for the horizontal row below */
+    }
+
+    .card-main-content {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-end !important;
+        gap: 10px !important;
+        width: 100% !important;
+    }
+
+    .card-contact {
+        margin-bottom: 0 !important;
+        /* Remove bottom margin as it's now a sibling */
+        flex: 1 !important;
+        min-width: 0 !important;
+        /* Allow shrinking for ellipsis */
+    }
+
+    .card-info {
+        font-size: 0.8rem !important;
+        /* Slightly smaller for density */
+        color: #64748b !important;
+        margin-bottom: 2px !important;
+        /* Reduced from 4px */
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .email-info {
+        font-size: 0.8rem !important;
+        opacity: 0.8;
+    }
+
+    .card-price-container {
+        display: flex;
+        flex-direction: column !important;
+        justify-content: flex-end;
+        align-items: flex-end;
+        margin-top: 0 !important;
+        /* Inline now */
+        flex-shrink: 0 !important;
+    }
+
+    .card-price {
+        font-size: 1.25rem !important;
+        /* Slightly adjusted for density */
+        font-weight: 600 !important;
+        color: var(--accent-delivery) !important;
+        line-height: 1 !important;
+        text-align: right;
+    }
+
+    .status-pending-hint {
+        font-size: 0.75rem;
+        color: var(--accent-delivery);
+        margin-left: 5px;
+        font-weight: normal;
+    }
+
+    .shipping-fee-hint {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        font-weight: normal;
+        margin-top: 2px;
+    }
+
+    .card-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+        /* Reduced from 15px */
+        padding-top: 10px;
+        /* Reduced from 15px */
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .btn-card-action {
+        flex: 1;
+        padding: 8px 5px !important;
+        /* Reduced from 10px */
+        font-size: 0.85rem !important;
+        border-radius: 8px !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 4px;
+        /* Slightly tighter gap */
+    }
+
+    .btn-gmail {
+        background: var(--accent-mail) !important;
+        color: #475569 !important;
+        border: 1px solid #e2e8f0 !important;
+        flex: 0 0 80px !important;
+    }
+
+    .btn-prev {
+        flex: 0 0 45px !important;
+        background: #f1f5f9 !important;
+        color: #475569 !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+}
+
+/* --- Reservoir Chart Styles --- */
+.reservoir-card {
+    background: #ffffff;
+    padding: 25px 20px;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.reservoir-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    border-color: #cbd5e1;
+}
+
+.reservoir-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.reservoir-circle-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.reservoir-label {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #64748b;
+    margin-bottom: 5px;
+}
+
+.reservoir-value {
+    font-size: 1.1rem;
+    font-weight: 400;
+    margin-top: 5px;
+}
+
+.reservoir-percent {
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: #94a3b8;
+}
+
+.reservoir-svg {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.reservoir-rect {
+    transition: y 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reservoir-wave {
+    animation: reservoir-wave-slide 3s linear infinite;
+    transform-box: fill-box;
+    transform-origin: left center;
+}
+
+.reservoir-wave-slow {
+    animation: reservoir-wave-slide 5s linear infinite;
+    transform-box: fill-box;
+    transform-origin: left center;
+}
+
+@keyframes reservoir-wave-slide {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-160px);
+    }
+}
+
+@keyframes reservoir-rise-anim {
+    from {
+        transform: translateY(80px);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* --- Aluminum Tube Chart Styles --- */
+.aluminum-tube-card {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.aluminum-tube-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.tube-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.sku-badge {
+    background: #f1f5f9;
+    color: #475569;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 400;
+    border: 1px solid #e2e8f0;
+}
+
+.tube-container {
+    width: 100%;
+    height: 32px;
+    background: #f1f5f9;
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tube-filler {
+    height: 100%;
+    border-radius: 16px;
+    transition: width 1.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+}
+
+.tube-text {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: #1e293b;
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* 餘料抽屜樣式 */
+.offcut-drawer {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+}
+
+.offcut-badge {
+    background: rgba(100, 116, 139, 0.1);
+    color: #64748b;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 400;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.offcut-drawer:hover .offcut-badge {
+    background: #64748b;
+    color: #ffffff;
+}
+
+.offcut-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid #e2e8f0;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    min-width: 140px;
+    transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    pointer-events: none;
+}
+
+.offcut-drawer:hover .offcut-tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.offcut-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.offcut-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: #475569;
 }
 
 /* --- Desktop Layout Only (Min Width 769px) --- */
@@ -1451,18 +1955,25 @@ body {
     }
 
     .group-header {
-        padding: 10px 15px;
-        border-radius: 11px 11px 0 0;
+        font-size: 1.1em;
         font-weight: 400;
         color: #fff;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 0.95rem;
-        white-space: nowrap;
+        /* White text for colored headers */
+        text-align: left;
+        /* Aligned left for flex */
+        padding: 10px 15px;
+        border-radius: 6px;
         margin-bottom: 15px;
         box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        text-align: left;
+        display: flex;
+        justify-content: space-between;
+        /* Title left, Tag right */
+        align-items: center;
+    }
+
+    .group-title-wrapper {
+        display: flex;
+        align-items: center;
     }
 
     .group-columns {
@@ -1505,11 +2016,12 @@ body {
 
     .kanban-card {
         background: #fff;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 10px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        border-radius: 12px;
+        padding: 10px 8px;
         cursor: pointer;
         transition: 0.2s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
     }
 
     .kanban-card:hover {
@@ -1552,7 +2064,7 @@ body {
 
 .hub-brand {
     font-size: 1.3rem;
-    font-weight: 700;
+    font-weight: 300;
     color: #fff;
     letter-spacing: 1px;
 }
@@ -1631,9 +2143,9 @@ body {
 }
 
 .hub-card {
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
     padding: 25px 30px;
@@ -1700,7 +2212,7 @@ body {
 .hub-card-content h3 {
     color: white;
     font-size: 1.05rem;
-    font-weight: 500;
+    font-weight: 300;
     margin: 0 0 2px 0;
 }
 
@@ -1717,6 +2229,7 @@ body {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 20px;
     display: inline-block;
+    font-weight: 300;
 }
 
 .hub-card-stat i {
@@ -1752,12 +2265,13 @@ body {
 /* Card Tags (Delivery Methods) */
 .card-tag {
     display: inline-block;
-    background: var(--accent-delivery);
+    background: var(--accent-mail);
+    /* Default */
     color: #fff !important;
     padding: 2px 10px;
     border-radius: 12px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 300;
     margin-top: 8px;
     border: 1px solid rgba(0, 0, 0, 0.05);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -1792,8 +2306,8 @@ body {
 
 .module-topbar-left h2 {
     color: var(--text);
-    font-weight: 400;
-    font-size: 1.2rem;
+    font-weight: 300;
+    font-size: 1.4rem;
     margin: 0;
 }
 
@@ -1913,7 +2427,7 @@ body {
 .history-month-header .month-label {
     color: var(--text);
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .history-month-header .month-stats {
@@ -1931,7 +2445,7 @@ body {
 .history-month-header .month-revenue {
     color: #1abc9c;
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .history-month-header .month-chevron {
@@ -1949,7 +2463,10 @@ body {
 }
 
 .history-month-body.show {
-    display: block;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    padding: 15px 5px;
 }
 
 .history-order-card {
@@ -1981,7 +2498,7 @@ body {
 
 .history-order-total {
     color: #1abc9c;
-    font-weight: 500;
+    font-weight: 400;
     font-size: 1rem;
 }
 
@@ -2179,6 +2696,7 @@ body {
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
+
 .clock-display h1 {
     font-size: 4.5rem;
     font-weight: 700;
@@ -2277,7 +2795,7 @@ body {
 /* ================================================
    HUB RESPONSIVE
    ================================================ */
-@media (max-width: 700px) {
+@media (max-width: 768px) {
     .admin-hub {
         height: 100vh;
         overflow: hidden;
@@ -2289,60 +2807,55 @@ body {
     .hub-grid,
     .shortcut-grid {
         grid-template-columns: repeat(2, 1fr) !important;
-        gap: 20px;
+        gap: 15px;
         width: 100%;
-        max-width: 240px;
-        /* Reduced grid width to shrink buttons collectively */
-        margin: 0 auto 20px auto;
+        max-width: 320px;
+        /* Slight increase for better spacing */
+        margin: 0 auto 30px auto;
     }
 
     .hub-card {
-        padding: 5px;
-        gap: 8px;
-        border-radius: 12px;
+        padding: 12px 10px;
+        /* More vertical padding for tap accuracy */
+        gap: 10px;
+        border-radius: 16px;
         flex-direction: column;
         text-align: center;
-        aspect-ratio: 1 / 1.3;
-        /* Taller look */
+        aspect-ratio: 1 / 1.1;
+        /* More square-ish for larger targets */
         width: 100%;
-        max-width: 90px;
-        /* Smaller button width */
+        max-width: 140px;
+        /* Significantly larger touch area */
         margin: 0 auto;
         min-height: unset;
         justify-content: center;
-        /* Vertical center */
         align-items: center;
-        /* Horizontal center */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
     }
 
     .hub-card-content {
         flex: none !important;
-        /* Stop stretching! */
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-    }
-
-    .hub-card::before {
         width: 100%;
-        height: 3px;
-        left: 0;
-        top: 0;
-        bottom: auto;
-        border-radius: 12px 12px 0 0;
     }
 
     .hub-card-icon {
-        font-size: 1.2rem;
-        margin: 0;
-        width: auto;
+        font-size: 1.6rem;
+        /* Bigger icons for priority */
+        margin-bottom: 5px;
     }
 
     .hub-card h3 {
-        font-size: 0.8rem;
+        font-size: 0.9rem;
         margin: 0;
-        line-height: 1.1;
+        line-height: 1.2;
+        font-weight: 500;
     }
 
     .hub-card p {
@@ -2350,9 +2863,12 @@ body {
     }
 
     .hub-card-stat {
-        font-size: 0.55rem;
-        padding: 1px 4px;
-        margin-top: 2px;
+        font-size: 0.6rem;
+        padding: 2px 6px;
+        margin-top: 5px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+        color: rgba(255, 255, 255, 0.7);
     }
 
     .hub-card-arrow {
@@ -2362,7 +2878,6 @@ body {
     .hub-body {
         padding: 5px 10px;
         justify-content: center;
-        /* Vertically center the grid */
         flex: 1;
         overflow-y: auto;
         display: flex;
@@ -2372,6 +2887,7 @@ body {
 
     .hub-welcome {
         margin-bottom: 10px;
+        text-align: center;
     }
 
     .hub-welcome h1 {
@@ -2385,10 +2901,12 @@ body {
     .hub-header {
         padding: 8px 12px;
         flex-direction: row;
-        /* Keep horizontal on mobile if possible, or very compact stack */
         justify-content: space-between;
         align-items: center;
         gap: 10px;
+        background: transparent;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        /* Match desktop subtle border */
     }
 
     .hub-header-right {
@@ -2398,7 +2916,6 @@ body {
 
     .hub-datetime {
         display: none;
-        /* Hide date on very small mobile to save space */
     }
 
     .hub-logout-btn {
@@ -2406,81 +2923,204 @@ body {
         font-size: 0.75rem;
     }
 
-    /* Module Page Adjustments */
-    .module-page {
-        padding: 0 10px 20px;
-    }
-
+    /* ===== 手機版 Module Topbar：標題左、主選單右、其他隱藏 ===== */
     .module-topbar {
-        padding: 15px 10px;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 8px 12px !important;
+        gap: 8px !important;
+        /* 防止訂單管理的 kanban 水平滾動導致 topbar 超出螢幕 */
+        width: 100% !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        /* sticky 定位時確保貼左邊 */
+        left: 0 !important;
     }
 
+    /* display:contents 讓 wrapper 消失，子元素直接參與 topbar flex 排版 */
+    .module-topbar-left {
+        display: contents !important;
+    }
+
+    /* h2 標題：靠左（order 1），撐滿剩餘空間 */
+    .module-topbar-left h2 {
+        order: 1 !important;
+        flex: 1 !important;
+        font-size: 0.95rem !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin: 0 !important;
+    }
+
+    /* 主選單按鈕：靠右（order 2） */
+    .module-topbar-left .btn-back-hub-top {
+        order: 2 !important;
+        flex-shrink: 0 !important;
+        padding: 6px 10px !important;
+        font-size: 0.78rem !important;
+    }
+
+    /* 右側所有資訊全部隱藏（最後更新、篩選、搜尋等） */
     .module-topbar-right {
-        width: 100%;
-        justify-content: space-between;
+        display: none !important;
     }
 
-    .module-topbar-right input[type="text"],
-    .module-topbar-right select {
-        width: calc(100% - 80px);
-        /* Leave room for refresh button */
+    /* ===== 訂單管理頁：topbar 改為 fixed，行為跟財報/歷史一致 ===== */
+    /* sticky + kanban 水平撐寬 → topbar 變超寬。改 fixed 永遠是 100vw */
+    .main-content>.module-topbar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        z-index: 200 !important;
     }
 
-    /* History Orders Adjustments */
-    .history-month-header {
-        padding: 12px 15px;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
+    /* Kanban board 補上 topbar 高度的 padding，防止卡片被擋住 */
+    .main-content .kanban-board {
+        padding-top: 50px !important;
     }
 
-    .history-month-header .month-stats {
-        width: 100%;
-        justify-content: space-between;
+    /* 庫存頁也補 padding */
+    .main-content #inventory-section {
+        padding-top: 50px !important;
     }
 
-    .history-order-card {
-        padding: 12px 15px;
+    /* ===== 手機版庫存管理：縮小兩大板塊 (鋁材/配件總覽) ===== */
+    /* 原本桌面版有 flex, width: 280px, height: 320px, 這裡必須強力覆寫 */
+    .category-card {
+        display: grid !important;
+        grid-template-columns: auto 1fr !important;
+        grid-template-rows: auto auto !important;
+        grid-template-areas:
+            "icon name"
+            "icon desc" !important;
+        align-items: center !important;
+        padding: 30px 25px !important;
+        /* 增加上下左右的 padding，讓卡片變胖一點 */
+        margin-bottom: 20px !important;
+        /* 增加兩張卡的間距 */
+        border-radius: 16px !important;
+        width: 100% !important;
+        /* 解除原本的固定寬度 */
+        height: auto !important;
+        /* 強制解除原本的 320px 高度 */
+        min-height: 140px !important;
+        /* 確保有一定的最小高度 */
+        gap: 8px 25px !important;
+        /* 圖標與文字的間距稍微拉開 */
+        text-align: left !important;
     }
 
-    .history-order-top {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 4px;
-        margin-bottom: 6px;
+    .category-icon {
+        grid-area: icon;
+        font-size: 3.5rem !important;
+        /* 圖標放大一點點 */
+        margin-bottom: 0 !important;
+        color: #94a3b8 !important;
     }
 
-    .history-order-total {
-        align-self: flex-end;
-        margin-top: -24px;
-        /* Pull it up next to date */
+    .category-name {
+        grid-area: name;
+        font-size: 1.3rem !important;
+        /* 標題放大一點點 */
+        margin-bottom: 0 !important;
+        font-weight: 500 !important;
+        align-self: end !important;
+        /* 讓名字靠下貼近說明 */
     }
 
-    /* Financial Reports Adjustments */
+    .category-desc {
+        grid-area: desc;
+        font-size: 0.85rem !important;
+        line-height: 1.3 !important;
+        align-self: start !important;
+        /* 讓說明靠上貼近名字 */
+        color: #888 !important;
+    }
+
+    /* ===== 手機版財務報表 (Financial Reports) RWD 修正 ===== */
     .kpi-row {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-        padding: 0;
+        grid-template-columns: repeat(2, 1fr) !important;
+        /* 變為雙欄雙列排列 */
+        gap: 12px !important;
+        margin-bottom: 20px !important;
+        padding: 0 5px !important;
+        /* 原本 padding: 0 10px，縮小變貼邊 */
     }
 
     .kpi-card {
-        padding: 15px;
+        padding: 15px !important;
+        /* 縮小卡片內部留白讓圖表變大 */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
 
     .kpi-value {
-        font-size: 1.4rem;
+        font-size: 1.6rem !important;
     }
 
     .charts-grid {
-        grid-template-columns: 1fr;
-        padding: 0;
-        gap: 15px;
+        grid-template-columns: 1fr !important;
+        /* 變為單欄垂直排列 */
+        gap: 15px !important;
+        padding: 0 5px !important;
+        /* 縮小兩側邊距貼近邊緣 */
     }
 
     .chart-box {
-        padding: 15px;
+        padding: 12px !important;
+        /* 卡片內容留白變小 */
+        width: 100% !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+        /* 防止圖表溢出 */
+    }
+
+    .chart-box h4 {
+        margin-bottom: 10px !important;
+    }
+
+    .trend-toggle-group {
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        margin-bottom: 5px !important;
+    }
+
+    /* 歷史訂單在手機版為單欄 */
+    .history-month-body.show {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        padding: 10px 0 !important;
+    }
+
+    /* 強制財務與歷史模組在手機版左右貼齊螢幕邊緣 */
+    #history-module,
+    #reports-module,
+    .history-content {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .kpi-row,
+    .charts-grid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .history-month-header,
+    .history-order-card,
+    .chart-box {
+        border-radius: 0 !important;
+        border-right: none !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
     }
 }

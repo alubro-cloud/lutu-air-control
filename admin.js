@@ -265,6 +265,9 @@ let ordersData = [];
 let filteredOrders = [];
 let currentFilter = 'all';
 
+// Track which columns are expanded on mobile to preserve state across renders
+window.expandedColumns = new Set();
+
 // --- CONFIGURATION ---
 const STATUS_LABELS = {
     unquoted: "待報價",
@@ -482,47 +485,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Mobile Accordion: Toggle column visibility on header click
-    setupMobileAccordion();
+    initMobileAccordion();
 });
 
-// Setup mobile accordion functionality
-function setupMobileAccordion() {
-    // Only activate on mobile (max-width: 768px)
+// Global Event Delegation for Mobile Accordion - ONLY ADD ONCE
+document.addEventListener('click', function (e) {
+    // Only activate on mobile
     if (window.innerWidth > 768) return;
 
-    // Add click listeners to all column headers
-    document.addEventListener('click', function (e) {
-        const header = e.target.closest('.column-header');
-        if (!header || window.innerWidth > 768) return;
+    const header = e.target.closest('.column-header');
+    if (!header) return;
 
-        const column = header.closest('.kanban-column');
-        if (!column) return;
+    const column = header.closest('.kanban-column');
+    if (!column) return;
 
-        const body = column.querySelector('.column-body');
-        if (!body) return;
+    const body = column.querySelector('.column-body');
+    if (!body) return;
 
-        // Toggle collapsed state
-        header.classList.toggle('collapsed');
-        body.classList.toggle('collapsed');
-    });
+    // Extract status key from header class (e.g., status-unquoted)
+    const statusMatch = header.className.match(/status-([a-z0-0_-]+)/i);
+    const statusKey = statusMatch ? statusMatch[1] : null;
 
-    // Initialize all columns as collapsed on mobile
-    if (window.innerWidth <= 768) {
-        setTimeout(() => {
-            document.querySelectorAll('.column-header').forEach(header => {
-                header.classList.add('collapsed');
-            });
-            document.querySelectorAll('.column-body').forEach(body => {
-                body.classList.add('collapsed');
-            });
-        }, 100);
+    // Toggle collapsed state
+    const isNowCollapsed = header.classList.toggle('collapsed');
+    body.classList.toggle('collapsed');
+
+    // Update global sticky state
+    if (statusKey) {
+        if (isNowCollapsed) {
+            window.expandedColumns.delete(statusKey);
+        } else {
+            window.expandedColumns.add(statusKey);
+        }
     }
+});
+
+// Initialize mobile accordion states (Only needed for first run or cross-tab resets)
+function initMobileAccordion() {
+    // Only activate on mobile
+    if (window.innerWidth > 768) return;
+
+    // We no longer need to force-collapse everything here because renderKanban 
+    // already uses window.expandedColumns to set the 'collapsed' class correctly.
+    // This function can now be empty or handle specific one-time setups.
 }
 
 // Re-setup accordion when window is resized
 window.addEventListener('resize', () => {
     if (window.innerWidth <= 768) {
-        setupMobileAccordion();
+        // Just re-init states if needed, don't add new listeners
+        // (Wait for render usually)
     } else {
         // Remove collapsed states on desktop
         document.querySelectorAll('.column-header').forEach(header => {
@@ -559,8 +571,32 @@ function showAdminHub() {
 }
 
 function navigateTo(module, subView) {
+    console.log(`🚀 navigateTo: module=${module}, subView=${subView}`);
+
+    // 1. SET STATE IMMEDIATELY & SYNCHRONOUSLY (Critical for applyFilter race conditions)
+    if (module === 'orders') {
+        if (subView === 'inventory') window.currentPrimaryView = 'inventory';
+        else if (subView === 'work') window.currentPrimaryView = 'work';
+        else if (subView === 'shipment') window.currentPrimaryView = 'shipment';
+        else window.currentPrimaryView = 'all';
+    }
+
     const hub = document.getElementById('admin-hub');
+    const dashboard = document.getElementById('dashboard');
+    const board = document.getElementById('kanban-board');
+    const inventory = document.getElementById('inventory-section');
     const TRANSITION_MS = 400;
+
+    // 2. SET VISIBILITY IMMEDIATELY (Prevents flashing/ghosting of last view)
+    if (module === 'orders') {
+        if (window.currentPrimaryView === 'inventory') {
+            if (board) board.classList.add('hidden');
+            if (inventory) inventory.classList.remove('hidden');
+        } else {
+            if (board) board.classList.remove('hidden');
+            if (inventory) inventory.classList.add('hidden');
+        }
+    }
 
     // Step 1: Fade out the hub
     hub.style.transition = `opacity ${TRANSITION_MS}ms ease`;
@@ -575,63 +611,68 @@ function navigateTo(module, subView) {
         // Determine the target element
         let targetEl;
         if (module === 'orders') {
-            targetEl = document.getElementById('dashboard');
+            targetEl = dashboard;
         } else if (module === 'history') {
             targetEl = document.getElementById('history-module');
         } else if (module === 'reports') {
             targetEl = document.getElementById('reports-module');
         }
 
-        // Prepare fade-in: set opacity 0, remove hidden, then animate to 1
+        // Prepare fade-in
         if (targetEl) {
             targetEl.style.opacity = '0';
             targetEl.classList.remove('hidden');
             targetEl.style.transition = `opacity ${TRANSITION_MS}ms ease`;
-            // Force reflow so the transition triggers
             void targetEl.offsetWidth;
             targetEl.style.opacity = '1';
-            // Clean up inline styles after transition
+
+            // Module-specific routing
+            if (module === 'orders') {
+                const performRouting = () => {
+                    if (subView === 'work') window.showWorkOrders();
+                    else if (subView === 'shipment') window.showWarehouseShipment();
+                    else if (subView === 'inventory') window.showInventory();
+                    else showAllOrders();
+                };
+
+                if (!ordersData || !ordersData.length) {
+                    // [快取] 先從 localStorage 快取立即顯示，背景刷新資料
+                    try {
+                        const cached = localStorage.getItem('orders_cache');
+                        if (cached) {
+                            const savedStatuses = JSON.parse(localStorage.getItem('order_statuses') || '{}');
+                            ordersData = JSON.parse(cached).map(order => {
+                                let key = String(order.timestamp);
+                                if (savedStatuses[key]) order.status = savedStatuses[key];
+                                return order;
+                            });
+                            performRouting(); // 立即顯示快取資料
+                            fetchOrders();   // 背景悄悄更新
+                        } else {
+                            fetchOrders().then(performRouting); // 無快取：等待 API
+                        }
+                    } catch (e) {
+                        fetchOrders().then(performRouting);
+                    }
+                } else {
+                    performRouting();
+                    fetchOrders(); // Refresh in background
+                }
+            } else if (module === 'history') {
+                if (!ordersData.length) fetchOrders().then(() => renderHistoryOrders());
+                else renderHistoryOrders();
+            } else if (module === 'reports') {
+                if (ordersData.length > 0) renderFinancialReports();
+                fetchOrders().then(() => renderFinancialReports());
+            }
+
             setTimeout(() => {
                 targetEl.style.opacity = '';
                 targetEl.style.transition = '';
             }, TRANSITION_MS);
         }
 
-        // Module-specific logic
-        if (module === 'orders') {
-            const performRouting = () => {
-                if (subView === 'work' && typeof window.showWorkOrders === 'function') {
-                    window.showWorkOrders(document.querySelector('.nav-btn i.fa-tools')?.parentElement);
-                } else if (subView === 'shipment' && typeof window.showWarehouseShipment === 'function') {
-                    window.showWarehouseShipment(document.querySelector('.nav-btn i.fa-shipping-fast')?.parentElement);
-                } else if (subView === 'inventory' && typeof window.showInventory === 'function') {
-                    window.showInventory(document.querySelector('.nav-btn i.fa-warehouse')?.parentElement);
-                } else {
-                    const navBtn = document.getElementById('nav-all-orders');
-                    if (typeof showAllOrders === 'function') {
-                        showAllOrders(navBtn);
-                    } else {
-                        applyFilter();
-                    }
-                }
-            };
-            if (!ordersData.length) {
-                fetchOrders().then(performRouting);
-            } else {
-                performRouting();
-            }
-        } else if (module === 'history') {
-            if (!ordersData.length) {
-                fetchOrders().then(() => renderHistoryOrders());
-            } else {
-                renderHistoryOrders();
-            }
-        } else if (module === 'reports') {
-            if (ordersData.length > 0) renderFinancialReports();
-            fetchOrders().then(() => renderFinancialReports());
-        }
-
-        // [優化] 改用透明度控制 3D 背景，並暫停動畫釋放資源
+        // Handle 3D Background
         const bg = document.getElementById('three-canvas-container');
         if (bg) {
             bg.classList.add('three-bg-hidden');
@@ -762,76 +803,48 @@ function checkLogin() {
 }
 
 window.showAllOrders = function (btnEl) {
-    setActiveNav(btnEl);
     window.currentPrimaryView = 'all';
     window.currentDeliveryFilter = 'all';
 
-    const board = document.querySelector('.kanban-board');
+    const board = document.getElementById('kanban-board');
     if (board) board.classList.remove('hidden');
     document.getElementById('inventory-section').classList.add('hidden');
 
-    // Show sidebar sub-filters
-    const sidebarFilters = document.getElementById('sidebar-filters');
-    if (sidebarFilters) sidebarFilters.style.display = 'flex';
-
-    document.getElementById('page-title').innerText = "全部訂單管理";
-
-    // Reset sub-filter buttons
-    document.querySelectorAll('.sub-nav-btn').forEach(p => p.classList.remove('active'));
-    const allBtn = document.querySelector('.sub-nav-btn[onclick*="all"]');
-    if (allBtn) allBtn.classList.add('active');
-
+    document.getElementById('page-title').innerHTML = '<i class="fas fa-list-check"></i> 全部訂單管理';
     applyFilter();
 };
 
 window.showWorkOrders = function (btnEl) {
-    setActiveNav(btnEl);
     window.currentPrimaryView = 'work';
 
-    const board = document.querySelector('.kanban-board');
+    const board = document.getElementById('kanban-board');
     if (board) board.classList.remove('hidden');
     document.getElementById('inventory-section').classList.add('hidden');
 
-    // Hide sidebar sub-filters
-    const sidebarFilters = document.getElementById('sidebar-filters');
-    if (sidebarFilters) sidebarFilters.style.display = 'none';
-
-    document.getElementById('page-title').innerText = "今日生產工單";
-
+    document.getElementById('page-title').innerHTML = '<i class="fas fa-tools"></i> 今日生產工單';
     applyFilter();
 };
 
 window.showWarehouseShipment = function (btnEl) {
-    setActiveNav(btnEl);
     window.currentPrimaryView = 'shipment';
 
-    const board = document.querySelector('.kanban-board');
+    const board = document.getElementById('kanban-board');
     if (board) board.classList.remove('hidden');
     document.getElementById('inventory-section').classList.add('hidden');
 
-    // Hide sidebar sub-filters
-    const sidebarFilters = document.getElementById('sidebar-filters');
-    if (sidebarFilters) sidebarFilters.style.display = 'none';
-
-    document.getElementById('page-title').innerText = "今日出貨";
-
+    document.getElementById('page-title').innerHTML = '<i class="fas fa-shipping-fast"></i> 今日出貨';
     applyFilter();
 };
 
 window.showInventory = function (btnEl) {
-    setActiveNav(btnEl);
     window.currentPrimaryView = 'inventory';
 
-    const board = document.querySelector('.kanban-board');
+    const board = document.getElementById('kanban-board');
     if (board) board.classList.add('hidden');
     const invSection = document.getElementById('inventory-section');
     if (invSection) invSection.classList.remove('hidden');
 
-    // Hide sidebar sub-filters
-    const sidebarFilters = document.getElementById('sidebar-filters');
-    if (sidebarFilters) sidebarFilters.style.display = 'none';
-
-    document.getElementById('page-title').innerText = "成品/配件 庫存管理";
+    document.getElementById('page-title').innerHTML = '<i class="fas fa-warehouse"></i> 成品/配件 庫存管理';
 
     // Always show Hub when first entering
     backToInventoryHub();
@@ -841,12 +854,6 @@ window.showInventory = function (btnEl) {
     }
 };
 
-window.filterByDelivery = function (type, btnEl) {
-    document.querySelectorAll('.sub-nav-btn').forEach(p => p.classList.remove('active'));
-    btnEl.classList.add('active');
-    window.currentDeliveryFilter = type;
-    applyFilter();
-};
 
 function setActiveNav(btnEl) {
     if (!btnEl) return;
@@ -896,6 +903,12 @@ async function fetchOrders() {
                 return order;
             });
 
+            // [快取] 將最新資料存入 localStorage，讓下次可立即顯示
+            try {
+                localStorage.setItem('orders_cache', JSON.stringify(ordersData));
+                localStorage.setItem('orders_cache_time', Date.now());
+            } catch (e) { /* localStorage 空間不足時靜默失敗 */ }
+
             applyFilter();
             document.getElementById('last-update').innerText = "最後更新: " + new Date().toLocaleTimeString();
         } else {
@@ -928,12 +941,8 @@ function applyFilter() {
         // Don't render Kanban if we are in inventory mode
         return;
     } else {
-        // All Orders View with delivery sub-filter (exclude completed)
-        if (window.currentDeliveryFilter !== 'all') {
-            filtered = ordersData.filter(o => (o.address || "").includes(window.currentDeliveryFilter) && o.status !== 'completed');
-        } else {
-            filtered = ordersData.filter(o => o.status !== 'completed');
-        }
+        // All Orders View (exclude completed)
+        filtered = ordersData.filter(o => o.status !== 'completed');
     }
 
     renderKanban(filtered);
@@ -955,7 +964,7 @@ function applyFilter() {
 }
 
 function renderKanban(data) {
-    const board = document.querySelector('.kanban-board');
+    const board = document.getElementById('kanban-board');
     if (!board) return;
 
     // Determine Groups based on view
@@ -1011,15 +1020,20 @@ function renderKanban(data) {
     // Helper to generate Column HTML
     const getColHtml = (statusKey) => {
         let label = STATUS_LABELS[statusKey] || statusKey;
-        // Label now includes both modes: 待出貨/待取件
+
+        // Mobile sticky state: Check if this column should be expanded
+        const isExpanded = window.expandedColumns.has(statusKey);
+        // On desktop, we don't use 'collapsed' class at all (CSS handles display),
+        // but adding it doesn't hurt as CSS only hides it on mobile.
+        const collapsedClass = isExpanded ? '' : 'collapsed';
 
         return `
     <div class="kanban-column">
-                <div class="column-header status-${statusKey}">
+                <div class="column-header status-${statusKey} ${collapsedClass}">
                     <span>${label}</span>
                     <span class="count-badge" id="count-${statusKey}">0</span>
                 </div>
-                <div class="column-body" id="col-${statusKey}"></div>
+                <div class="column-body ${collapsedClass}" id="col-${statusKey}"></div>
             </div>`;
     };
 
@@ -1034,9 +1048,9 @@ function renderKanban(data) {
         html += `
         <div class="kanban-group">
             <div class="group-header" style="${g.headerStyle}">
-                <div style="display:flex; align-items:center;">
-                    ${g.title}
-                </div>
+            <div class="group-title-wrapper">
+                ${g.title}
+            </div>
                 ${actionHtml}
             </div>
             <div class="group-columns">
@@ -1048,6 +1062,23 @@ function renderKanban(data) {
     html += `</div>`;
     board.innerHTML = html;
 
+    // [New] Global Chromological Sequence Calculation (MMDD-NN)
+    // 1. Sort all currently filtered data by timestamp
+    const chronologicalData = [...data].sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
+
+    // 2. Map timestamps to formatted sequence strings
+    const orderIdMap = new Map();
+    const dateCounts = {};
+
+    chronologicalData.forEach(order => {
+        const d = window.safeParseDate(order.timestamp);
+        const dateKey = (d.getMonth() + 1).toString().padStart(2, '0') + d.getDate().toString().padStart(2, '0');
+
+        dateCounts[dateKey] = (dateCounts[dateKey] || 0) + 1;
+        const sequenceStr = `${dateKey}-${dateCounts[dateKey].toString().padStart(2, '0')}`;
+        orderIdMap.set(order.timestamp, sequenceStr);
+    });
+
     // Distribute Cards & Update Counts
     let counts = {};
     data.forEach(order => {
@@ -1055,15 +1086,18 @@ function renderKanban(data) {
         const body = document.getElementById(`col-${status}`);
         if (body) {
             counts[status] = (counts[status] || 0) + 1;
-            body.appendChild(createCard(order, counts[status], status));
+            const dailyId = orderIdMap.get(order.timestamp) || '#';
+            body.appendChild(createCard(order, dailyId, status));
         }
     });
 
-    // Update badges
     for (let s in counts) {
         const badge = document.getElementById(`count-${s}`);
         if (badge) badge.innerText = counts[s];
     }
+
+    // New: After rendering cards, ensure mobile accordion is initialized
+    initMobileAccordion();
 }
 
 // --- New Function: Generate Consolidated Cutting List ---
@@ -1766,13 +1800,37 @@ function createCard(order, index, currentStatus) {
         time = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + d.getMinutes().toString().padStart(2, '0');
     } catch (e) { }
 
+    // Determine tag color based on status (synced with group header)
+    // 功能區配色 (與 group-header / column-header 一致)
+    // 客服區: unquoted / quoted / paid → 暖茶色
+    // 工廠區: cutting → 板岩藍
+    // 倉庫區: inspection / picking / packing → 奶茶咖啡
+    // 出貨區: shipping / dispatched → 鼠尾草綠
+    const TAG_COLORS = {
+        'unquoted': 'var(--accent-30)',
+        'quoted': 'var(--accent-30)',
+        'paid': 'var(--accent-30)',
+        'cutting': 'var(--accent-20)',
+        'inspection': 'var(--accent-warehouse)',
+        'picking': 'var(--accent-warehouse)',
+        'packing': 'var(--accent-warehouse)',
+        'shipping': 'var(--accent-40)',
+        'dispatched': 'var(--accent-40)',
+        'completed': 'var(--status-completed)'
+    };
+    const tagColor = TAG_COLORS[currentStatus] || 'var(--accent-mail)';
+    const tagStyle = `style="background:${tagColor};color:#fff;"`;
+
+    // 卡片左框顏色跟功能區大標籤一致
+    el.style.borderLeft = `3px solid ${tagColor}`;
+
     let tag = "";
     let isSelfPickup = false;
     let isStore = false;
 
-    if ((order.address || "").includes("宅配")) tag = `<span class="card-tag">宅配</span>`;
+    if ((order.address || "").includes("宅配")) tag = `<span class="card-tag" ${tagStyle}>宅配</span>`;
     if ((order.address || "").includes("自取")) {
-        tag = `<span class="card-tag">自取</span>`;
+        tag = `<span class="card-tag" ${tagStyle}>自取</span>`;
         isSelfPickup = true;
     }
     // [Fix] Most robust Store-to-Store detection mapping using window.safeParsePrice
@@ -1782,11 +1840,11 @@ function createCard(order, index, currentStatus) {
     let parsedShipFee = window.safeParsePrice(order.shippingFee);
 
     if (hasS2SKeyword || parsedShipFee === 60) {
-        tag = `<span class="card-tag">店到店</span>`;
+        tag = `<span class="card-tag" ${tagStyle}>店到店</span>`;
         isStore = true;
         isSelfPickup = false;
     }
-    if (addrStr.includes("公司配送")) tag = `<span class="card-tag">公司配送</span>`;
+    if (addrStr.includes("公司配送")) tag = `<span class="card-tag" ${tagStyle}>公司配送</span>`;
 
     // Determine Next Step Logic
     let nextStatus = null;
@@ -1879,30 +1937,37 @@ function createCard(order, index, currentStatus) {
     let mailBody = encodeURIComponent(rawBody);
 
     el.innerHTML = `
-    <div class="card-top">
-        <span>#${index + 1}</span>
-        <span>${time}</span>
+    <div class="card-header">
+        <div class="card-meta">
+            <span class="card-no">${index}</span>
+        </div>
+        ${tag}
     </div>
-    <div class="card-title">${order.name}</div>
-    <div class="card-info"><i class="fas fa-phone-alt"></i> ${order.phone}</div>
-    <div class="card-info" style="font-size:0.85em; color:#666; margin-top:3px; word-break:break-all;">
-        <i class="far fa-envelope"></i> ${order.email || "無 Email"}
-    </div>
-    ${tag}
-    <div class="card-price">
-        ${formatPrice(order.total)}
-        ${(currentStatus === 'unquoted' && !isSelfPickup && !isStore) ? '<span style="font-size:0.7em; color:var(--accent-delivery); margin-left:5px; font-weight:normal;">(待報價)</span>' : ''}
-        ${(order.shippingFee && order.shippingFee > 0) ? `<div style="font-size:0.75rem; color:var(--accent-delivery); font-weight:normal; margin-top:2px; opacity:0.8;">(含運費 $${order.shippingFee})</div>` : ''}
+    <div class="card-body">
+        <div class="card-title">${order.name}</div>
+        <div class="card-main-content">
+            <div class="card-contact">
+                <div class="card-info"><i class="fas fa-phone-alt"></i> ${order.phone}</div>
+                <div class="card-info email-info"><i class="far fa-envelope"></i> ${order.email || "無 Email"}</div>
+            </div>
+            <div class="card-price-container">
+                <div class="card-price">
+                    ${formatPrice(order.total)}
+                    ${(currentStatus === 'unquoted' && !isSelfPickup && !isStore) ? '<span class="status-pending-hint">(待報價)</span>' : ''}
+                    ${(order.shippingFee && order.shippingFee > 0) ? `<div class="shipping-fee-hint">(含運費 $${order.shippingFee})</div>` : ''}
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card-actions">
         ${prevBtnHtml}
-            <button class="btn-card-action btn-gmail" 
+        <button class="btn-card-action btn-gmail" 
             onclick="event.stopPropagation(); window.triggerGmailReply('${order.timestamp}')">
             <i class="fas fa-envelope"></i> 回覆
-            </button>
-            ${nextBtnHtml}
-        </div>
+        </button>
+        ${nextBtnHtml}
+    </div>
     `;
     return el;
 }
@@ -4149,16 +4214,13 @@ window.switchInventoryCategory = function (category) {
 
     window.currentInventoryCategory = category;
 
-    // Update Title and Sub-filters
+    // Update Title
     const titleEl = document.getElementById('inventory-view-title');
-    const seriesFilters = document.getElementById('aluminum-series-filters');
 
     if (category === 'aluminum') {
         if (titleEl) titleEl.innerHTML = `<i class="fas fa-layer-group"></i> 鋁材庫存概覽`;
-        if (seriesFilters) seriesFilters.style.display = 'flex';
     } else {
         if (titleEl) titleEl.innerHTML = `<i class="fas fa-tools"></i> 配件庫存概覽`;
-        if (seriesFilters) seriesFilters.style.display = 'none';
         window.currentInventorySeries = 'all';
     }
 
@@ -4174,21 +4236,12 @@ window.backToInventoryHub = function () {
     }
 };
 
-window.filterBySeries = function (series, btn) {
-    document.querySelectorAll('#aluminum-series-filters .filter-pill').forEach(b => b.classList.remove('active'));
-    if (btn) btn.classList.add('active');
-    window.currentInventorySeries = series;
-    filterInventory();
-};
 
 window.filterInventory = function () {
     if (!window.allInventory) return;
-    const searchTerm = (document.getElementById('inventory-search')?.value || "").toLowerCase();
     const category = window.currentInventoryCategory;
-    const series = window.currentInventorySeries;
 
     const filtered = window.allInventory.filter(item => {
-        // Use the same robust key detection for filtering
         const name = ((() => {
             const keys = ['name', '品項名稱', '品項'];
             const objKeys = Object.keys(item);
@@ -4198,22 +4251,14 @@ window.filterInventory = function () {
             return "";
         })()).toString().trim();
 
-        const matchesSearch = name.toLowerCase().includes(searchTerm);
-
         // Tier 1: Category Check (Strict)
         const isAluminum = ALUMINUM_ALLOW_LIST.some(model => name.includes(model));
         const matchesCategory = (category === 'aluminum') ? isAluminum : !isAluminum;
 
-        // Tier 2: Series Check (only for aluminum)
-        let matchesSeries = true;
-        if (category === 'aluminum' && series !== 'all') {
-            matchesSeries = name.includes(series);
-        }
-
-        return matchesSearch && matchesCategory && matchesSeries;
+        return matchesCategory;
     });
 
-    renderInventory(filtered, false); // Update stats based on filtered view
+    renderInventory(filtered, false);
 };
 
 function renderInventory(inventory, isPartial = false) {
@@ -4271,55 +4316,22 @@ function renderInventory(inventory, isPartial = false) {
         return true;
     });
 
-    if (statsContainer && !isPartial && currentCat === 'aluminum') {
-        let totalStockBars = 0;
-        let totalOffcuts = 0;
-
-        validItems.forEach(item => {
-            const rawStock = parseNum(findValue(item, ['qty', 'stock', '庫存數量', '數量', '庫存']));
-            totalStockBars += Math.floor(rawStock / 600);
-
-            const offcutsStr = (findValue(item, ['offcuts', '餘料', '備註']) || "").toString();
-            if (offcutsStr) {
-                const offcuts = offcutsStr.split(/[,，、 ]+/).reduce((acc, s) => {
-                    let num = parseFloat(s.trim());
-                    if (!isNaN(num) && num > 0 && num < 600) acc++;
-                    return acc;
-                }, 0);
-                totalOffcuts += offcuts;
-            }
-        });
-
-        statsContainer.innerHTML = `
-            <div class="stat-pill">
-                <span class="stat-label">品項總數</span>
-                <span class="stat-value">${validItems.length} 種</span>
-            </div>
-            <div class="stat-pill">
-                <span class="stat-label">標準料總量</span>
-                <span class="stat-value">${totalStockBars} 支</span>
-            </div>
-            <div class="stat-pill">
-                <span class="stat-label">餘料總數</span>
-                <span class="stat-value">${totalOffcuts} 支</span>
-            </div>
-        `;
-    }
 
     if (!Array.isArray(inventory) || inventory.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding:50px; color:#999; border: 1px dashed #ddd; border-radius:8px;">沒有符合搜尋條件的庫存資料</div>';
         return;
     }
 
-    // Hide stats container for accessories
-    if (statsContainer && window.currentInventoryCategory === 'accessory') {
-        statsContainer.style.display = 'none';
-    } else if (statsContainer) {
-        statsContainer.style.display = 'flex';
-    }
 
     // 【關鍵修復】清空容器，防止舊數據殘留
     container.innerHTML = '';
+
+    // 非同步觸發水位上升動畫
+    setTimeout(() => {
+        document.querySelectorAll('.reservoir-fill-group').forEach(group => {
+            group.style.transform = 'translateY(0)';
+        });
+    }, 100);
 
     let html = '<div class="inventory-grid">';
 
@@ -4390,400 +4402,201 @@ function renderInventory(inventory, isPartial = false) {
 
     sortedInventory.forEach(item => {
         // 判斷是鋁材還是配件組
-        const isAccessoryGroup = Array.isArray(item); // accessoryGroups的entry是[baseName, items[]]
+        const isAccessoryGroup = Array.isArray(item);
 
         if (isAccessoryGroup) {
-            // === 配件組渲染（新UI：大卡片+小卡片） ===
+            // === 配件組渲染：圓餅水庫模式 ===
             const [baseName, seriesItems] = item;
-
-            // 過濾當前分類
             const currentCategory = window.currentInventoryCategory || 'aluminum';
-            if (currentCategory === 'aluminum') return; // 鋁材頁面不顯示配件
+            if (currentCategory === 'aluminum') return;
 
-            // 插入配件分隔標題（只在第一個配件組時）
             if (lastType !== 'accessory') {
-                html += `
-                <div class="inventory-section-header" style="grid-column: 1 / -1; margin: 30px 0 20px; padding: 18px 25px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-left: 6px solid var(--accent-20); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                    <h2 style="margin: 0; color: var(--primary); font-size: 1.4rem; font-weight: 700; display: flex; align-items: center;">
-                        <i class="fas fa-cubes" style="margin-right: 12px; color: var(--accent-20); font-size: 1.3rem;"></i>配件總覽
-                    </h2>
-                </div>`;
                 lastType = 'accessory';
             }
 
+            const checkIsScrewOrNutSet = (name) => {
+                const n = name.toLowerCase();
+                return n.includes('螺絲') || n.includes('螺母') || n.includes('螺帽') || n.includes('滑塊') || n.includes('彈片');
+            };
+            const isScrewSet = checkIsScrewOrNutSet(baseName);
+            const defaultMax = isScrewSet ? 1000 : 100;
 
-            // 渲染配件組：大標題卡片（兩個一排）
             html += `
-            <div style="grid-column: 1 / -1; margin-bottom: 25px;">
-                <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 14px 20px; border-radius: 10px; border-left: 4px solid #64748b; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
-                    <h3 style="margin: 0; color: #475569; font-size: 1.2rem; font-weight: 700; display: flex; align-items: center;">
-                        <i class="fas fa-box-open" style="margin-right: 8px; color: #94a3b8; font-size: 1.1rem;"></i>${baseName}
+            <div class="reservoir-card" style="grid-column: span 1; margin-bottom: 20px;">
+                <div style="text-align: left; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px;">
+                    <h3 style="margin: 0; color: #1e293b; font-size: 1.1rem; font-weight: 300; display: flex; align-items: center;">
+                        <i class="fas fa-box" style="margin-right: 8px; color: #94a3b8; font-size: 0.9rem;"></i>${baseName}
                     </h3>
+                    <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">基準量: ${defaultMax} | 超過顯示溢出</div>
                 </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px;">`;
+                <div class="reservoir-grid">`;
 
-            // 排序系列：20 → 30 → 40
-            const sortedSeries = seriesItems.sort((a, b) => {
-                const nameA = (findValue(a, ['name', '品項名稱']) || "").toString();
-                const nameB = (findValue(b, ['name', '品項名稱']) || "").toString();
-                const getS = (n) => {
-                    const m = n.match(/^(20|30|40)-/);
-                    return m ? parseInt(m[1]) : 99;
+            ['20', '30', '40'].forEach(s => {
+                const itemEntry = seriesItems.find(it => {
+                    const n = (findValue(it, ['name', '品項名稱']) || "").toString();
+                    return n.startsWith(s + '-');
+                });
+
+                const rawStock = itemEntry ? parseNum(findValue(itemEntry, ['qty', 'stock', '庫存數量', '數量'])) : 0;
+                const percentage = Math.round((rawStock / defaultMax) * 100);
+                const hasItem = !!itemEntry;
+                const displayPercent = hasItem ? percentage + '%' : 'N/A';
+                const fillLevel = hasItem ? Math.max(0, Math.min(percentage, 100)) : 0;
+
+                const sColors = {
+                    '20': { color: '#b3c7d9', label: '20 系列' },
+                    '30': { color: '#c6a682', label: '30 系列' },
+                    '40': { color: '#b8ccb8', label: '40 系列' }
                 };
-                return getS(nameA) - getS(nameB);
-            });
+                const config = sColors[s];
+                let activeColor = hasItem ? config.color : '#f1f5f9';
+                if (hasItem && percentage < 20) activeColor = 'var(--accent-mail)';
 
-            // 渲染每個系列的小卡片
-            sortedSeries.forEach(seriesItem => {
-                const name = (findValue(seriesItem, ['name', '品項名稱']) || "").toString().trim();
-                const rawStock = parseNum(findValue(seriesItem, ['qty', 'stock', '庫存數量', '數量']));
+                let textColor = hasItem ? '#475569' : '#cbd5e1';
+                if (hasItem && rawStock < 0) textColor = 'var(--accent-mail)';
 
-                // 提取系列
-                const match = name.match(/^(20|30|40)-/);
-                const series = match ? match[1] : '';
+                const radius = 30, viewBox = `0 0 80 80`, center = 40;
+                const maskId = `mask-${baseName.replace(/\s+/g, '')}-${s}`;
+                const fillY = center + radius - (fillLevel / 100) * (radius * 2);
 
-                // 【新增】提取規格（M4/M6/M8 或 3mm/5mm/6mm）
-                let spec = '';
-                const baseName = window.removeSKU(name).replace(/^(20|30|40|80)-/, '').trim();
-                const mMatch = baseName.match(/^(M\d+)/);  // M4, M6, M8
-                const mmMatch = baseName.match(/^(\d+mm)/); // 3mm, 5mm, 6mm
-
-                if (mMatch) {
-                    spec = mMatch[1];  // M4, M6, M8
-                } else if (mmMatch) {
-                    spec = mmMatch[1]; // 3mm, 5mm, 6mm
-                }
-
-                // 【新增】提取 SKU 編碼（例如 [L-001]）
-                let skuCode = '';
-                const skuMatch = name.match(/\[([^\]]+)\]/); // 匹配 [任意內容]
-                if (skuMatch) {
-                    skuCode = skuMatch[1]; // 提取括號內的內容
-                }
-
-                // 【修改】以當前庫存為上限基準
-                const stockLimit = rawStock; // 當前數量 = 100%
-
-                // 計算百分比
-                const percentage = Math.min(Math.round((rawStock / stockLimit) * 100), 100);
-
-                // 使用灰色進度條
-                const statusColor = '#64748b'; // 統一灰色
-
-                const seriesColors = {
-                    '20': { bg: '#ffffff', border: 'var(--accent-20)', text: 'var(--accent-20)' },
-                    '30': { bg: '#ffffff', border: 'var(--accent-30)', text: 'var(--accent-30)' },
-                    '40': { bg: '#ffffff', border: 'var(--accent-40)', text: 'var(--accent-40)' }
-                };
-                const colors = seriesColors[series] || seriesColors['20'];
-
-                // SVG 環形進度條參數
-                const radius = 35;
-                const circumference = 2 * Math.PI * radius;
                 html += `
-                    <div style="background: ${colors.bg}; padding: 20px 15px; border-radius: 10px; border: 2px solid #cbd5e1; text-align: center; box-shadow: 0 3px 8px rgba(0,0,0,0.1); transition: transform 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 3px 8px rgba(0,0,0,0.1)';">
-                        <div style="font-size: 0.9rem; color: ${colors.text}; font-weight: 700; margin-bottom: 4px; letter-spacing: 0.5px;">${series} 系列</div>
-                        ${skuCode ? `<div style="font-size: 0.7rem; color: ${colors.text}; font-weight: 500; margin-bottom: 6px; opacity: 0.8;">[${skuCode}]</div>` : ''}
-                        ${spec ? `<div style="font-size: 0.8rem; color: #64748b; font-weight: 600; opacity: 0.7; margin-bottom: 10px; padding: 2px 8px; background: rgba(100,116,139,0.1); border-radius: 4px; display: inline-block;">${spec}</div>` : '<div style="height: 10px;"></div>'}
-                        
-                        <!-- 庫存數量 -->
-                        <div style="font-size: 1.8rem; font-weight: 900; color: ${colors.text}; line-height: 1; margin: 10px 0;">${rawStock}</div>
-                        <div style="font-size: 0.65rem; color: #64748b; opacity: 0.7; margin-bottom: 10px;">上限: ${stockLimit}</div>
-                        
-                        <!-- 橫向進度條 -->
-                        <div style="width: 100%; background: #e2e8f0; border-radius: 10px; height: 8px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
-                            <div style="width: ${percentage}%; background: ${colors.border}; height: 100%; border-radius: 10px; transition: width 0.5s ease;"></div>
-                        </div>
-                        <div style="font-size: 0.65rem; color: #64748b; margin-top: 6px;">${percentage}%</div>
-                    </div>`;
+                <div class="reservoir-circle-container" style="opacity: ${hasItem ? 1 : 0.6}">
+                    <div class="reservoir-label">${config.label}</div>
+                    <svg width="70" height="70" viewBox="${viewBox}" class="reservoir-svg">
+                        <circle cx="${center}" cy="${center}" r="${radius}" fill="#f8fafc" stroke="${hasItem ? '#e2e8f0' : '#f1f5f9'}" stroke-width="2" />
+                        <defs><clipPath id="${maskId}"><circle cx="${center}" cy="${center}" r="${radius}" /></clipPath></defs>
+                        <g clip-path="url(#${maskId})">
+                            <g class="reservoir-fill-group" style="transform: translateY(80px); transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.2, 1);">
+                                <rect x="-80" y="${fillY}" width="240" height="100" fill="${activeColor}" />
+                                ${hasItem && fillLevel > 0 && fillLevel < 100 ? `
+                                    <path d="M 0 ${fillY} q 20 -8 40 0 t 40 0 40 0 40 0 40 0 40 0 40 0 40 0" fill="${activeColor}" opacity="0.3" class="reservoir-wave-slow" />
+                                    <path d="M 0 ${fillY} q 20 -5 40 0 t 40 0 40 0 40 0 40 0 40 0 40 0 40 0" fill="${activeColor}" opacity="0.6" class="reservoir-wave" />
+                                ` : ''}
+                            </g>
+                        </g>
+                        <text x="${center}" y="${center + 5}" text-anchor="middle" font-size="${hasItem ? 12 : 14}" font-weight="300" 
+                              fill="${hasItem && fillLevel > 50 ? '#fff' : textColor}" 
+                              style="text-shadow: ${hasItem && fillLevel > 50 ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'}; pointer-events: none; opacity: ${hasItem ? 1 : 0.5}">
+                            ${displayPercent}
+                        </text>
+                    </svg>
+                    <div class="reservoir-value" style="color: ${textColor}">${hasItem ? rawStock : '-'}</div>
+                </div>`;
             });
-
-            html += `</div></div>`; // 關閉小卡片grid和外層div
+            html += `</div></div>`;
 
         } else {
-            // === 鋁材渲染（原邏輯） ===
+            // === 鋁材渲染：能量試管圖模式 ===
             const name = (findValue(item, ['name', '品項名稱', '品項']) || "").toString().trim();
-
             if (!name || name === '') return;
+
+            // 分類過濾
+            const currentCategory = window.currentInventoryCategory || 'aluminum';
+            const isActuallyAluminum = ALUMINUM_ALLOW_LIST.some(m => name.includes(m));
+            if (currentCategory === 'aluminum' && !isActuallyAluminum) return;
+            if (currentCategory === 'accessory' && isActuallyAluminum) return;
+
+            // 插入鋁材標題
+            if (lastType !== 'aluminum') {
+                lastType = 'aluminum';
+            }
 
             const rawStock = parseNum(findValue(item, ['qty', 'stock', '庫存數量', '數量', '庫存']));
             const offcutsStr = (findValue(item, ['offcuts', '餘料', '備註']) || "").toString();
 
-            const isActuallyAluminum = ALUMINUM_ALLOW_LIST.some(model => name.includes(model));
-            const currentCategory = window.currentInventoryCategory || 'aluminum';
+            // 1. 提取 SKU & 名稱
+            const skuMatch = name.match(/\[([^\]]+)\]/);
+            const sku = skuMatch ? `[${skuMatch[1]}]` : '[SKU]';
+            const cleanName = name.replace(/\[[^\]]+\]/, '').trim();
 
-            // 分類過濾
-            if (currentCategory === 'aluminum' && !isActuallyAluminum) return;
-            if (currentCategory === 'accessory' && isActuallyAluminum) return;
+            // 2. 存量計算 (基準量 60,000 cm)
+            const defaultMaxLength = 60000;
+            const totalBars = Math.floor(rawStock / 600);
+            const percentage = Math.round((rawStock / defaultMaxLength) * 100);
+            const fillWidth = Math.max(0, Math.min(percentage, 100));
 
-            if (!isActuallyAluminum) {
-                const isBackendInventoryRow = name.match(/^(20|30|40)-/);
-                if (!isBackendInventoryRow) return;
-            }
+            // 3. 餘料解析
+            const offcuts = offcutsStr ? offcutsStr.split(/[,，、 ]+/).filter(s => s.trim() !== "").map(s => parseFloat(s)).filter(n => !isNaN(n)).sort((a, b) => b - a) : [];
+            const offcutCount = offcuts.length;
 
-            // 判定系列
-            const currentSeries = (() => {
-                if (isActuallyAluminum) {
-                    if (name.includes('20')) return 20;
-                    if (name.includes('30')) return 30;
-                    if (name.includes('40')) return 40;
-                } else {
-                    const match = name.match(/^(20|30|40)-/);
-                    if (match) return parseInt(match[1]);
-                }
-                return null;
-            })();
-
-            const currentType = isActuallyAluminum ? 'aluminum' : 'accessory';
-
-            // 插入分隔標題
-            if (currentSeries && (currentSeries !== lastSeries || currentType !== lastType)) {
-                const typeLabel = isActuallyAluminum ? '鋁材' : '配件';
-                const seriesColors = {
-                    20: 'var(--accent-20)',
-                    30: 'var(--accent-30)',
-                    40: 'var(--accent-40)'
-                };
-                const color = seriesColors[currentSeries] || '#666';
-
-                html += `
-            <div style="grid-column: 1 / -1; margin: 20px 0 10px; padding: 10px 15px; background: linear-gradient(135deg, ${color}15, ${color}05); border-left: 4px solid ${color}; border-radius: 6px;">
-                <h3 style="margin: 0; color: ${color}; font-size: 1.2rem; font-weight: 600;">
-                    <i class="fas fa-layer-group"></i> ${currentSeries} 系列 ${typeLabel}
-                </h3>
-            </div>`;
-
-                lastSeries = currentSeries;
-                lastType = currentType;
-            }
-
-            // Determine Series for Color
-            let seriesClass = "";
-            if (isActuallyAluminum) {
-                // For aluminum, use name-based detection
-                if (name.includes('20')) seriesClass = "series-20";
-                else if (name.includes('30')) seriesClass = "series-30";
-                else if (name.includes('40')) seriesClass = "series-40";
+            // 判定系列 (修正：使用更嚴謹的正則判定，確保 2040 不會被誤判為 40)
+            let series = 20;
+            const seriesMatch = name.match(/(20|30|40)\d{2}/); // 尋找 2020, 2040, 3030 等格式
+            if (seriesMatch) {
+                series = parseInt(seriesMatch[1]);
             } else {
-                // 【修正】For accessories, use PREFIX-based detection
-                // 根據前綴判定系列（與過濾邏輯一致）
-                if (name.startsWith('20-')) seriesClass = "series-20";
-                else if (name.startsWith('30-')) seriesClass = "series-30";
-                else if (name.startsWith('40-')) seriesClass = "series-40";
-                // 不再使用 accessoryIndex，已棄用
+                // 備用：檢查前綴或包含
+                if (name.includes('40')) series = 40;
+                else if (name.includes('30')) series = 30;
+                else series = 20;
             }
 
-            // Determine Type (Light/Heavy) for Badges
-            let typeBadge = "";
-            if (name.includes('重型')) typeBadge = '<span class="badge-heavy">重型</span>';
-            else if (name.includes('輕型')) typeBadge = '<span class="badge-light">輕型</span>';
+            const sColors = {
+                20: { color: '#b3c7d9', label: '20 系列' },
+                30: { color: '#c6a682', label: '30 系列' },
+                40: { color: '#b8ccb8', label: '40 系列' }
+            };
+            const config = sColors[series];
 
-            if (isActuallyAluminum) {
-                // === ALUMINUM CARD TEMPLATE ===
-                let stockInBars = Math.floor(rawStock / 600);
-                let cmDetail = `<div style="font-size:0.75rem; color:#856404; opacity:0.8;">(共 ${rawStock} cm)</div>`;
+            let tubeColor = config.color;
+            let isWarning = percentage < 20;
+            if (isWarning) tubeColor = 'var(--accent-mail)';
 
-                const offcuts = offcutsStr ? offcutsStr.split(/[,，、 ]+/).reduce((acc, s) => {
-                    let num = parseFloat(s.trim());
-                    // Fix for concatenated strings (e.g., 199199199)
-                    if (num > 650) { // If larger than any reasonable stock
-                        // Try to split by common lengths (e.g. 199, 199.5)
-                        let str = s.trim();
-                        while (str.length > 0) {
-                            // Try to find a logical split (3-5 chars)
-                            // This is a heuristic fallback
-                            let chunk = str.substring(0, str.indexOf('.') + 2); // try to find decimal
-                            if (!chunk || chunk.length < 3) chunk = str.substring(0, 3);
-
-                            let val = parseFloat(chunk);
-                            if (!isNaN(val)) acc.push(val);
-                            str = str.substring(chunk.length);
-                            if (acc.length > 20) break; // emergency break
-                        }
-                    } else if (num > 0) {
-                        acc.push(num);
-                    }
-                    return acc;
-                }, []) : [];
-
-                // Determine color theme based on series
-                let barGradient = "linear-gradient(90deg, #f39c12, #e67e22)"; // Default orange
-                let bgGradient = "linear-gradient(135deg, #fffcf5 0%, #fff8f0 100%)";
-                let borderColor = "#ffeeba";
-                let labelColor = "#856404";
-                let numberColor = "#d35400";
-
-                if (seriesClass === "series-20") {
-                    barGradient = "var(--accent-20)";
-                    bgGradient = "rgba(179, 199, 217, 0.1)";
-                    borderColor = "var(--accent-20)";
-                    labelColor = "var(--primary)";
-                    numberColor = "var(--primary)";
-                } else if (seriesClass === "series-30") {
-                    barGradient = "var(--accent-30)";
-                    bgGradient = "rgba(198, 166, 130, 0.1)";
-                    borderColor = "var(--accent-30)";
-                    labelColor = "var(--primary)";
-                    numberColor = "var(--primary)";
-                } else if (seriesClass === "series-40") {
-                    barGradient = "var(--accent-40)";
-                    bgGradient = "rgba(184, 204, 184, 0.1)";
-                    borderColor = "var(--accent-40)";
-                    labelColor = "var(--primary)";
-                    numberColor = "var(--primary)";
-                }
-
-                let offcutsHtml = '';
-                offcuts.forEach((len, idx) => {
-                    let widthPct = Math.min((len / 600) * 100, 100);
-                    offcutsHtml += `
-                    <div style="margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-                        <div style="flex:1;">
-                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:2px;">
-                                <span style="font-weight:600; color:${labelColor};">${len} <span style="font-size:0.7rem; opacity:0.7;">cm</span></span>
+            html += `
+            <div class="aluminum-tube-card" style="grid-column: span 1;">
+                <div class="tube-header">
+                    <div style="text-align: left;">
+                        <div class="sku-badge">${sku}</div>
+                        <div style="font-size: 0.95rem; font-weight: 300; color: #1e293b; margin-top: 6px;">${cleanName}</div>
+                    </div>
+                    <div class="offcut-drawer">
+                        <div class="offcut-badge"><i class="fas fa-scissors"></i> ${offcutCount} 片餘料</div>
+                        ${offcutCount > 0 ? `
+                        <div class="offcut-tooltip">
+                            <div style="font-size: 0.75rem; font-weight: 300; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 5px;">餘料分布 (cm)</div>
+                            <div class="offcut-list">
+                                ${Object.entries(offcuts.reduce((acc, len) => {
+                acc[len] = (acc[len] || 0) + 1;
+                return acc;
+            }, {})).map(([len, count]) => `
+                                    <span class="offcut-item">${len}${count > 1 ? ` <small style="opacity:0.6; margin-left:2px;">x${count}</small>` : ''}</span>
+                                `).join('')}
                             </div>
-                            <div style="height:6px; background:#f1f5f9; border-radius:3px; overflow:hidden;">
-                                <div style="height:100%; width:${widthPct}%; background:${barGradient}; border-radius:3px;"></div>
-                            </div>
-                        </div>
-                        <button onclick="deleteOffcut('${name}', ${idx})" title="刪除此餘料" style="background:none; border:none; color:#cbd5e1; cursor:pointer; padding:4px;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#cbd5e1'">
-                            <i class="fas fa-times-circle"></i>
-                        </button>
-                    </div>`;
-                });
-
-                // --- Waste Display Logic ---
-                let totalWaste = 0;
-                let wasteHtml = '';
-                // Robustly find 'waste' column (G)
-                let wasteRaw = findValue(item, ['waste', '廢料', 'G']);
-                if (wasteRaw) totalWaste = parseFloat(wasteRaw) || 0;
-
-                if (totalWaste > 0) {
-                    wasteHtml = `
-                <div class="waste-section" style="margin-top:10px; padding:10px; background:#f8f9fa; border:1px dashed #94a3b8; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <span style="font-size:0.85rem; color:#64748b; font-weight:bold;"><i class="fas fa-trash-alt"></i> 累積廢料</span>
-                        <div style="font-size:0.7rem; color:#94a3b8; margin-top:2px;">(已無法再利用的短料總和)</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <span style="font-size:1.1rem; font-weight:bold; color:#64748b;">${totalWaste.toFixed(1)} <span style="font-size:0.7rem;">cm</span></span>
-                        <button onclick="clearWaste('${name}')" style="margin-left:8px; font-size:0.75rem; color:#fff; background:#94a3b8; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; box-shadow:0 2px 4px rgba(148,163,184,0.2);" onmouseover="this.style.background='#64748b'" onmouseout="this.style.background='#94a3b8'">
-                            <i class="fas fa-eraser"></i> 歸零
-                        </button>
-                    </div>
-                </div>`;
-                }
-
-                // 解析 SKU 編碼（如果有）
-                let sku = window.parseSKU(name);
-                let displayName = window.removeSKU(name);
-                let skuBadge = sku ? `<span style="display:inline-block; margin-left:8px; font-size:0.7rem; font-weight:600; color:#64748b; background:rgba(148,163,184,0.15); padding:3px 8px; border-radius:4px; border:1px solid rgba(148,163,184,0.3);">${sku}</span>` : '';
-
-                html += `
-            <div class="inventory-card" style="border-top: 4px solid ${labelColor}; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
-                <div class="card-header" style="background: ${bgGradient}; border-bottom: 1px solid ${borderColor}">
-                    <div class="card-title" style="color: ${labelColor}">
-                        ${displayName} ${typeBadge} ${skuBadge}
-                    </div>
-                    <div class="card-stock-main">
-                        <span style="font-size: 1.25rem; font-weight: 700; color: ${labelColor}">${stockInBars}</span>
-                        <span style="font-size: 0.8rem; font-weight: 500; color: ${labelColor}; opacity: 0.8; margin-left: 2px">支</span>
+                        </div>` : ''}
                     </div>
                 </div>
-
-                <div class="card-body">
-                    <!-- Standard Stock Info -->
-                    <div class="stock-showcase" style="margin-bottom:18px; background:${bgGradient}; padding:12px; border-radius:10px; border:1px solid ${borderColor}; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px;">
-                            <div style="font-size:0.85rem; color:${labelColor}; font-weight:bold;"><i class="fas fa-box-open"></i> 標準全長料 (600cm)</div>
-                            <div style="font-size:0.75rem; color:${labelColor}; opacity:0.8;">(共 ${rawStock} cm)</div>
-                        </div>
-                        <div class="stock-bar-container">
-                            <div class="stock-bar" style="width: ${Math.min((stockInBars / 200) * 100, 100)}%;">w: 100%</div>
-                        </div>
-                        <div style="text-align:right; margin-top:4px;">
-                            <span style="color:${numberColor}; font-weight:700; font-size:0.9rem;">${stockInBars}</span>
-                            <span style="color:#64748b; font-size:0.75rem;">支</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="tube-container" style="flex: 1;">
+                        <div class="tube-text" style="color: ${fillWidth > 60 ? '#fff' : '#475569'}">${rawStock} cm/600m</div>
+                        <div class="tube-filler" style="width: ${fillWidth}%; background: ${tubeColor}; position: relative; overflow: hidden;">
                         </div>
                     </div>
-
-                    <!-- Offcuts Visuals -->
-                    <div class="offcuts-section" style="margin-top:15px; border-top:1px solid #f1f5f9; padding-top:15px;">
-                        <div style="display:flex; align-items:center; margin-bottom:10px;">
-                            <i class="fas fa-ruler-combined" style="color:#64748b; font-size:0.8rem; margin-right:6px;"></i>
-                            <span style="font-size:0.8rem; color:#64748b; font-weight: 500;">餘料視覺分佈 (${offcuts.length} 支) :</span>
-                        </div>
-                        
-                        <div class="offcuts-list-scroll">
-                            ${offcuts.length > 0 ? offcutsHtml : '<div class="no-offcuts">暫無餘料</div>'}
-                        </div>
+                    <div style="text-align: right; min-width: 50px;">
+                        <div style="font-size: 1.1rem; font-weight: 300; color: ${isWarning ? 'var(--accent-mail)' : '#475569'};">${totalBars} <span style="font-size: 0.65rem; opacity: 0.6;">支</span></div>
                     </div>
-                    
-                    ${wasteHtml}
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94a3b8; font-weight: 300;">
+                    <div>${config.label} | 標配 600cm/支</div>
+                    <div style="color: ${isWarning ? 'var(--accent-mail)' : '#94a3b8'}">${percentage}% (標配庫存 600m)</div>
                 </div>
             </div>`;
-
-            } else {
-                // === ACCESSORY CARD TEMPLATE (Simple) ===
-                // Determine color theme based on series
-                let bgGradient = "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)";
-                let borderColor = "var(--border)";
-                let iconColor = "var(--accent-20)";
-                let textColor = "var(--primary)";
-                let numberColor = "var(--primary)";
-
-                if (seriesClass === "series-20") {
-                    bgGradient = "rgba(179, 199, 217, 0.1)";
-                    borderColor = "var(--accent-20)";
-                    iconColor = "var(--accent-20)";
-                    textColor = "var(--primary)";
-                    numberColor = "var(--primary)";
-                } else if (seriesClass === "series-30") {
-                    bgGradient = "rgba(198, 166, 130, 0.1)";
-                    borderColor = "var(--accent-30)";
-                    iconColor = "var(--accent-30)";
-                    textColor = "var(--primary)";
-                    numberColor = "var(--primary)";
-                } else if (seriesClass === "series-40") {
-                    bgGradient = "rgba(184, 204, 184, 0.1)";
-                    borderColor = "var(--accent-40)";
-                    iconColor = "var(--accent-40)";
-                    textColor = "var(--primary)";
-                    numberColor = "var(--primary)";
-                }
-
-
-                // 解析 SKU 編碼（配件）
-                let skuAcc = window.parseSKU(name);
-                let displayNameAcc = window.removeSKU(name);
-                let skuBadgeAcc = skuAcc ? `<span style="display:inline-block; margin-left:8px; font-size:0.7rem; font-weight:600; color:#64748b; background:rgba(148,163,184,0.15); padding:3px 8px; border-radius:4px; border:1px solid rgba(148,163,184,0.3);">${skuAcc}</span>` : '';
-
-                html += `
-            <div class="inventory-card" style="border-top: 4px solid ${textColor}; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-                <div class="card-header" style="background: ${bgGradient}; border-bottom: 1px solid ${borderColor}">
-                    <div class="card-title" style="color: ${textColor}">
-                        ${displayNameAcc} ${skuBadgeAcc}
-                    </div>
-                </div>
-                <div class="card-body" style="display:flex; justify-content:center; align-items:center; flex-direction:column; padding:20px;">
-                     <div style="width:60px; height:60px; background:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(0,0,0,0.05); margin-bottom:10px;">
-                        <i class="fas fa-cubes" style="font-size:1.8rem; color:${iconColor};"></i>
-                     </div>
-                     <div style="text-align:center;">
-                        <div style="font-size:0.75rem; color:${textColor}; font-weight:600;">庫存數量</div>
-                        <div style="font-size:1.5rem; font-weight:900; color:${numberColor};">${rawStock}</div>
-                        <div style="font-size:0.9rem; color:${textColor}; font-weight:600;">個/組</div>
-                     </div>
-                </div>
-            </div > `;
-            }
-        }  // 結束else (鋁材渲染)
-    });  // 結束forEach
+        }
+    });
 
     html += '</div>';
     container.innerHTML = html;
+
+    // 觸發動畫
+    setTimeout(() => {
+        const fills = container.querySelectorAll('.reservoir-fill-group');
+        fills.forEach(f => f.style.transform = 'translateY(0)');
+        const tubeFillers = container.querySelectorAll('.tube-filler');
+        tubeFillers.forEach(tf => {
+            const w = tf.style.width;
+            tf.style.width = '0%';
+            setTimeout(() => tf.style.width = w, 50);
+        });
+    }, 100);
 }
 
 window.deleteOffcut = async function (model, index) {
@@ -5643,17 +5456,42 @@ window.renderHistoryOrders = function () {
             const dateStr = window.safeParseDate(o.timestamp).toLocaleString('zh-TW', {
                 month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
-            const firstItem = (o.summary || "").split(/[,+]/)[0] || "無明細";
+
+            let tag = "";
+            let addrStr = o.address || "";
+            let isSelfPickup = addrStr.includes("自取") || addrStr.includes("[自取]");
+            let isStore = addrStr.includes("店到店") || addrStr.includes("超商") || addrStr.includes("7-11") || addrStr.includes("全家") || addrStr.includes("[店到店]") || window.safeParsePrice(o.shippingFee) === 60;
+
+            const tagStyle = `style="background:var(--status-completed, #94a3b8);color:#fff;"`;
+            if (isStore) tag = `<span class="card-tag" ${tagStyle}>店到店</span>`;
+            else if (isSelfPickup) tag = `<span class="card-tag" ${tagStyle}>自取</span>`;
+            else if (addrStr.includes("公司配送")) tag = `<span class="card-tag" ${tagStyle}>公司配送</span>`;
+            else if (addrStr.includes("宅配")) tag = `<span class="card-tag" ${tagStyle}>宅配</span>`;
 
             return `
-                <div class="history-order-card" onclick="viewOrder('${o.timestamp}')">
-                    <div class="history-order-top">
-                        <span class="history-order-date">${dateStr}</span>
-                        <span class="history-order-total">$${window.safeParsePrice(o.total).toLocaleString()}</span>
+                <div class="kanban-card" onclick="viewOrder('${o.timestamp}')" style="border-left: 3px solid var(--status-completed, #94a3b8); cursor: pointer;">
+                    <div class="card-header">
+                        <div class="card-meta" style="flex:1;">
+                            <span class="card-no">
+                                <i class="far fa-calendar-alt"></i> ${dateStr}
+                            </span>
+                        </div>
+                        ${tag}
                     </div>
-                    <div class="history-order-customer"><i class="fas fa-user"></i> ${o.name || '客戶'} (${o.phone || '無電話'})</div>
-                    <div class="history-order-summary">${firstItem} ...</div>
-                    <div class="history-order-delivery"><i class="fas fa-truck"></i> <span class="card-tag" style="margin-top:0; font-size:0.7rem;">${o.address || '不需寄送'}</span></div>
+                    <div class="card-body">
+                        <div class="card-title">${o.name || '客戶'}</div>
+                        <div class="card-main-content">
+                            <div class="card-contact">
+                                <div class="card-info"><i class="fas fa-phone-alt"></i> ${o.phone || '無電話'}</div>
+                                <div class="card-info"><i class="fas fa-truck"></i> <span style="font-size: 0.8rem; opacity:0.8;">${addrStr || '不需寄送'}</span></div>
+                            </div>
+                            <div class="card-price-container">
+                                <div class="card-price">
+                                    $${window.safeParsePrice(o.total).toLocaleString()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
         }).join('');
