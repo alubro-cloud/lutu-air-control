@@ -298,11 +298,12 @@ const customStyles = `
 
     .detail-card {
         cursor: pointer; display: flex !important; align-items: center; transition: all 0.2s ease;
-        user-select: none; background: #fff; padding: 10px; border: 1px solid #eee;
-        border-radius: 8px; margin-bottom: 8px;
+        user-select: none; background: transparent; padding: 1px 6px; border: 1px solid #eee;
+        border-radius: 3px; margin-bottom: 2px; font-size: 0.82rem; line-height: 1.25;
+        min-height: 0;
     }
     .check-box {
-        width: 24px; height: 24px; border: 2px solid #ddd; border-radius: 4px; margin-right: 12px;
+        width: 18px; height: 18px; border: 2px solid #ddd; border-radius: 3px; margin-right: 8px;
         display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         transition: all 0.2s; background: #fff;
     }
@@ -327,7 +328,7 @@ const customStyles = `
     .detail-card.checked:not([class*="series-"]) { background: #f8f9fa; border-color: #d1d5db; }
     .detail-card.checked:not([class*="series-"]) .check-box { background: var(--ash-gray); border-color: var(--ash-gray); }
     
-    .detail-card .d-name { flex: 1; line-height: 1.4; font-size: 0.95rem; }
+    .detail-card .d-name { flex: 1; line-height: 1.3; font-size: 0.88rem; }
 
     .checklist-progress-bar {
         position: sticky; top: 0; background: #fff; z-index: 10; padding: 10px;
@@ -346,11 +347,11 @@ const customStyles = `
 
 
     .btn-print {
-        background: var(--ash-gray); color: white; border: none; padding: 6px 15px;
+        background: #a0a0a0; color: white; border: none; padding: 6px 15px;
         border-radius: 6px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 6px;
         transition: 0.2s;
     }
-    .btn-print:hover { background: var(--primary); }
+    .btn-print:hover { background: #888; }
 
     .btn-close-inline {
         background: #eee; color: #555; border: none; padding: 6px 12px;
@@ -592,6 +593,8 @@ function navigateTo(module, subView) {
         if (window.currentPrimaryView === 'inventory') {
             if (board) board.classList.add('hidden');
             if (inventory) inventory.classList.remove('hidden');
+            // NEW: Fire dashboard render
+            setTimeout(() => renderInventoryDashboard(), 100);
         } else {
             if (board) board.classList.remove('hidden');
             if (inventory) inventory.classList.add('hidden');
@@ -680,7 +683,211 @@ function navigateTo(module, subView) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
         }
     }, TRANSITION_MS);
-}
+};
+
+// ==========================================
+// INVENTORY DASHBOARD (戰情面板)
+// ==========================================
+window.renderInventoryDashboard = function () {
+    if (!window.allInventory || window.allInventory.length === 0) return;
+
+    try {
+        const parseNum = (val) => {
+            if (!val) return 0;
+            const num = Number(val.toString().trim());
+            return isNaN(num) ? 0 : num;
+        };
+
+        const findValue = (obj, keys) => {
+            if (!obj || typeof obj !== 'object') return undefined;
+            const objKeys = Object.keys(obj);
+            // 1. Exact or Trimmed Match
+            for (const k of objKeys) {
+                const cleanK = k.trim().toLowerCase();
+                if (keys.some(target => target.trim().toLowerCase() === cleanK)) return obj[k];
+            }
+            // 2. Partial Match
+            for (const k of objKeys) {
+                const cleanK = k.trim().toLowerCase();
+                if (keys.some(target => cleanK.includes(target.toLowerCase()) || target.toLowerCase().includes(cleanK))) {
+                    return obj[k];
+                }
+            }
+            return undefined;
+        };
+
+        const generateReservoirHTML = (index, pct, valueLabel, mainLabel, options = {}) => {
+            const visualPct = Math.max(0, Math.min(100, Math.round(pct)));
+            const isCritical = options.isCritical || pct < 20;
+            const radius = 25, viewBox = `0 0 70 70`, center = 35;
+            const maskId = `reservoir-mask-${index}`;
+            const fillY = center + radius - (visualPct / 100) * (radius * 2);
+
+            const activeColor = options.activeColor || (isCritical ? 'var(--dusty-rose)' : '#cbd5e1');
+            const textColor = options.textColor || (isCritical ? 'var(--dusty-rose)' : '#475569');
+            const circleColor = options.circleColor || (isCritical ? 'var(--dusty-rose)' : '#e2e8f0');
+            const customClass = options.className || '';
+
+            return `
+            <div class="reservoir-circle-container ${customClass}" style="display:flex; flex-direction:column; align-items:center; opacity: 1; padding: 0 4px;">
+                <svg width="80" height="80" viewBox="${viewBox}" class="reservoir-svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.05)); margin-bottom: 2px;">
+                    <circle cx="${center}" cy="${center}" r="${radius}" fill="#f8fafc" stroke="${circleColor}" stroke-width="2" />
+                    <defs><clipPath id="${maskId}"><circle cx="${center}" cy="${center}" r="${radius}" /></clipPath></defs>
+                    <g clip-path="url(#${maskId})">
+                        <g class="reservoir-fill-group">
+                            <rect x="-70" y="${fillY}" width="210" height="100" fill="${activeColor}" />
+                            ${visualPct > 0 && visualPct < 100 ? `
+                                <path d="M 0 ${fillY} q 17.5 -8 35 0 t 35 0 35 0 35 0 35 0 35 0" fill="${activeColor}" opacity="0.3" class="reservoir-wave-slow" />
+                                <path d="M 0 ${fillY} q 17.5 -5 35 0 t 35 0 35 0 35 0 35 0 35 0" fill="${activeColor}" opacity="0.6" class="reservoir-wave" />
+                            ` : ''}
+                        </g>
+                    </g>
+                    <text x="${center}" y="${center + 4}" text-anchor="middle" font-size="14" font-weight="600" 
+                          fill="${visualPct > 50 ? '#fff' : textColor}" 
+                          style="text-shadow: ${visualPct > 50 ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'}; pointer-events: none;">
+                        ${Math.round(pct)}%
+                    </text>
+                </svg>
+                <div class="reservoir-value" style="color: ${textColor}; margin-top:0; font-size:0.7rem; font-weight:bold; min-height: 1.2em; line-height: 1.2; white-space: nowrap;">${valueLabel}</div>
+                <div class="reservoir-label" style="font-size: 0.8rem; overflow:visible; white-space:nowrap; max-width:none; margin-top:2px; font-weight: 500; color: var(--primary); min-height: 1.2em; line-height: 1.2;">${mainLabel}</div>
+            </div>`;
+        };
+
+        const MAX_HEALTH_MAP = { 20: 120000, 30: 240000, 40: 240000 };
+        let health = { 20: 0, 30: 0, 40: 0 };
+        const ALUMINUM_ALLOW_LIST = ["2020型", "2040型", "3030輕型", "3060輕型", "3030重型", "3060重型", "4040輕型", "4080輕型", "4040重型", "4080重型"];
+        let accessories = [];
+
+        window.allInventory.forEach(item => {
+            const rawName = (findValue(item, ['name', '品項名稱', '品項']) || "").toString().trim();
+            if (!rawName) return;
+
+            // 1. Precise Aluminum Matching
+            let series = 0;
+            if (rawName.match(/^20/)) series = 20;
+            else if (rawName.match(/^30/)) series = 30;
+            else if (rawName.match(/^40/)) series = 40;
+
+            const isAluminumProfile = ALUMINUM_ALLOW_LIST.some(model => rawName.includes(model));
+
+            if (isAluminumProfile && series > 0) {
+                // Try to find total length directly first, then fallback to qty * len
+                let totalLen = parseNum(findValue(item, ['總長度', '總長度(cm)', 'total_length']));
+                if (totalLen === 0) {
+                    let qty = parseNum(findValue(item, ['qty', 'stock', '庫存數量', '數量', '庫存', '支數']));
+                    let len = parseNum(findValue(item, ['長度', '長度(cm)', 'length']));
+                    if (len === 0) len = 600;
+
+                    // HEURISTIC: If qty is > 5000, it's likely already the total CM
+                    if (qty > 5000) {
+                        totalLen = qty;
+                    } else {
+                        totalLen = qty * len;
+                    }
+                }
+                health[series] += totalLen;
+            } else {
+                // 2. Accessory Matching
+                if (rawName.match(/^(20|30|40|HR)-/) || rawName.match(/\[(A|M|HR)/)) {
+                    accessories.push(item);
+                }
+            }
+        });
+
+        // Update Aluminum Gauges (Left Side)
+        const aluminumContainer = document.querySelector('.gauges-container');
+        if (aluminumContainer) {
+            const aluminumColors = { 20: '#94a3b8', 30: '#b5926c', 40: '#9db39d' };
+            const aluminumHealthHTML = [20, 30, 40].map(s => {
+                const maxHealth = MAX_HEALTH_MAP[s] || 240000;
+                const currentCm = health[s] || 0;
+                const pct = Math.round((currentCm / maxHealth) * 100);
+                const valueLabel = `${(currentCm / 100).toFixed(1)}m / ${(maxHealth / 100).toFixed(0)}m`;
+                const mainLabel = `${s} 系列`;
+
+                return generateReservoirHTML(`alu-${s}`, pct, valueLabel, mainLabel, {
+                    activeColor: aluminumColors[s],
+                    textColor: aluminumColors[s],
+                    circleColor: '#e2e8f0',
+                    isCritical: pct < 20,
+                    className: 'dashboard-reservoir'
+                });
+            }).join('');
+            aluminumContainer.innerHTML = aluminumHealthHTML;
+            aluminumContainer.style.display = 'flex';
+            aluminumContainer.style.justifyContent = 'space-around';
+            aluminumContainer.style.width = '100%';
+        }
+
+        // Accessoriess Mapping
+        let accCounts = accessories.map(i => {
+            let findRes = findValue(i, ['name', '品項名稱', '品項']);
+            let name = (findRes !== undefined && findRes !== null ? findRes : "未知").toString().trim();
+            let qty = parseNum(findValue(i, ['qty', 'stock', '庫存數量', '數量', '庫存']));
+
+            let skuMatch = name.match(/\[([^\]]+)\]/);
+            let displaySku = skuMatch ? `[${skuMatch[1]}]` : name;
+
+            let cleanBase = name;
+            if (typeof window.removeSKU === 'function') {
+                try { cleanBase = window.removeSKU(name) || name; } catch (e) { }
+            } else {
+                cleanBase = name.replace(/\[([^\]]+)\]/, '').trim();
+            }
+
+            let baseName = String(cleanBase).replace(/^(20|30|40|80)-/, '').trim();
+            baseName = baseName.replace(/^M\d+/, '').trim();
+            baseName = baseName.replace(/^\d+mm/, '').trim();
+
+            const checkIsScrewOrNutSet = (n) => {
+                if (!n) return false;
+                const low = String(n).toLowerCase();
+                return low.includes('螺絲') || low.includes('螺母') || low.includes('螺帽') || low.includes('滑塊') || low.includes('彈片');
+            };
+            const defaultMax = checkIsScrewOrNutSet(baseName) ? 1000 : 100;
+            let pctFilled = (qty / defaultMax) * 100;
+
+            return { name, displaySku, qty, max: defaultMax, pctFilled };
+        });
+
+        accCounts.sort((a, b) => (isNaN(a.pctFilled) ? 0 : a.pctFilled) - (isNaN(b.pctFilled) ? 0 : b.pctFilled));
+        let top5 = accCounts.slice(0, 5);
+        const barsContainer = document.getElementById('low-stock-bars');
+
+        if (barsContainer) {
+            if (top5.length === 0) {
+                barsContainer.innerHTML = '<div style="color:#aaa; text-align:center;">目前無配件資料</div>';
+            } else {
+                barsContainer.style.display = 'flex';
+                barsContainer.style.flexDirection = 'row';
+                barsContainer.style.justifyContent = 'space-around';
+                barsContainer.style.alignItems = 'center';
+                barsContainer.style.gap = '10px';
+                barsContainer.style.flexWrap = 'nowrap';
+                barsContainer.style.overflowX = 'auto';
+                barsContainer.style.paddingBottom = '10px';
+                barsContainer.style.height = '100%';
+
+                barsContainer.innerHTML = top5.map((item, index) => {
+                    const pct = Math.round(item.pctFilled || 0);
+                    const valueLabel = `${item.qty}件`;
+                    const mainLabel = item.displaySku || "未知";
+
+                    return generateReservoirHTML(`acc-${index}`, pct, valueLabel, mainLabel, {
+                        isCritical: pct < 25,
+                        className: 'dashboard-reservoir'
+                    });
+                }).join('');
+            }
+        }
+    } catch (err) {
+        console.error("Dashboard overall failure:", err);
+        const barsContainer = document.getElementById('low-stock-bars');
+        if (barsContainer) {
+            barsContainer.innerHTML = `<div style="color:var(--accent-mail); padding:10px; font-size:12px; font-weight:bold; white-space:pre-wrap;">圖表渲染錯誤: <br>${err.message}</div>`;
+        }
+    }
+};
 
 function backToHub() {
     const TRANSITION_MS = 400;
@@ -1744,9 +1951,46 @@ function renderCuttingVisuals(bins, stockLen) {
 
 function formatPrice(val) {
     if (!val) return "NT$ 0";
-    // Use Math.round to properly round floating-point totals (e.g., 23641.6 → 23642)
     let num = Math.round(parseFloat(String(val)));
     return "NT$ " + (isNaN(num) ? "0" : num);
+}
+
+// 根據訂單明細判斷公司配送車型 (同 script.js renderAnalysisAndManifest 邏輯)
+function detectVehicleType(detailsStr) {
+    if (!detailsStr) return null;
+    const weightMap = {
+        '2020型': 0.458, '2040型': 0.862, '2060型': 1.266, '2080型': 1.7,
+        '3030輕型': 0.693, '3030重型': 1.07, '3060輕型': 1.218, '3060重型': 1.844,
+        '6060型': 2.45,
+        '4040輕型': 1.298, '4040重型': 1.923, '4080輕型': 2.265, '4080重型': 3.505,
+        '8080型': 5.2
+    };
+    let maxLen = 0;
+    let totalWeight = 0;
+    const lines = detailsStr.split(/\\n|\n/).filter(l => l.trim());
+    lines.forEach(line => {
+        if (!line.includes('鋁材') && !line.includes('鋁擠型') && !line.includes('型')) return;
+        const lenMatch = line.match(/(?:L=|長度)(\d+(?:\.\d+)?)cm/);
+        const qtyMatch = line.match(/\( x (\d+) \)/);
+        const len = lenMatch ? parseFloat(lenMatch[1]) : 0;
+        const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+        if (len <= 0) return;
+        if (len > maxLen) maxLen = len;
+        // 找對應重量
+        let wPerM = 0;
+        for (const [key, w] of Object.entries(weightMap)) {
+            if (line.includes(key)) { wPerM = w; break; }
+        }
+        if (wPerM === 0) wPerM = 1; // 未知型號預設 1kg/m
+        totalWeight += wPerM * (len / 100) * qty;
+    });
+    if (maxLen === 0 && totalWeight === 0) {
+        // 只有配件，沒有鋁材 → 小貨車就夠
+        return '<span style="color:#27ae60;"><i class="fas fa-truck-pickup"></i> 小貨車</span>';
+    }
+    return (maxLen > 250 || totalWeight > 50)
+        ? '<span style="color:#c0392b;"><i class="fas fa-truck-moving"></i> 大貨車</span>'
+        : '<span style="color:#27ae60;"><i class="fas fa-truck-pickup"></i> 小貨車</span>';
 }
 
 window.openGmail = function (email, subject, body) {
@@ -1844,7 +2088,13 @@ function createCard(order, index, currentStatus) {
         isStore = true;
         isSelfPickup = false;
     }
-    if (addrStr.includes("公司配送")) tag = `<span class="card-tag" ${tagStyle}>公司配送</span>`;
+    if (addrStr.includes("公司配送")) {
+        const vt = detectVehicleType(order.details);
+        const vtLabel = vt
+            ? (vt.includes('大貨車') ? ' <i class="fas fa-truck-moving"></i>' : ' <i class="fas fa-truck-pickup"></i>')
+            : '';
+        tag = `<span class="card-tag" ${tagStyle}>公司配送${vtLabel}</span>`;
+    }
 
     // Determine Next Step Logic
     let nextStatus = null;
@@ -1939,7 +2189,7 @@ function createCard(order, index, currentStatus) {
     el.innerHTML = `
     <div class="card-header">
         <div class="card-meta">
-            <span class="card-no">${index}</span>
+            <span class="card-no" style="background:${tagColor}; color:#fff;">${index}</span>
         </div>
         ${tag}
     </div>
@@ -1954,7 +2204,7 @@ function createCard(order, index, currentStatus) {
                 <div class="card-price">
                     ${formatPrice(order.total)}
                     ${(currentStatus === 'unquoted' && !isSelfPickup && !isStore) ? '<span class="status-pending-hint">(待報價)</span>' : ''}
-                    ${(order.shippingFee && order.shippingFee > 0) ? `<div class="shipping-fee-hint">(含運費 $${order.shippingFee})</div>` : ''}
+                    ${(order.shippingFee && order.shippingFee > 0) ? `<div class="shipping-fee-hint" style="color:#999; font-size:0.78rem;">(含運費 $${order.shippingFee})</div>` : ''}
                 </div>
             </div>
         </div>
@@ -1962,13 +2212,20 @@ function createCard(order, index, currentStatus) {
 
     <div class="card-actions">
         ${prevBtnHtml}
-        <button class="btn-card-action btn-gmail" 
+        <button class="btn-card-action btn-gmail"
+            style="background:${tagColor}; color:#fff;"
             onclick="event.stopPropagation(); window.triggerGmailReply('${order.timestamp}')">
             <i class="fas fa-envelope"></i> 回覆
         </button>
         ${nextBtnHtml}
     </div>
     `;
+    // 強制回覆按鈕顏色跟功能區一致（覆蓋 CSS class 的 rose 預設）
+    const gmailBtn = el.querySelector('.btn-gmail');
+    if (gmailBtn) {
+        gmailBtn.style.setProperty('background', tagColor, 'important');
+        gmailBtn.style.setProperty('color', '#fff', 'important');
+    }
     return el;
 }
 
@@ -1977,7 +2234,7 @@ window.regressStatus = function (orderId, prevStatus) {
     if (target) {
         // [Safety Guard] Prevent regression if accessories were deducted
         if (target.status === 'shipping' || target.status === 'dispatched') {
-            if (localStorage.getItem(`deducted_acc_${orderId}`)) {
+            if (localStorage.getItem(`deducted_acc_${orderId} `)) {
                 alert("⚠️ 無法退回上一步！\n\n此訂單的配件庫存已經扣除。\n若強制退回將導致庫存重複扣除或數據不一致。\n若必須退回，請聯繫管理員手動調整庫存。");
                 return;
             }
@@ -2044,7 +2301,7 @@ window.advanceStatus = function (orderId, nextStatus) {
 
             // ... rest of logic ...
             if (target.email) {
-                let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name}`);
+                let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name} `);
                 let rawBody = window.generateMailBody(target.name, target.total, 0, target.details);
                 let mailBody = encodeURIComponent(rawBody);
                 window.openGmail(target.email, mailSubject, mailBody);
@@ -2069,7 +2326,7 @@ window.advanceStatus = function (orderId, nextStatus) {
 
     // --- 1.5. Quoted -> Paid Safety Check (Payment Confirmation) ---
     if (target.status === 'quoted' && nextStatus === 'paid') {
-        if (!confirm(`⚠️ 確認收到款項了嗎？\n\n訂單：${target.name}\n應收金額：${formatPrice(target.total)}\n\n按下確定後將轉入「已付款 (待處理)」階段。`)) {
+        if (!confirm(`⚠️ 確認收到款項了嗎？\n\n訂單：${target.name} \n應收金額：${formatPrice(target.total)} \n\n按下確定後將轉入「已付款(待處理)」階段。`)) {
             return; // Block transition if user cancels
         }
     }
@@ -2097,7 +2354,7 @@ window.advanceStatus = function (orderId, nextStatus) {
         const deductionMap = new Map();
 
         // Safety Check: Already deducted?
-        if (localStorage.getItem(`deducted_acc_${orderId}`)) {
+        if (localStorage.getItem(`deducted_acc_${orderId} `)) {
             console.log("Accessories already deducted for this order. Skipping.");
             const confirmSkip = confirm("⚠️ 注意：系統紀錄顯示此訂單「已扣除」過配件庫存。\n是否直接移至待出貨 (不再重複扣庫存)？");
             if (confirmSkip) {
@@ -2215,7 +2472,7 @@ window.advanceStatus = function (orderId, nextStatus) {
 
                     if (success) {
                         // Mark as deducted
-                        localStorage.setItem(`deducted_acc_${orderId}`, 'true');
+                        localStorage.setItem(`deducted_acc_${orderId} `, 'true');
 
                         target.status = nextStatus;
                         applyFilter();
@@ -2249,21 +2506,21 @@ window.advanceStatus = function (orderId, nextStatus) {
 
     // [New] Shipping Email Trigger
     if (nextStatus === 'dispatched' && target.email) {
-        let subject = encodeURIComponent(`LUTU鋁圖 - 出貨通知 (${target.name})`);
+        let subject = encodeURIComponent(`LUTU鋁圖 - 出貨通知(${target.name})`);
 
         // Format details for email
         let formattedDetails = (target.details || "").replace(/\\n/g, '\n').replace(/\n/g, '\n');
         let detailsClip = formattedDetails;
         let note = target.note ? target.note : "無";
 
-        let bodyText = `您好，LUTU鋁圖通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip}\n\n出貨單號 / 備註：${note}\n\n如有任何問題，歡迎隨時與我們聯絡！`;
+        let bodyText = `您好，LUTU鋁圖通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip} \n\n出貨單號 / 備註：${note} \n\n如有任何問題，歡迎隨時與我們聯絡！`;
         let body = encodeURIComponent(bodyText);
 
         if (body.length > 1800) {
             let cutoff = formattedDetails.lastIndexOf('\n', 1200);
             if (cutoff === -1) cutoff = 1200;
             detailsClip = formattedDetails.substring(0, cutoff);
-            bodyText = `您好，LUTU鋁圖通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip}\n\n出貨單號 / 備註：${note}\n\n如有任何問題，歡迎隨時與我們聯絡！`;
+            bodyText = `您好，LUTU鋁圖通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip} \n\n出貨單號 / 備註：${note} \n\n如有任何問題，歡迎隨時與我們聯絡！`;
             body = encodeURIComponent(bodyText);
         }
 
@@ -2364,58 +2621,72 @@ window.viewOrder = function (order) {
 
     // Add explicit shipping fee info if it has been quoted
     if (order.status !== 'unquoted' && typeof order.shippingFee !== 'undefined') {
-        note += `<br><span style="color:#b08850; font-weight:bold;">[系統紀錄: 實際運費已核定為 NT$ ${order.shippingFee}]</span>`;
+        const feeNote = `<span style="color:#888;">[運費已核定：NT$ ${order.shippingFee}]</span>`;
+        if (note === '無') {
+            note = feeNote; // 取代「無」，不同時顯示
+        } else {
+            note += `<br>${feeNote}`; // 備註有內容才追加
+        }
     }
 
     window.currentOrderForPrint = order;
 
     body.innerHTML = `
-        <div class="detail-group">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div class="detail-label">訂單時間</div>
+        <div style="display:flex; flex-direction:column; gap:0; font-size:0.84rem; margin-bottom:10px;">
+
+            <div style="display:flex; justify-content:flex-end; margin-bottom:6px;">
                 <button onclick="window.closeModal()" class="btn-close-inline">✖ 關閉</button>
             </div>
-            <div class="detail-value" style="margin-top:5px;">${dateStr}</div>
-        </div>
 
-        <div style="display:flex; gap:10px;">
-            <div class="detail-group" style="flex:1;">
-                <div class="detail-label">客戶姓名</div>
-                <div class="detail-value">${order.name}</div>
+            <!-- 每一欄：label 左固定寬，value 右自動 -->
+            <div style="display:flex; align-items:baseline; padding:4px 0; border-bottom:1px solid #f2f2f2;">
+                <span style="color:#aaa; font-size:0.76rem; width:72px; flex-shrink:0;">訂單時間</span>
+                <span style="color:#333;">${dateStr}</span>
             </div>
-            <div class="detail-group" style="flex:1;">
-                <div class="detail-label">聯絡電話</div>
-                <div class="detail-value">${order.phone}</div>
+
+            <div style="display:flex; align-items:baseline; padding:4px 0; border-bottom:1px solid #f2f2f2;">
+                <span style="color:#aaa; font-size:0.76rem; width:72px; flex-shrink:0;">客戶姓名</span>
+                <span style="color:#333;">${order.name}</span>
             </div>
-        </div>
-        <div style="display:flex; gap:10px;">
-            <div class="detail-group" style="flex:1;">
-                <div class="detail-label">配送方式</div>
-                <div class="detail-value" style="color:var(--accent-delivery); font-weight:400;">${(() => {
+
+            <div style="display:flex; align-items:baseline; padding:4px 0; border-bottom:1px solid #f2f2f2;">
+                <span style="color:#aaa; font-size:0.76rem; width:72px; flex-shrink:0;">聯絡電話</span>
+                <span style="color:#333;">${order.phone}</span>
+            </div>
+
+            <div style="display:flex; align-items:baseline; padding:4px 0; border-bottom:1px solid #f2f2f2;">
+                <span style="color:#aaa; font-size:0.76rem; width:72px; flex-shrink:0;">配送方式</span>
+                <span style="color:var(--accent-delivery);">${(() => {
             let addr = order.address || "";
             if (addr.includes("宅配")) return "宅配寄送";
             if (addr.includes("自取")) return "客戶自取";
             if (addr.includes("店到店")) return "店到店";
-            if (addr.includes("公司配送")) return "公司配送";
+            if (addr.includes("公司配送")) {
+                const vt = detectVehicleType(order.details);
+                return "公司配送" + (vt ? " · " + vt : "");
+            }
             return "一般貨運";
-        })()}</div>
+        })()}</span>
             </div>
-            <div class="detail-group" style="flex:2;">
-                <div class="detail-label">配送地址</div>
-                <div class="detail-value" style="word-break:break-all;">${address}</div>
+
+            <div style="display:flex; align-items:flex-start; padding:4px 0; border-bottom:1px solid #f2f2f2;">
+                <span style="color:#aaa; font-size:0.76rem; width:72px; flex-shrink:0;">配送地址</span>
+                <span style="color:#333; word-break:break-all;">${address}</span>
             </div>
-        </div>
-        <div class="detail-group">
-            <div class="detail-label">備註事項</div>
-            <div class="detail-value" style="color:#666;">${note}</div>
+
+            ${note !== '無' || note ? `
+            <div style="display:flex; align-items:flex-start; padding:4px 0; border-bottom:1px solid #f2f2f2;">
+                <span style="color:#aaa; font-size:0.76rem; width:72px; flex-shrink:0;">備註</span>
+                <span style="color:#333;">${note}</span>
+            </div>` : ''}
+
+            <div style="display:flex; align-items:baseline; padding:5px 0;">
+                <span style="color:#aaa; font-size:0.76rem; width:72px; flex-shrink:0;">訂單總額</span>
+                <span style="color:var(--accent-delivery); font-size:1.05rem; font-weight:400;">${formatPrice(order.total)}</span>
+            </div>
         </div>
 
-        <div class="detail-group" style="background: #f8fafc; padding:15px; border-radius:12px; border:1px solid var(--border);">
-            <div class="detail-label" style="color:var(--text); opacity:0.6;">訂單總額 (含運)</div>
-            <div class="detail-value" style="font-size:1.6rem; color:var(--accent-delivery); font-weight:400;">${formatPrice(order.total)}</div>
-        </div>
-        
-        <hr style="border:0; border-top:1px dashed #ddd; margin: 15px 0;">
+        <hr style="border:0; border-top:1px dashed #ddd; margin: 8px 0;">
         
         <div class="detail-group">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -2455,19 +2726,19 @@ window.viewOrder = function (order) {
                         ✖ 關閉視窗
                      </button>
                      ${order.status === 'cutting' ? `
-                     <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse);">
+                     <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse); color:#fff;">
                          ✓ 切割完成 → 前進至品檢
                      </button>
                      ` : order.status === 'inspection' ? `
-                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse);">
+                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse); color:#fff;">
                          ✓ 核對完成 → 前進至撿貨單
                      </button>
                      ` : order.status === 'picking' ? `
-                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse);">
+                     <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse); color:#fff;">
                          ✓ 核對完成 → 前進至包裝
                      </button>
                      ` : order.status === 'packing' ? `
-                     <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-40);">
+                     <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-40); color:#fff;">
                          ✓ 確認無誤 → 前進至待出貨
                      </button>
                      ` : ''}
@@ -2733,8 +3004,10 @@ function buildScene() {
     const riverGeometry = new THREE.PlaneGeometry(20000, 20000);
     const riverMaterial = new THREE.MeshStandardMaterial({
         color: 0xb2d8d8, // Light Morandi Blue-Green
-        roughness: 0.2, // Softer water reflection
-        metalness: 0.3,
+        roughness: 0.1,  // Lower roughness for smoother water reflection
+        metalness: 0.6,  // Higher metalness for glass-like reflection
+        transparent: true, // Enable transparency
+        opacity: 0.85     // Slightly see-through
     });
     const riverPlane = new THREE.Mesh(riverGeometry, riverMaterial);
     riverPlane.rotation.x = -Math.PI / 2;
@@ -2742,9 +3015,9 @@ function buildScene() {
     riverPlane.receiveShadow = true;
     scene.add(riverPlane);
 
-    // Banks - Sleek dark landscaping instead of bright toy green
+    // Banks - Sleek dark landscaping instead of bright toy green -> Changed to White per user request
     const bankMaterial = new THREE.MeshStandardMaterial({
-        color: 0x94a3b8, // Morandi Ash Gray base
+        color: 0xffffff, // White
         roughness: 0.8,
         metalness: 0.1
     });
@@ -3786,25 +4059,50 @@ function renderDetailCards(detailsStr, status) {
     });
 
     // 注入系列顏色樣式 (如果網頁中還沒有的話)
-    if (!document.getElementById('series-styles')) {
-        const styleId = 'series-styles';
-        const css = `
-            .series-20 { border-left: 5px solid #6b8db0 !important; background-color: #f0f4f8 !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
-            .series-20 span { color: #6b8db0 !important; }
-            .series-30 { border-left: 5px solid #b08850 !important; background-color: #fdf6ed !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
-            .series-30 span { color: #b08850 !important; }
-            .series-40 { border-left: 5px solid #5e8a5e !important; background-color: #f4f7f6 !important; margin-bottom: 5px !important; margin-top: 5px !important; padding: 10px !important; border-radius: 4px; }
-            .series-40 span { color: #5e8a5e !important; }
-            .detail-card-inner { display: flex; flex-direction: column; gap: 8px; }
-            .detail-item { position: relative; }
-        `;
-        const head = document.head || document.getElementsByTagName('head')[0];
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.type = 'text/css';
-        style.appendChild(document.createTextNode(css));
-        head.appendChild(style);
-    }
+    // Always reinject series styles fresh (removed ID caching to ensure latest styles)
+    const _oldSeriesStyle = document.getElementById('series-styles-v3');
+    if (_oldSeriesStyle) _oldSeriesStyle.remove();
+    const _seriesCss = `
+        .series-20, .series-30, .series-40 {
+            background: transparent !important;
+            padding: 1px 6px !important;
+            margin: 1px 0 !important;
+            border-radius: 3px !important;
+            font-size: 0.82rem !important;
+            line-height: 1.25 !important;
+        }
+        .series-20 { border-left: 3px solid #6b8db0 !important; }
+        .series-20 span { color: #6b8db0 !important; }
+        .series-30 { border-left: 3px solid #b08850 !important; }
+        .series-30 span { color: #b08850 !important; }
+        .series-40 { border-left: 3px solid #5e8a5e !important; }
+        .series-40 span { color: #5e8a5e !important; }
+        .detail-card-inner { display: flex; flex-direction: column; gap: 2px; }
+        .detail-item { position: relative; font-size: 0.82rem; line-height: 1.25; }
+        @media (max-width: 768px) {
+            .series-20, .series-30, .series-40, .detail-item {
+                font-size: 0.68rem !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                max-width: 100% !important;
+            }
+            .detail-card {
+                font-size: 0.68rem !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+            }
+            .detail-card > div[style*="flex:1"] {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+        }
+    `;
+    const _seriesStyleEl = document.createElement('style');
+    _seriesStyleEl.id = 'series-styles-v3';
+    _seriesStyleEl.appendChild(document.createTextNode(_seriesCss));
+    (document.head || document.body).appendChild(_seriesStyleEl);
 
     // 將彙總的螺絲螺帽轉換為項目 (Skip for inspection)
     if (status !== 'inspection') {
@@ -3834,12 +4132,12 @@ function renderDetailCards(detailsStr, status) {
                     else foundName = '螺絲/螺母';
                 }
 
-                displayLabel = `🔩 ${foundName} ${key}`;
+                displayLabel = `🔩 ${foundName}`;
                 seriesNum = window.detectSeries(foundName) || (sku.includes('A20') ? 20 : sku.includes('A30') ? 30 : sku.includes('A40') ? 40 : 99);
             }
 
             normalItems.push({
-                raw: `【配件】 <span style="font-weight:bold;">${displayLabel}</span> <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`,
+                raw: `【配件】 <span style="font-weight:bold;">${displayLabel}</span><span style="font-size:0.82em; color:#999; font-weight:bold; margin-left:4px;">${key}</span> <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`,
                 type: 'accessory',
                 series: seriesNum,
                 seriesClass: (seriesNum !== 99) ? `series-${seriesNum}` : '',
@@ -3866,15 +4164,19 @@ function renderDetailCards(detailsStr, status) {
     // 組合 HTML
     let finalHtml = '<div class="detail-card-inner">';
     let enteredScrewNutSection = false;
+    let prevType = null; // track type transitions for spacing
 
     normalItems.forEach(item => {
-        // 螺絲螺帽（全域彙總）分隔區
+        // 鋁材→配件 空格
+        if (prevType === 'profile' && item.type === 'accessory') {
+            finalHtml += `<div style="margin-top:8px;"></div>`;
+        }
+        // 螺絲螺帽 空格
         if (item.isScrewNut && !enteredScrewNutSection) {
-            finalHtml += `<div style="border-top:2px dashed #b08850; margin:15px 0 10px; padding-top:10px; text-align:center; color:#b08850; font-weight:bold;">
-                🔩 螺絲螺帽 (全域合計)
-            </div>`;
+            finalHtml += `<div style="margin-top:8px;"></div>`;
             enteredScrewNutSection = true;
         }
+        prevType = item.type;
         let isCheckable = false;
         if (status === 'picking') {
             isCheckable = true; // picking checks everything
@@ -3894,7 +4196,7 @@ function renderDetailCards(detailsStr, status) {
             if (status === 'inspection' && item.type !== 'profile') {
                 return; // Do not render non-aluminum items during inspection
             }
-            finalHtml += `<div class="detail-item ${item.seriesClass}" style="padding:10px; border:1px solid #eee;">
+            finalHtml += `<div class="detail-item ${item.seriesClass}" style="padding:4px 8px; border:1px solid #eee; border-radius:5px; margin-bottom:3px; font-size:0.88rem;">
                 ${item.raw}
             </div>`;
         }
@@ -4184,6 +4486,9 @@ window.fetchInventoryData = async function () {
             console.log("Extracted Item 0 Sample:", data[0]);
             window.allInventory = data;
             renderInventory(data);
+            if (typeof renderInventoryDashboard === 'function') {
+                renderInventoryDashboard();
+            }
         } else {
             console.error("Unknown Inventory Data Format:", json);
             container.innerHTML = `<div style="color:red; text-align:center; padding:20px;">資料格式無法解析（請檢查 Google Apps Script 回傳格式）</div>`;
@@ -4209,6 +4514,7 @@ window.switchInventoryCategory = function (category) {
     const details = document.getElementById('inventory-details');
     if (!hub || !details) return;
 
+    // Hide the entire hub (all 4 blocks disappear — same as desktop behavior)
     hub.classList.add('hidden');
     details.classList.remove('hidden');
 
@@ -4216,7 +4522,6 @@ window.switchInventoryCategory = function (category) {
 
     // Update Title
     const titleEl = document.getElementById('inventory-view-title');
-
     if (category === 'aluminum') {
         if (titleEl) titleEl.innerHTML = `<i class="fas fa-layer-group"></i> 鋁材庫存概覽`;
     } else {
@@ -4405,10 +4710,7 @@ function renderInventory(inventory, isPartial = false) {
         const isAccessoryGroup = Array.isArray(item);
 
         if (isAccessoryGroup) {
-            // === 配件組渲染：圓餅水庫模式 ===
-            const [baseName, seriesItems] = item;
-            const currentCategory = window.currentInventoryCategory || 'aluminum';
-            if (currentCategory === 'aluminum') return;
+            const [baseName, seriesItems] = item; // <<< THIS WAS MISSING
 
             if (lastType !== 'accessory') {
                 lastType = 'accessory';
@@ -4421,6 +4723,7 @@ function renderInventory(inventory, isPartial = false) {
             const isScrewSet = checkIsScrewOrNutSet(baseName);
             const defaultMax = isScrewSet ? 1000 : 100;
 
+
             html += `
             <div class="reservoir-card" style="grid-column: span 1; margin-bottom: 20px;">
                 <div style="text-align: left; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px;">
@@ -4429,7 +4732,7 @@ function renderInventory(inventory, isPartial = false) {
                     </h3>
                     <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">基準量: ${defaultMax} | 超過顯示溢出</div>
                 </div>
-                <div class="reservoir-grid">`;
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 5px; width: 100%;">`;
 
             ['20', '30', '40'].forEach(s => {
                 const itemEntry = seriesItems.find(it => {
@@ -4450,37 +4753,37 @@ function renderInventory(inventory, isPartial = false) {
                 };
                 const config = sColors[s];
                 let activeColor = hasItem ? config.color : '#f1f5f9';
-                if (hasItem && percentage < 20) activeColor = 'var(--accent-mail)';
+                if (hasItem && percentage < 20) activeColor = 'var(--dusty-rose)';
 
                 let textColor = hasItem ? '#475569' : '#cbd5e1';
-                if (hasItem && rawStock < 0) textColor = 'var(--accent-mail)';
+                if (hasItem && rawStock < 0) textColor = 'var(--dusty-rose)';
 
-                const radius = 30, viewBox = `0 0 80 80`, center = 40;
+                const radius = 22, viewBox = `0 0 60 60`, center = 30; // Shrunk for side-by-side
                 const maskId = `mask-${baseName.replace(/\s+/g, '')}-${s}`;
                 const fillY = center + radius - (fillLevel / 100) * (radius * 2);
 
                 html += `
-                <div class="reservoir-circle-container" style="opacity: ${hasItem ? 1 : 0.6}">
-                    <div class="reservoir-label">${config.label}</div>
-                    <svg width="70" height="70" viewBox="${viewBox}" class="reservoir-svg">
-                        <circle cx="${center}" cy="${center}" r="${radius}" fill="#f8fafc" stroke="${hasItem ? '#e2e8f0' : '#f1f5f9'}" stroke-width="2" />
+                <div class="reservoir-circle-container" style="opacity: ${hasItem ? 1 : 0.6}; flex: 1; min-width: 0;">
+                    <div class="reservoir-label" style="font-size: 0.65rem; margin-bottom: 2px;">${config.label}</div>
+                    <svg width="55" height="55" viewBox="${viewBox}" class="reservoir-svg" style="display: block; margin: 0 auto;">
+                        <circle cx="${center}" cy="${center}" r="${radius}" fill="#f8fafc" stroke="${hasItem ? '#e2e8f0' : '#f1f5f9'}" stroke-width="1.5" />
                         <defs><clipPath id="${maskId}"><circle cx="${center}" cy="${center}" r="${radius}" /></clipPath></defs>
                         <g clip-path="url(#${maskId})">
                             <g class="reservoir-fill-group" style="transform: translateY(80px); transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.2, 1);">
                                 <rect x="-80" y="${fillY}" width="240" height="100" fill="${activeColor}" />
                                 ${hasItem && fillLevel > 0 && fillLevel < 100 ? `
-                                    <path d="M 0 ${fillY} q 20 -8 40 0 t 40 0 40 0 40 0 40 0 40 0 40 0 40 0" fill="${activeColor}" opacity="0.3" class="reservoir-wave-slow" />
-                                    <path d="M 0 ${fillY} q 20 -5 40 0 t 40 0 40 0 40 0 40 0 40 0 40 0 40 0" fill="${activeColor}" opacity="0.6" class="reservoir-wave" />
+                                    <path d="M 0 ${fillY} q 15 -6 30 0 t 30 0 30 0 30 0 30 0" fill="${activeColor}" opacity="0.3" class="reservoir-wave-slow" />
+                                    <path d="M 0 ${fillY} q 15 -4 30 0 t 30 0 30 0 30 0 30 0" fill="${activeColor}" opacity="0.6" class="reservoir-wave" />
                                 ` : ''}
                             </g>
                         </g>
-                        <text x="${center}" y="${center + 5}" text-anchor="middle" font-size="${hasItem ? 12 : 14}" font-weight="300" 
-                              fill="${hasItem && fillLevel > 50 ? '#fff' : textColor}" 
-                              style="text-shadow: ${hasItem && fillLevel > 50 ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'}; pointer-events: none; opacity: ${hasItem ? 1 : 0.5}">
+                        <text x="${center}" y="${center + 4}" text-anchor="middle" font-size="${hasItem ? 11 : 12}" font-weight="400" 
+                               fill="${hasItem && fillLevel > 50 ? '#fff' : textColor}" 
+                               style="text-shadow: ${hasItem && fillLevel > 50 ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'}; pointer-events: none; opacity: ${hasItem ? 1 : 0.5}">
                             ${displayPercent}
                         </text>
                     </svg>
-                    <div class="reservoir-value" style="color: ${textColor}">${hasItem ? rawStock : '-'}</div>
+                    <div class="reservoir-value" style="color: ${textColor}; font-size: 0.75rem;">${hasItem ? rawStock : '-'}</div>
                 </div>`;
             });
             html += `</div></div>`;
@@ -4496,9 +4799,39 @@ function renderInventory(inventory, isPartial = false) {
             if (currentCategory === 'aluminum' && !isActuallyAluminum) return;
             if (currentCategory === 'accessory' && isActuallyAluminum) return;
 
-            // 插入鋁材標題
-            if (lastType !== 'aluminum') {
+            // 判定系列 (修正：使用更嚴謹的正則判定，確保 2040 不會被誤判為 40)
+            let series = 20;
+            const seriesMatch = name.match(/(20|30|40)\d{2}/); // 尋找 2020, 2040, 3030 等格式
+            if (seriesMatch) {
+                series = parseInt(seriesMatch[1]);
+            } else {
+                // 備用：檢查前綴或包含
+                if (name.includes('40')) series = 40;
+                else if (name.includes('30')) series = 30;
+                else series = 20;
+            }
+
+            // 插入鋁材系列分隔標題 & 換行
+            if (lastType !== 'aluminum' || lastSeries !== series) {
+                // 如果已經有卡片了，先把 grid 容器關掉（避免跟上一系列混排）
+                if (lastType === 'aluminum' && lastSeries !== null) {
+                    html += `</div><div class="inventory-grid" style="margin-top: 15px;">`;
+                }
+
+                const sColors = {
+                    20: { color: '#b3c7d9', label: '20 系列' },
+                    30: { color: '#c6a682', label: '30 系列' },
+                    40: { color: '#b8ccb8', label: '40 系列' }
+                };
+
+                html += `
+                <div style="grid-column: 1 / -1; margin-top: 5px; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 2px solid #f1f5f9;">
+                    <h3 style="margin: 0; color: ${sColors[series].color}; font-size: 1.1rem; font-weight: 500; display: flex; align-items: center;">
+                        <i class="fas fa-layer-group" style="margin-right: 8px;"></i>${sColors[series].label} 鋁材區
+                    </h3>
+                </div>`;
                 lastType = 'aluminum';
+                lastSeries = series;
             }
 
             const rawStock = parseNum(findValue(item, ['qty', 'stock', '庫存數量', '數量', '庫存']));
@@ -4519,18 +4852,6 @@ function renderInventory(inventory, isPartial = false) {
             const offcuts = offcutsStr ? offcutsStr.split(/[,，、 ]+/).filter(s => s.trim() !== "").map(s => parseFloat(s)).filter(n => !isNaN(n)).sort((a, b) => b - a) : [];
             const offcutCount = offcuts.length;
 
-            // 判定系列 (修正：使用更嚴謹的正則判定，確保 2040 不會被誤判為 40)
-            let series = 20;
-            const seriesMatch = name.match(/(20|30|40)\d{2}/); // 尋找 2020, 2040, 3030 等格式
-            if (seriesMatch) {
-                series = parseInt(seriesMatch[1]);
-            } else {
-                // 備用：檢查前綴或包含
-                if (name.includes('40')) series = 40;
-                else if (name.includes('30')) series = 30;
-                else series = 20;
-            }
-
             const sColors = {
                 20: { color: '#b3c7d9', label: '20 系列' },
                 30: { color: '#c6a682', label: '30 系列' },
@@ -4540,10 +4861,11 @@ function renderInventory(inventory, isPartial = false) {
 
             let tubeColor = config.color;
             let isWarning = percentage < 20;
-            if (isWarning) tubeColor = 'var(--accent-mail)';
+            // 低庫存顏色，統一使用跟配件水庫一樣的 var(--status-quoted) 或 --accent-mail 警告色
+            if (isWarning) tubeColor = 'var(--status-quoted)'; // Rose Red
 
             html += `
-            <div class="aluminum-tube-card" style="grid-column: span 1;">
+            <div class="aluminum-tube-card" style="grid-column: span 1; border: ${isWarning ? '1px solid rgba(231,76,60,0.3)' : '1px solid transparent'};">
                 <div class="tube-header">
                     <div style="text-align: left;">
                         <div class="sku-badge">${sku}</div>
@@ -5468,8 +5790,31 @@ window.renderHistoryOrders = function () {
             else if (addrStr.includes("公司配送")) tag = `<span class="card-tag" ${tagStyle}>公司配送</span>`;
             else if (addrStr.includes("宅配")) tag = `<span class="card-tag" ${tagStyle}>宅配</span>`;
 
+            // Data Visualization: Series composition sparkline
+            const itemsInfo = window.parseOrderItemsRobust ? window.parseOrderItemsRobust(o) : { count20: 0, count30: 0, count40: 0, countProfile: 0, countAccessory: 0 };
+            const totalItems = (itemsInfo.countProfile + itemsInfo.countAccessory) || 1;
+            const p20 = (itemsInfo.count20 / totalItems) * 100;
+            const p30 = (itemsInfo.count30 / totalItems) * 100;
+            const p40 = (itemsInfo.count40 / totalItems) * 100;
+            // The rest is accessories
+            let pAcc = 100 - (p20 + p30 + p40);
+            if (pAcc < 0) pAcc = 0;
+
+            let sparklineHtml = '';
+            // Only show if there's actual parsed content
+            if ((itemsInfo.countProfile + itemsInfo.countAccessory) > 0) {
+                sparklineHtml = `
+                    <div class="history-sparkline">
+                        ${p20 > 0 ? `<div class="spark-bar bg-20" style="width:${p20}%" title="20系列 (${Math.round(p20)}%)"></div>` : ''}
+                        ${p30 > 0 ? `<div class="spark-bar bg-30" style="width:${p30}%" title="30系列 (${Math.round(p30)}%)"></div>` : ''}
+                        ${p40 > 0 ? `<div class="spark-bar bg-40" style="width:${p40}%" title="40系列 (${Math.round(p40)}%)"></div>` : ''}
+                        ${pAcc > 0 ? `<div class="spark-bar bg-acc" style="width:${pAcc}%" title="配件 (${Math.round(pAcc)}%)"></div>` : ''}
+                    </div>
+                `;
+            }
+
             return `
-                <div class="kanban-card" onclick="viewOrder('${o.timestamp}')" style="border-left: 3px solid var(--status-completed, #94a3b8); cursor: pointer;">
+                <div class="kanban-card history-order-card" onclick="viewOrder('${o.timestamp}')">
                     <div class="card-header">
                         <div class="card-meta" style="flex:1;">
                             <span class="card-no">
@@ -5484,6 +5829,7 @@ window.renderHistoryOrders = function () {
                             <div class="card-contact">
                                 <div class="card-info"><i class="fas fa-phone-alt"></i> ${o.phone || '無電話'}</div>
                                 <div class="card-info"><i class="fas fa-truck"></i> <span style="font-size: 0.8rem; opacity:0.8;">${addrStr || '不需寄送'}</span></div>
+                                ${sparklineHtml}
                             </div>
                             <div class="card-price-container">
                                 <div class="card-price">
@@ -5543,8 +5889,69 @@ window.chartConfigs = {
     trend: { time: 'day', cat: 'all' },
     series: { time: 'month', cat: 'all' },
     delivery: { time: 'month', cat: 'all' },
-    top10: { time: 'month', cat: 'all' }
+    top10: { time: 'month', cat: 'all' },
+    seriesMix: { time: 'month' },
+    crossSell: { time: 'month' },
+    logistics: { time: 'month' }
 };
+
+// --- UI Helpers for Financial Reports ---
+window.updateFinancialButtonVisibility = function () {
+    const viewModeEl = document.getElementById('report-view-mode');
+    const mode = viewModeEl ? viewModeEl.value : 'single';
+    const module = document.getElementById('reports-module');
+    if (!module) return;
+
+    if (mode === 'trend') {
+        module.classList.add('mode-trend');
+        module.classList.remove('mode-single');
+    } else {
+        module.classList.add('mode-single');
+        module.classList.remove('mode-trend');
+    }
+    console.log(`[📊 Financial Report] View Mode updated: ${mode}`);
+};
+
+// --- Financial Month Switcher Logic ---
+window.shiftFinancialMonth = function (delta) {
+    let yearEl = document.getElementById('report-active-year');
+    let monthEl = document.getElementById('report-active-month');
+    if (!yearEl || !monthEl || !yearEl.value) {
+        let d = new Date();
+        if (yearEl) yearEl.value = d.getFullYear();
+        if (monthEl) monthEl.value = d.getMonth() + 1;
+    }
+
+    let y = parseInt(document.getElementById('report-active-year').value) || new Date().getFullYear();
+    let m = parseInt(document.getElementById('report-active-month').value) || (new Date().getMonth() + 1);
+
+    let d = new Date(y, m - 1 + delta, 1);
+    document.getElementById('report-active-year').value = d.getFullYear();
+    document.getElementById('report-active-month').value = d.getMonth() + 1;
+    document.getElementById('current-financial-period').innerText = `${d.getFullYear()} / ${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+    // Auto-set single month mode if navigating month-by-month
+    document.getElementById('report-view-mode').value = 'single';
+
+    window.updateFinancialButtonVisibility();
+    renderFinancialReports();
+};
+
+window.toggleFinancialViewMode = function () {
+    const mode = document.getElementById('report-view-mode').value;
+    const year = document.getElementById('report-active-year').value;
+    const month = document.getElementById('report-active-month').value;
+
+    if (mode === 'trend') {
+        document.getElementById('current-financial-period').innerText = `${year} 全年度`;
+    } else {
+        document.getElementById('current-financial-period').innerText = `${year} / ${String(month).padStart(2, '0')}`;
+    }
+
+    window.updateFinancialButtonVisibility();
+    renderFinancialReports();
+};
+
 
 window.setChartFilter = function (chartId, filterType, value) {
     if (window.chartConfigs[chartId]) {
@@ -5572,20 +5979,19 @@ window.setChartFilter = function (chartId, filterType, value) {
     renderFinancialReports();
 }
 
-function timeFilterPassed(d, timeConfig) {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
+function timeFilterPassed(d, timeConfig, baseDate = new Date()) {
+    const bYear = baseDate.getFullYear();
+    const bMonth = baseDate.getMonth();
 
     if (timeConfig === 'day') {
-        return d.getFullYear() === currentYear && d.getMonth() === currentMonth && d.getDate() === now.getDate();
+        return d.getFullYear() === bYear && d.getMonth() === bMonth && d.getDate() === baseDate.getDate();
     }
     if (timeConfig === 'week') {
-        const diff = now.getTime() - d.getTime();
+        const diff = baseDate.getTime() - d.getTime();
         return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
     }
     if (timeConfig === 'month') {
-        return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+        return d.getFullYear() === bYear && d.getMonth() === bMonth;
     }
     return true;
 }
@@ -5678,34 +6084,70 @@ window.renderFinancialReports = function () {
     const module = document.getElementById('reports-module');
     if (!module) return;
 
-    const reportRange = document.getElementById('report-range') ? document.getElementById('report-range').value : 'month';
-    const now = new Date();
-    let cutoffDate = new Date(0);
+    // Initialize period if empty or NaN
+    let yearInput = document.getElementById('report-active-year');
+    let monthInput = document.getElementById('report-active-month');
+    let periodSpan = document.getElementById('current-financial-period');
 
-    if (reportRange === 'month') {
-        cutoffDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (reportRange === '3month') {
-        cutoffDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    } else if (reportRange === '6month') {
-        cutoffDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    if (!yearInput.value || isNaN(parseInt(yearInput.value))) {
+        const d = new Date();
+        yearInput.value = d.getFullYear();
+        monthInput.value = d.getMonth() + 1;
+        if (periodSpan) periodSpan.innerText = `${d.getFullYear()} / ${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    const viewMode = document.getElementById('report-view-mode') ? document.getElementById('report-view-mode').value : 'single';
+    const selYear = parseInt(yearInput.value);
+    const selMonth = parseInt(monthInput.value);
+    const now = new Date();
+
+    window.updateFinancialButtonVisibility();
+
+    // Auto-adjust granularity based on viewMode
+    if (viewMode === 'single') {
+        // Narrow look: use Day/Week
+        if (window.chartConfigs.trend.time === 'month') window.chartConfigs.trend.time = 'day';
+        if (window.chartConfigs.seriesMix.time === 'month') window.chartConfigs.seriesMix.time = 'day';
+        if (window.chartConfigs.crossSell.time === 'month') window.chartConfigs.crossSell.time = 'day';
+    } else {
+        // Wide look: use Month
+        window.chartConfigs.trend.time = 'month';
+        window.chartConfigs.seriesMix.time = 'month';
+        window.chartConfigs.crossSell.time = 'month';
     }
 
     const reportOrders = ordersData.filter(o => {
         if (o.status !== 'completed') return false;
-        return window.safeParseDate(o.timestamp).getTime() >= cutoffDate.getTime();
+        const oDate = window.safeParseDate(o.timestamp);
+        if (viewMode === 'single') {
+            return oDate.getFullYear() === selYear && (oDate.getMonth() + 1) === selMonth;
+        } else {
+            return oDate.getFullYear() === selYear;
+        }
     });
+
+    const cutoffDateStart = viewMode === 'single' ? new Date(selYear, selMonth - 1, 1) : new Date(selYear, 0, 1);
+    const cutoffDateEnd = viewMode === 'single' ? new Date(selYear, selMonth, 0, 23, 59, 59) : new Date(selYear, 11, 31, 23, 59, 59);
 
     const totalRevenue = reportOrders.reduce((sum, o) => sum + window.safeParsePrice(o.total), 0);
     const orderCount = reportOrders.length;
     const avgOrderValue = orderCount > 0 ? Math.round(totalRevenue / orderCount) : 0;
 
-    const allOrdersInRange = ordersData.filter(o => window.safeParseDate(o.timestamp).getTime() >= cutoffDate.getTime());
+    const allOrdersInRange = ordersData.filter(o => window.safeParseDate(o.timestamp).getTime() >= cutoffDateStart.getTime());
     const completionRate = allOrdersInRange.length > 0 ? Math.round((orderCount / allOrdersInRange.length) * 100) : 0;
 
     document.getElementById('kpi-revenue').innerText = `$${totalRevenue.toLocaleString()}`;
     document.getElementById('kpi-count').innerText = orderCount;
     document.getElementById('kpi-avg').innerText = `$${avgOrderValue.toLocaleString()}`;
     document.getElementById('kpi-rate').innerText = `${completionRate}%`;
+
+    // Clarify Logistics description based on scope
+    const logDesc = document.getElementById('logistics-description');
+    if (logDesc) {
+        logDesc.innerText = viewMode === 'single' ?
+            `分析 ${selYear}/${selMonth} 整個月內，週一至週日的配送量分布` :
+            `分析 ${selYear} 全年度內，週一至週日的配送量總和分布`;
+    }
 
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
@@ -5715,9 +6157,10 @@ window.renderFinancialReports = function () {
     // 1. DELIVERY CHART AGGREGATION
     const deliveryData = {};
     const dConf = window.chartConfigs.delivery;
+    const dTime = viewMode === 'trend' ? 'all' : dConf.time; // Show all orders in year if in trend mode
     reportOrders.forEach(o => {
         const d = window.safeParseDate(o.timestamp);
-        if (!timeFilterPassed(d, dConf.time)) return;
+        if (!timeFilterPassed(d, dTime, cutoffDateEnd)) return;
         const itemsInfo = parseOrderItemsRobust(o);
         if (dConf.cat === 'profile' && itemsInfo.countProfile === 0) return;
         if (dConf.cat === 'accessory' && itemsInfo.countAccessory === 0) return;
@@ -5736,9 +6179,10 @@ window.renderFinancialReports = function () {
     // 2. SERIES PIE CHART AGGREGATION
     const seriesData = { '20 系列': 0, '30 系列': 0, '40 系列': 0 };
     const sConf = window.chartConfigs.series;
+    const sTime = viewMode === 'trend' ? 'all' : sConf.time;
     reportOrders.forEach(o => {
         const d = window.safeParseDate(o.timestamp);
-        if (!timeFilterPassed(d, sConf.time)) return;
+        if (!timeFilterPassed(d, sTime, cutoffDateEnd)) return;
 
         const itemsInfo = parseOrderItemsRobust(o);
         let totalSeriesCount = itemsInfo.count20 + itemsInfo.count30 + itemsInfo.count40 + itemsInfo.countOther;
@@ -5763,9 +6207,10 @@ window.renderFinancialReports = function () {
     const top10Map = {};
     const topItemsColorMap = {};
     const tConf = window.chartConfigs.top10;
+    const tTime = viewMode === 'trend' ? 'all' : tConf.time;
     reportOrders.forEach(o => {
         const d = window.safeParseDate(o.timestamp);
-        if (!timeFilterPassed(d, tConf.time)) return;
+        if (!timeFilterPassed(d, tTime, cutoffDateEnd)) return;
 
         const itemsInfo = parseOrderItemsRobust(o);
 
@@ -5797,23 +6242,75 @@ window.renderFinancialReports = function () {
     const monthlyDataProfile = {};
     const monthlyDataAccessory = {};
     const trConf = window.chartConfigs.trend;
+    const smConf = window.chartConfigs.seriesMix || { time: 'month' };
+    const logConf = window.chartConfigs.logistics || { time: 'month' };
 
+    // --- NEW CHARTS DATA STRUCTURES ---
+    const seriesMixData = { '20系列': {}, '30系列': {}, '40系列': {} };
+    const crossSellData = { profileLength: {}, accessoryCount: {} };
+    const logisticsData = { '週一': {}, '週二': {}, '週三': {}, '週四': {}, '週五': {}, '週六': {}, '週日': {} };
+
+    // Initialize Logistics categories
+    const rDays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    rDays.forEach(d => {
+        logisticsData[d]['公司配送'] = 0;
+        logisticsData[d]['自取'] = 0;
+        logisticsData[d]['一般貨運'] = 0;
+    });
+
+    // Init trend chart time keys
     if (trConf.time === 'day') {
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const daysInMonth = new Date(selYear, selMonth, 0).getDate();
         for (let i = 1; i <= daysInMonth; i++) {
-            let mKey = `${currentMonth + 1}/${i}`;
+            let mKey = `${selMonth}/${i}`;
             monthlyDataTotal[mKey] = 0;
             monthlyDataProfile[mKey] = 0;
             monthlyDataAccessory[mKey] = 0;
         }
     } else if (trConf.time === 'week') {
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const daysInMonth = new Date(selYear, selMonth, 0).getDate();
         const maxWeek = Math.ceil(daysInMonth / 7);
         for (let i = 1; i <= maxWeek; i++) {
             let wKey = `第${i}週`;
             monthlyDataTotal[wKey] = 0;
             monthlyDataProfile[wKey] = 0;
             monthlyDataAccessory[wKey] = 0;
+        }
+    } else {
+        // Trend / Year Mode: Init all 12 months
+        for (let i = 1; i <= 12; i++) {
+            let mKey = `${selYear % 100}年${i}月`;
+            monthlyDataTotal[mKey] = 0;
+            monthlyDataProfile[mKey] = 0;
+            monthlyDataAccessory[mKey] = 0;
+        }
+    }
+
+    // Init seriesMix + crossSell time keys
+    if (smConf.time === 'day') {
+        const daysInMonth = new Date(selYear, selMonth, 0).getDate();
+        for (let i = 1; i <= daysInMonth; i++) {
+            let mKey = `${selMonth}/${i}`;
+            ['20系列', '30系列', '40系列'].forEach(s => seriesMixData[s][mKey] = 0);
+            crossSellData.profileLength[mKey] = 0;
+            crossSellData.accessoryCount[mKey] = 0;
+        }
+    } else if (smConf.time === 'week') {
+        const daysInMonth = new Date(selYear, selMonth, 0).getDate();
+        const maxWeek = Math.ceil(daysInMonth / 7);
+        for (let i = 1; i <= maxWeek; i++) {
+            let wKey = `第${i}週`;
+            ['20系列', '30系列', '40系列'].forEach(s => seriesMixData[s][wKey] = 0);
+            crossSellData.profileLength[wKey] = 0;
+            crossSellData.accessoryCount[wKey] = 0;
+        }
+    } else {
+        // Yearly trend for seriesMix
+        for (let i = 1; i <= 12; i++) {
+            let mKey = `${selYear % 100}年${i}月`;
+            ['20系列', '30系列', '40系列'].forEach(s => seriesMixData[s][mKey] = 0);
+            crossSellData.profileLength[mKey] = 0;
+            crossSellData.accessoryCount[mKey] = 0;
         }
     }
 
@@ -5827,35 +6324,81 @@ window.renderFinancialReports = function () {
         let pRatio = itemsInfo.countProfile / totalItemsCount;
         let aRatio = itemsInfo.countAccessory / totalItemsCount;
 
+        // Series Mix logic
+        let totalSeriesCount = itemsInfo.count20 + itemsInfo.count30 + itemsInfo.count40 + itemsInfo.countOther;
+        if (totalSeriesCount === 0) totalSeriesCount = 1;
+        let p20 = price * (itemsInfo.count20 / totalSeriesCount);
+        let p30 = price * (itemsInfo.count30 / totalSeriesCount);
+        let p40 = price * (itemsInfo.count40 / totalSeriesCount);
+        let pAcc = price * (itemsInfo.countOther / totalSeriesCount); // Assuming 'other' mostly means accessories in this split
+
+        // Cross Sell logic - we need raw lengths vs qty
+        let totalProfileLength = 0; // rough cm estimation for cross sell chart
+        let totalAccQty = 0;
+        Object.keys(itemsInfo.itemsMapTotal).forEach(key => {
+            const param = itemsInfo.paramMap[key];
+            if (param.isProfile) {
+                // Try to guess length from name, or default if missing
+                const lenMatch = key.match(/(\d+(?:\.\d+)?)\s*cm/i);
+                if (lenMatch) totalProfileLength += parseFloat(lenMatch[1]) * itemsInfo.itemsMapTotal[key];
+                else totalProfileLength += 100 * itemsInfo.itemsMapTotal[key]; // fallback assumption
+            } else {
+                totalAccQty += itemsInfo.itemsMapTotal[key];
+            }
+        });
+
+        // Logistics logic (Uses the already pre-filtered reportOrders)
+        const logTime = viewMode === 'trend' ? 'all' : logConf.time;
+        if (timeFilterPassed(oDate, logTime, cutoffDateEnd)) {
+            const dayStr = rDays[oDate.getDay()];
+            const deliv = o.address || "未填寫";
+            let delivType = "一般貨運";
+            if (deliv.includes('自取')) delivType = "自取";
+            else if (deliv.includes('公司配送') || deliv.includes('專車')) delivType = "公司配送";
+            logisticsData[dayStr][delivType]++;
+        }
+
+        let timeKey = "";
         if (trConf.time === 'day') {
-            if (oDate.getFullYear() === currentYear && oDate.getMonth() === currentMonth) {
-                let dKey = `${currentMonth + 1}/${oDate.getDate()}`;
-                if (monthlyDataTotal[dKey] !== undefined) {
-                    monthlyDataTotal[dKey] += price;
-                    monthlyDataProfile[dKey] += price * pRatio;
-                    monthlyDataAccessory[dKey] += price * aRatio;
-                }
+            if (oDate.getFullYear() === selYear && (oDate.getMonth() + 1) === selMonth) {
+                timeKey = `${selMonth}/${oDate.getDate()}`;
             }
         } else if (trConf.time === 'week') {
-            if (oDate.getFullYear() === currentYear && oDate.getMonth() === currentMonth) {
+            if (oDate.getFullYear() === selYear && (oDate.getMonth() + 1) === selMonth) {
                 let wNum = Math.ceil(oDate.getDate() / 7);
-                let wKey = `第${wNum}週`;
-                if (monthlyDataTotal[wKey] !== undefined) {
-                    monthlyDataTotal[wKey] += price;
-                    monthlyDataProfile[wKey] += price * pRatio;
-                    monthlyDataAccessory[wKey] += price * aRatio;
-                }
+                timeKey = `第${wNum}週`;
             }
         } else {
-            let mKey = `${oDate.getFullYear() % 100}年${oDate.getMonth() + 1}月`;
-            if (monthlyDataTotal[mKey] === undefined) {
-                monthlyDataTotal[mKey] = 0;
-                monthlyDataProfile[mKey] = 0;
-                monthlyDataAccessory[mKey] = 0;
+            // Yearly mode
+            if (oDate.getFullYear() === selYear) {
+                timeKey = `${oDate.getFullYear() % 100}年${oDate.getMonth() + 1}月`;
             }
-            monthlyDataTotal[mKey] += price;
-            monthlyDataProfile[mKey] += price * pRatio;
-            monthlyDataAccessory[mKey] += price * aRatio;
+        }
+
+        if (timeKey && monthlyDataTotal[timeKey] !== undefined) {
+            monthlyDataTotal[timeKey] += price;
+            monthlyDataProfile[timeKey] += price * pRatio;
+            monthlyDataAccessory[timeKey] += price * aRatio;
+        }
+
+        // SeriesMix + CrossSell aggregation
+        let smTimeKey = "";
+        if (smConf.time === 'day') {
+            if (oDate.getFullYear() === selYear && (oDate.getMonth() + 1) === selMonth)
+                smTimeKey = `${selMonth}/${oDate.getDate()}`;
+        } else if (smConf.time === 'week') {
+            if (oDate.getFullYear() === selYear && (oDate.getMonth() + 1) === selMonth)
+                smTimeKey = `第${Math.ceil(oDate.getDate() / 7)}週`;
+        } else {
+            if (oDate.getFullYear() === selYear)
+                smTimeKey = `${oDate.getFullYear() % 100}年${oDate.getMonth() + 1}月`;
+        }
+        if (smTimeKey && seriesMixData['20系列'][smTimeKey] !== undefined) {
+            seriesMixData['20系列'][smTimeKey] += p20;
+            seriesMixData['30系列'][smTimeKey] += p30;
+            seriesMixData['40系列'][smTimeKey] += p40;
+            crossSellData.profileLength[smTimeKey] += totalProfileLength;
+            crossSellData.accessoryCount[smTimeKey] += totalAccQty;
         }
     });
 
@@ -5912,6 +6455,95 @@ window.renderFinancialReports = function () {
                             }
                         },
                         scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+                    }
+                });
+            }
+
+            // NEW CHART 1: SERIES MIX (Stacked Area/Bar)
+            const ctxSeriesMix = document.getElementById('chart-series-mix');
+            if (ctxSeriesMix) {
+                chartsInstance.seriesMix = new Chart(ctxSeriesMix, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(seriesMixData['20系列']),
+                        datasets: [
+                            { label: '20系列', data: Object.values(seriesMixData['20系列']).map(v => Math.round(v)), backgroundColor: '#b3c7d9', borderRadius: { topLeft: 0, topRight: 0 } },
+                            { label: '30系列', data: Object.values(seriesMixData['30系列']).map(v => Math.round(v)), backgroundColor: '#c6a682' },
+                            { label: '40系列', data: Object.values(seriesMixData['40系列']).map(v => Math.round(v)), backgroundColor: '#b8ccb8', borderRadius: { topLeft: 4, topRight: 4 } }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true } } },
+                        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+                    }
+                });
+            }
+
+            // NEW CHART 2: CROSS SELL (Combo)
+            const ctxCrossSell = document.getElementById('chart-cross-sell');
+            if (ctxCrossSell) {
+                chartsInstance.crossSell = new Chart(ctxCrossSell, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(crossSellData.profileLength),
+
+                        datasets: [
+                            {
+                                type: 'line',
+                                label: '搭售配件數',
+                                data: Object.values(crossSellData.accessoryCount),
+                                borderColor: '#ba8181', // Rose
+                                backgroundColor: '#ba8181',
+                                borderWidth: 2,
+                                tension: 0.3,
+                                yAxisID: 'y1'
+                            },
+                            {
+                                type: 'bar',
+                                label: '鋁材出貨長度 (cm)',
+                                data: Object.values(crossSellData.profileLength),
+                                backgroundColor: '#a3bcbd', // Sage Green
+                                borderRadius: 4,
+                                yAxisID: 'y'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: { type: 'linear', display: true, position: 'left', title: { display: true, text: '長度 (cm)', color: '#888' } },
+                            y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '配件數量 (個)', color: '#ba8181' } }
+                        }
+                    }
+                });
+            }
+
+            // NEW CHART 3: LOGISTICS HEATMAP (Grouped Bar)
+            const ctxLogistics = document.getElementById('chart-logistics');
+            if (ctxLogistics) {
+                const lLabels = Object.keys(logisticsData);
+                const dCorp = lLabels.map(l => logisticsData[l]['公司配送']);
+                const dSelf = lLabels.map(l => logisticsData[l]['自取']);
+                const dGen = lLabels.map(l => logisticsData[l]['一般貨運']);
+
+                chartsInstance.logistics = new Chart(ctxLogistics, {
+                    type: 'bar',
+                    data: {
+                        labels: lLabels,
+                        datasets: [
+                            { label: '公司配送 (車趟壓力)', data: dCorp, backgroundColor: '#c2a3a3', borderRadius: 4 },
+                            { label: '客戶自取', data: dSelf, backgroundColor: '#bcaaa4', borderRadius: 4 },
+                            { label: '一般貨運', data: dGen, backgroundColor: '#94a3b8', borderRadius: 4 }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { position: 'top', labels: { boxWidth: 12 } } },
+                        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, title: { display: true, text: '訂單數' } } }
                     }
                 });
             }

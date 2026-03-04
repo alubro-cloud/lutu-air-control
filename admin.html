@@ -193,36 +193,57 @@
 
             <!-- 6. Inventory Management Section (Hidden by default) -->
             <div id="inventory-section" class="hidden" style="padding: 20px;">
-                <!-- Category Hub (Initial View) -->
-                <div id="inventory-hub" class="category-hub">
-                    <div class="category-card" onclick="switchInventoryCategory('aluminum')">
-                        <i class="fas fa-layer-group category-icon"></i>
-                        <div class="category-name">鋁材總覽</div>
-                        <div class="category-desc">管理 20/30/40系列 鋁材庫存與餘料</div>
+
+                <!-- NEW: Unified Dashboard Grid (2x2 / 4x1) -->
+                <div class="dashboard-grid-4" id="inventory-hub">
+                    <!-- 1. Aluminum Health Gauges -->
+                    <div class="dashboard-panel panel-gauges">
+                        <h3 class="panel-title"><i class="fas fa-heartbeat"></i> 鋁材庫存健康度</h3>
+                        <div class="gauges-container">
+                            <!-- Injected via JS -->
+                        </div>
                     </div>
+
+                    <!-- 2. Accessory Shortage Alerts -->
+                    <div class="dashboard-panel panel-alerts">
+                        <h3 class="panel-title alert-title"><i class="fas fa-exclamation-triangle"></i> 短缺警報</h3>
+                        <div class="velocity-bars-container" id="low-stock-bars">
+                            <div style="color: #999; font-size: 0.85rem;">載入中...</div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Aluminum Overview Shortcut -->
+                    <div class="category-card" onclick="switchInventoryCategory('aluminum')">
+                        <div class="category-card-inner">
+                            <i class="fas fa-layer-group category-icon"></i>
+                            <div class="category-text">
+                                <div class="category-name">鋁材總覽</div>
+                                <div class="category-desc">進入管理詳細 20/30/40 鋁材切料庫存</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Accessory Overview Shortcut -->
                     <div class="category-card" onclick="switchInventoryCategory('accessory')">
-                        <i class="fas fa-tools category-icon"></i>
-                        <div class="category-name">配件總覽</div>
-                        <div class="category-desc">管理各式配件、螺絲與耗材庫存</div>
+                        <div class="category-card-inner">
+                            <i class="fas fa-tools category-icon"></i>
+                            <div class="category-text">
+                                <div class="category-name">配件總覽</div>
+                                <div class="category-desc">進入管理各式配件、螺絲與耗材</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Inventory Details (Shown after selecting category) -->
+                <!-- Inventory Details (Sibling to hub — hub hides completely when this shows) -->
                 <div id="inventory-details" class="hidden">
-                    <div class="module-topbar">
-                        <div class="module-topbar-left">
-                            <button class="btn-back-hub-top" onclick="backToInventoryHub()"><i
-                                    class="fas fa-arrow-left"></i> 返回類別</button>
-                            <h2 id="inventory-view-title"><i class="fas fa-warehouse"></i> 鋁材庫存監視</h2>
-                        </div>
-                        <div class="module-topbar-right">
-                            <!-- Optional actions could go here -->
-                        </div>
+                    <div class="inv-detail-header">
+                        <button class="btn-back-hub-top" onclick="backToInventoryHub()">
+                            <i class="fas fa-arrow-left"></i> 返回類別
+                        </button>
+                        <h3 id="inventory-view-title"><i class="fas fa-warehouse"></i> 鋁材庫存監視</h3>
                     </div>
-
-
                     <div id="inventory-content">
-                        <!-- Dynamic inventory table/cards injected here -->
                         <div style="text-align:center; padding:50px; color:#999;">載入中...</div>
                     </div>
                 </div>
@@ -256,12 +277,29 @@
                 <h2><i class="fas fa-chart-pie"></i> 財務報表</h2>
             </div>
             <div class="module-topbar-right">
-                <select id="report-range" onchange="renderFinancialReports()">
-                    <option value="month">本月</option>
-                    <option value="3month">近 3 個月</option>
-                    <option value="6month">近半年</option>
-                    <option value="all">全部</option>
-                </select>
+                <!-- Month Switcher UI -->
+                <div id="financial-controls" style="display:flex; align-items:center; gap:12px;">
+                    <button class="btn-period" onclick="shiftFinancialMonth(-1)"
+                        style="background:#f1f5f9; border:1px solid var(--border); border-radius:18px; padding:6px 12px; cursor:pointer; color:var(--text); transition:0.3s;"><i
+                            class="fas fa-chevron-left"></i></button>
+                    <span id="current-financial-period"
+                        style="font-weight:600; font-size:1.1rem; color:var(--text); min-width:100px; text-align:center;">2024
+                        / 03</span>
+                    <button class="btn-period" onclick="shiftFinancialMonth(1)"
+                        style="background:#f1f5f9; border:1px solid var(--border); border-radius:18px; padding:6px 12px; cursor:pointer; color:var(--text); transition:0.3s;"><i
+                            class="fas fa-chevron-right"></i></button>
+
+                    <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
+
+                    <select id="report-view-mode" onchange="toggleFinancialViewMode()"
+                        style="padding:6px 12px; border-radius:18px; border:1px solid var(--border); background:#fff; font-size:0.85rem; cursor:pointer;">
+                        <option value="single">單月明細</option>
+                        <option value="trend">年度趨勢</option>
+                    </select>
+                </div>
+                <!-- Hidden inputs for state management -->
+                <input type="hidden" id="report-active-year" value="">
+                <input type="hidden" id="report-active-month" value="">
             </div>
         </div>
 
@@ -298,13 +336,13 @@
                         <div class="trend-toggle-group"
                             style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-trend-time-month" onclick="setChartFilter('trend', 'time', 'month')"
-                                class="trend-toggle-btn"
+                                class="trend-toggle-btn btn-period-unit" data-unit="month"
                                 style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
                             <button id="toggle-trend-time-week" onclick="setChartFilter('trend', 'time', 'week')"
-                                class="trend-toggle-btn"
+                                class="trend-toggle-btn btn-period-unit" data-unit="week"
                                 style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
                             <button id="toggle-trend-time-day" onclick="setChartFilter('trend', 'time', 'day')"
-                                class="trend-toggle-btn active"
+                                class="trend-toggle-btn btn-period-unit active" data-unit="day"
                                 style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
                         </div>
                         <div class="trend-toggle-group"
@@ -332,13 +370,13 @@
                         <div class="trend-toggle-group"
                             style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-series-time-month" onclick="setChartFilter('series', 'time', 'month')"
-                                class="trend-toggle-btn active"
+                                class="trend-toggle-btn btn-period-unit active" data-unit="month"
                                 style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
                             <button id="toggle-series-time-week" onclick="setChartFilter('series', 'time', 'week')"
-                                class="trend-toggle-btn"
+                                class="trend-toggle-btn btn-period-unit" data-unit="week"
                                 style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
                             <button id="toggle-series-time-day" onclick="setChartFilter('series', 'time', 'day')"
-                                class="trend-toggle-btn"
+                                class="trend-toggle-btn btn-period-unit" data-unit="day"
                                 style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
                         </div>
                         <div class="trend-toggle-group"
@@ -355,7 +393,9 @@
                         </div>
                     </div>
                 </div>
-                <canvas id="chart-series-pie"></canvas>
+                <div style="position: relative; height: 250px; width: 100%;">
+                    <canvas id="chart-series-pie"></canvas>
+                </div>
             </div>
             <div class="chart-box">
                 <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px;">
@@ -364,13 +404,14 @@
                         <div class="trend-toggle-group"
                             style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-delivery-time-month"
-                                onclick="setChartFilter('delivery', 'time', 'month')" class="trend-toggle-btn active"
+                                onclick="setChartFilter('delivery', 'time', 'month')"
+                                class="trend-toggle-btn btn-period-unit active" data-unit="month"
                                 style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
                             <button id="toggle-delivery-time-week" onclick="setChartFilter('delivery', 'time', 'week')"
-                                class="trend-toggle-btn"
+                                class="trend-toggle-btn btn-period-unit" data-unit="week"
                                 style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
                             <button id="toggle-delivery-time-day" onclick="setChartFilter('delivery', 'time', 'day')"
-                                class="trend-toggle-btn"
+                                class="trend-toggle-btn btn-period-unit" data-unit="day"
                                 style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
                         </div>
                         <div class="trend-toggle-group"
@@ -387,7 +428,9 @@
                         </div>
                     </div>
                 </div>
-                <canvas id="chart-delivery-pie"></canvas>
+                <div style="position: relative; height: 250px; width: 100%;">
+                    <canvas id="chart-delivery-pie"></canvas>
+                </div>
             </div>
             <div class="chart-box">
                 <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px;">
@@ -396,13 +439,13 @@
                         <div class="trend-toggle-group"
                             style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
                             <button id="toggle-top10-time-month" onclick="setChartFilter('top10', 'time', 'month')"
-                                class="trend-toggle-btn active"
+                                class="trend-toggle-btn btn-period-unit active" data-unit="month"
                                 style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
                             <button id="toggle-top10-time-week" onclick="setChartFilter('top10', 'time', 'week')"
-                                class="trend-toggle-btn"
+                                class="trend-toggle-btn btn-period-unit" data-unit="week"
                                 style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
                             <button id="toggle-top10-time-day" onclick="setChartFilter('top10', 'time', 'day')"
-                                class="trend-toggle-btn"
+                                class="trend-toggle-btn btn-period-unit" data-unit="day"
                                 style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
                         </div>
                         <div class="trend-toggle-group"
@@ -423,6 +466,59 @@
                     <canvas id="chart-top-items"></canvas>
                 </div>
             </div>
+
+            <!-- NEW CHARTS -->
+            <div class="chart-box" style="grid-column: 1 / -1;">
+                <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px;">
+                    <h4 style="margin:0;">系列營收貢獻度 (20/30/40 全系列)</h4>
+                    <p style="margin:0; font-size: 0.8rem; color: #888;">觀察各系列鋁材與配件的疊加營收走勢</p>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <div class="trend-toggle-group"
+                            style="display:flex; background:#f1f5f9; border-radius:20px; padding:2px; border:1px solid var(--border);">
+                            <button id="toggle-seriesMix-time-month"
+                                onclick="setChartFilter('seriesMix','time','month')"
+                                class="trend-toggle-btn btn-period-unit active" data-unit="month"
+                                style="background:var(--accent-mail); color:#fff; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按月</button>
+                            <button id="toggle-seriesMix-time-week" onclick="setChartFilter('seriesMix','time','week')"
+                                class="trend-toggle-btn btn-period-unit" data-unit="week"
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按週</button>
+                            <button id="toggle-seriesMix-time-day" onclick="setChartFilter('seriesMix','time','day')"
+                                class="trend-toggle-btn btn-period-unit" data-unit="day"
+                                style="background:transparent; color:#888; opacity:0.8; border:none; padding:4px 12px; border-radius:18px; font-size:0.75rem; cursor:pointer; transition:0.3s;">按日</button>
+                        </div>
+                    </div>
+                </div>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="chart-series-mix"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-box">
+                <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px;">
+                    <h4 style="margin:0;">配件連帶銷售率 (Cross-sell)</h4>
+                    <p style="margin:0; font-size: 0.8rem; color: #888;">分析鋁材長度與附加配件數量的雙軸關係</p>
+                    <div style="display:none; gap:10px; flex-wrap:wrap;">
+                        <!-- Time unit buttons removed from bubble chart as it aggregates entire selected period -->
+                    </div>
+                </div>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="chart-cross-sell"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-box">
+                <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:15px;">
+                    <h4 style="margin:0;">物流壓力熱區 (Logistics Heatmap)</h4>
+                    <p id="logistics-description" style="margin:0; font-size: 0.8rem; color: #888;">週一至週日的出貨量與配送方式分佈</p>
+                    <div style="display:none; gap:10px; flex-wrap:wrap;">
+                        <!-- Logistics heatmap buttons removed as they were redundant -->
+                    </div>
+                </div>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="chart-logistics"></canvas>
+                </div>
+            </div>
+
         </div>
     </div>
 

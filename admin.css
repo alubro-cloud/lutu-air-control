@@ -87,12 +87,7 @@
 .btn-card-action {
     flex: 1;
     padding: 8px 4px;
-    color: white;
-    text-align: center;
-    border-radius: 4px;
-    text-decoration: none;
-    font-size: 0.85rem;
-    transition: 0.2s;
+    font-weight: 400;
     border: none;
     cursor: pointer;
     display: flex;
@@ -212,55 +207,72 @@ body {
 }
 
 .login-box {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
+    /* Clear, highly transparent white */
+    border: 1px solid rgba(255, 255, 255, 0.4);
     padding: 50px 40px;
-    border-radius: 24px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    /* Softer, modern shadow */
     width: 100%;
     max-width: 400px;
     text-align: center;
-    color: white;
+    color: #ffffff;
 }
 
 .login-box h2 {
-    color: white;
+    color: #ffffff;
     margin-bottom: 20px;
     font-weight: 500;
 }
 
 .login-box p {
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.8);
     margin-bottom: 30px;
 }
 
 .login-box input {
     width: 100%;
     padding: 15px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
-    color: white;
+    background: rgba(255, 255, 255, 0.2);
+    /* Semi-transparent white input */
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    color: #475569;
+    /* Gray text when typing */
     margin-bottom: 20px;
+    transition: all 0.2s ease;
+}
+
+.login-box input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.login-box input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 3px rgba(186, 203, 219, 0.3);
+    /* Subtle primary glow */
 }
 
 .login-box button {
     width: 100%;
     padding: 15px;
-    background: var(--ash-gray);
+    background: var(--primary);
     color: white;
     border: none;
-    border-radius: 12px;
-    font-weight: bold;
+    border-radius: 8px;
+    font-weight: 500;
     cursor: pointer;
-    transition: 0.3s;
+    transition: all 0.3s ease;
 }
 
 .login-box button:hover {
-    background: var(--primary);
+    background: #a3bcd3;
+    /* Slightly darker var(--primary) */
     transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(186, 203, 219, 0.4);
 }
 
 .hidden {
@@ -477,7 +489,7 @@ body {
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 400;
     min-width: 52px;
     height: 18px;
     letter-spacing: 0.5px;
@@ -521,6 +533,37 @@ body {
     background: var(--status-completed) !important;
 }
 
+/* btn-gmail (回覆) inherits zone color per status */
+.status-unquoted .btn-gmail,
+.status-quoted .btn-gmail,
+.status-paid .btn-gmail {
+    background: var(--accent-30) !important;
+    color: #fff !important;
+}
+
+.status-cutting .btn-gmail {
+    background: var(--accent-20) !important;
+    color: #fff !important;
+}
+
+.status-inspection .btn-gmail,
+.status-picking .btn-gmail,
+.status-packing .btn-gmail {
+    background: var(--accent-warehouse) !important;
+    color: #fff !important;
+}
+
+.status-shipping .btn-gmail,
+.status-dispatched .btn-gmail {
+    background: var(--accent-40) !important;
+    color: #fff !important;
+}
+
+.status-completed .btn-gmail {
+    background: var(--status-completed) !important;
+    color: #fff !important;
+}
+
 .kanban-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
@@ -548,7 +591,7 @@ body {
 }
 
 .card-title {
-    font-weight: 500;
+    font-weight: 400;
     font-size: 1rem;
     color: #1e293b;
     margin-bottom: 4px;
@@ -603,14 +646,16 @@ body {
 }
 
 .card-tag {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    height: 18px;
     background: var(--accent-mail);
     /* Default */
     color: #fff !important;
     font-size: 0.75rem;
-    font-weight: 330;
+    font-weight: 400;
     /* Keep it light */
     margin-top: 5px;
     border: 1px solid rgba(0, 0, 0, 0.05);
@@ -879,62 +924,71 @@ body {
     box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
-/* Inventory Hub Styles */
-.category-hub {
-    display: flex;
-    gap: 30px;
-    justify-content: center;
-    padding: 40px 20px;
-    flex-wrap: wrap;
-    animation: fadeIn 0.4s ease-out;
+/* Inventory Hub Styles - Unified with Dashboard Panel */
+.dashboard-grid-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 25px;
 }
 
 .category-card {
-    background: white;
-    width: 280px;
-    height: 320px;
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f1f5f9;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    border: 2px solid transparent;
-    text-align: center;
-    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    min-height: 160px;
+    /* Slightly taller for better click area */
 }
 
 .category-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.1);
-    border-color: var(--accent);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border-color: var(--accent-20);
+}
+
+.category-card-inner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
 }
 
 .category-icon {
-    font-size: 5rem;
+    font-size: 3rem;
     color: #94a3b8;
-    margin-bottom: 25px;
     transition: 0.3s;
+    width: 60px;
+    text-align: center;
 }
 
 .category-card:hover .category-icon {
-    transform: scale(1.05);
     color: var(--accent-20);
+    transform: scale(1.05);
+}
+
+.category-text {
+    flex: 1;
 }
 
 .category-name {
-    font-size: 1.8rem;
-    font-weight: 400;
-    color: #2c3e50;
-    margin-bottom: 10px;
-    letter-spacing: 1px;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 4px;
 }
 
 .category-desc {
-    font-size: 0.95rem;
-    color: #888;
+    font-size: 0.85rem;
+    color: #64748b;
+    line-height: 1.4;
 }
 
 .btn-back-hub {
@@ -2396,6 +2450,225 @@ body {
 }
 
 /* ================================================
+   INVENTORY DASHBOARD (戰情面板)
+   ================================================ */
+/* Inventory Dashboard - Shared with Grid */
+.dashboard-panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 15px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f1f5f9;
+    min-height: 160px;
+    /* Match category card */
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 900px) {
+    .inventory-dashboard-widgets {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 0;
+    }
+}
+
+.dashboard-panel {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px 15px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f1f5f9;
+}
+
+.dashboard-panel .panel-title {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0.85;
+}
+
+/* Dashboard Unified Containers */
+#low-stock-bars,
+.gauges-container {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    /* Start from left to avoid center-forcing gaps */
+    align-items: flex-start !important;
+    /* Align to top to ensure text lines up */
+    gap: 15px !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    min-height: 140px;
+    /* Force same height */
+    padding: 10px 5px;
+    overflow-x: auto !important;
+    /* Enable scroll if too wide */
+    -webkit-overflow-scrolling: touch;
+}
+
+.reservoir-circle-container {
+    flex: 0 1 auto !important;
+    min-width: 80px;
+    /* Reduced default min-width */
+    max-width: 160px;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center;
+}
+
+/* Specific wider style for dashboard gauges */
+.dashboard-reservoir {
+    min-width: 120px !important;
+}
+
+.dashboard-panel .alert-title {
+    color: var(--dusty-rose);
+    /* Muted Morandi Rose instead of bright red */
+}
+
+.dashboard-panel .alert-title i {
+    color: var(--dusty-rose);
+}
+
+/* Aluminum specific adjustments removed - now unified */
+
+.circular-chart {
+    display: block;
+    margin: 0 auto;
+    max-width: 80px;
+    position: relative;
+    max-height: 80px;
+}
+
+.circle-bg {
+    fill: none;
+    stroke: #eee;
+    stroke-width: 3.8;
+}
+
+.circle {
+    fill: none;
+    stroke-width: 2.8;
+    stroke-linecap: round;
+    transition: stroke-dasharray 1s ease-out, stroke 0.3s ease;
+}
+
+#gauge-20 .circle {
+    stroke: var(--accent-20);
+}
+
+#gauge-30 .circle {
+    stroke: var(--accent-30);
+}
+
+#gauge-40 .circle {
+    stroke: var(--accent-40);
+}
+
+/* Override to alert color if capacity is low (<25%) */
+.circular-chart.alert .circle {
+    stroke: var(--accent-mail) !important;
+}
+
+.circular-chart .percentage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.gauge-wrapper {
+    position: relative;
+}
+
+.gauge-label {
+    margin-top: 4px;
+    font-size: 0.85rem;
+    color: var(--primary);
+    opacity: 0.8;
+    font-weight: 500;
+}
+
+/* --- Velocity Bars (Low Stock) --- */
+.velocity-bars-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.v-bar-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.v-bar-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.v-bar-name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70%;
+}
+
+.v-bar-count {
+    font-weight: bold;
+    color: var(--accent-mail);
+}
+
+.v-bar-track {
+    width: 100%;
+    height: 8px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.v-bar-fill {
+    height: 100%;
+    background: var(--accent-mail);
+    border-radius: 4px;
+    transition: width 0.5s ease-out;
+}
+
+/* Pulse animation for very low stock */
+@keyframes pulseLowStock {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+.v-bar-item.critical .v-bar-fill {
+    animation: pulseLowStock 1.5s infinite;
+}
+
+/* ================================================
    HISTORY ORDERS
    ================================================ */
 .history-content {
@@ -2793,6 +3066,57 @@ body {
 }
 
 /* ================================================
+   HISTORY SPARKLINE VISUALIZATION
+   ================================================ */
+.history-sparkline {
+    display: flex;
+    width: 100%;
+    height: 6px;
+    background: #eef2f5;
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.history-sparkline:hover {
+    height: 10px;
+    transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.spark-bar {
+    height: 100%;
+    transition: width 0.5s ease-in-out, filter 0.2s;
+}
+
+.spark-bar:hover {
+    filter: brightness(1.2);
+    /* subtle highlight on hover */
+}
+
+.spark-bar.bg-20 {
+    background: #b3c7d9;
+}
+
+/* 20系列 */
+.spark-bar.bg-30 {
+    background: #c6a682;
+}
+
+/* 30系列 */
+.spark-bar.bg-40 {
+    background: #b8ccb8;
+}
+
+/* 40系列 */
+.spark-bar.bg-acc {
+    background: #dcd6ce;
+}
+
+/* 配件 (neutral contrasting color) */
+
+/* ================================================
    HUB RESPONSIVE
    ================================================ */
 @media (max-width: 768px) {
@@ -2965,6 +3289,16 @@ body {
         font-size: 0.78rem !important;
     }
 
+    /* Financial Report Button Toggles */
+    #reports-module.mode-single .btn-period-unit[onclick*="month"] {
+        display: none !important;
+    }
+
+    #reports-module.mode-trend .btn-period-unit[onclick*="day"],
+    #reports-module.mode-trend .btn-period-unit[onclick*="week"] {
+        display: none !important;
+    }
+
     /* 右側所有資訊全部隱藏（最後更新、篩選、搜尋等） */
     .module-topbar-right {
         display: none !important;
@@ -2986,141 +3320,308 @@ body {
         padding-top: 50px !important;
     }
 
-    /* 庫存頁也補 padding */
-    .main-content #inventory-section {
-        padding-top: 50px !important;
+    /* ===== 手機版極致優化：全螢幕邊對邊 (Edge-to-Edge Control Room) v6 (Unified) ===== */
+    .module-page#inventory-section {
+        padding: 60px 0 0 0 !important;
+        overflow-x: hidden !important;
     }
 
-    /* ===== 手機版庫存管理：縮小兩大板塊 (鋁材/配件總覽) ===== */
-    /* 原本桌面版有 flex, width: 280px, height: 320px, 這裡必須強力覆寫 */
-    .category-card {
-        display: grid !important;
-        grid-template-columns: auto 1fr !important;
-        grid-template-rows: auto auto !important;
-        grid-template-areas:
-            "icon name"
-            "icon desc" !important;
+    /* inventory-details custom header — replaces module-topbar to avoid all CSS conflicts */
+    #inventory-details .module-topbar,
+    .inv-detail-header {
+        display: flex !important;
+        flex-direction: row !important;
         align-items: center !important;
-        padding: 30px 25px !important;
-        /* 增加上下左右的 padding，讓卡片變胖一點 */
-        margin-bottom: 20px !important;
-        /* 增加兩張卡的間距 */
-        border-radius: 16px !important;
+        gap: 12px !important;
+        padding: 10px 16px !important;
+        background: #f8fafc !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        position: static !important;
+        top: auto !important;
+        left: auto !important;
+        z-index: auto !important;
         width: 100% !important;
-        /* 解除原本的固定寬度 */
+        box-sizing: border-box !important;
+    }
+
+    .inv-detail-header h3 {
+        margin: 0 !important;
+        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        color: #1e293b !important;
+    }
+
+    #inventory-details .module-topbar-left {
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+
+    #inventory-details h2#inventory-view-title {
+        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        margin: 0 !important;
+    }
+
+    #inventory-hub {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .dashboard-grid-4 {
+        display: grid !important;
+        grid-template-columns: 1.5fr 1.5fr 1fr !important;
+        /* 調整比例，讓右側按鈕有足夠空間不被擠壓成直行 */
+        grid-template-rows: 1fr 1fr !important;
+        gap: 0 !important;
+        height: calc(100vh - 60px) !important;
+        margin: 0 !important;
+        border: none !important;
+    }
+
+    /* CRITICAL: ensure hub truly hides when .hidden is toggled via JS */
+    #inventory-hub.hidden {
+        display: none !important;
+    }
+
+
+    .dashboard-panel,
+    .category-card {
+        border-radius: 12px !important;
+        /* Unified rounded corners */
+        border: 1px solid #f1f5f9 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+        margin: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        background: #ffffff !important;
+        overflow: hidden !important;
+    }
+
+    /* 讓右邊捷徑更像按鈕，並保持一致性 */
+    .dashboard-grid-4>.category-card {
+        margin: 4px !important;
+        cursor: pointer;
+        transition: transform 0.1s, box-shadow 0.1s;
+    }
+
+    .dashboard-grid-4>.category-card:active {
+        transform: scale(0.96);
+        box-shadow: none !important;
+    }
+
+
+    .dashboard-panel .panel-title {
+        background: #f8fafc;
+        padding: 6px 2px !important;
+        /* 縮小左右 padding 貼邊 */
+        margin: 0 !important;
+        font-size: 0.55rem !important;
+        font-weight: 700 !important;
+        text-align: center;
+        border-bottom: 1px solid #eef2f6;
+        width: 100%;
+    }
+
+    .panel-gauges,
+    .panel-alerts {
+        grid-row: 1 / span 2 !important;
+    }
+
+    .gauges-container,
+    #low-stock-bars {
+        flex: 1;
+        overflow-y: hidden !important;
+        /* No scroll — all items must fit */
+        padding: 2px 0 !important;
+        gap: 4px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        width: 100% !important;
+        justify-content: space-evenly !important;
+        /* Distribute 5 items evenly in available height */
+    }
+
+    /* Make each dashboard-reservoir item fit in 1/5 of panel height */
+    .dashboard-reservoir {
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        max-height: 20% !important;
+    }
+
+    .dashboard-reservoir svg {
+        width: 100% !important;
+        /* 寬度自動撐滿卡片 */
+        max-width: 38px !important;
+        /* Reduced from 55px */
         height: auto !important;
-        /* 強制解除原本的 320px 高度 */
-        min-height: 140px !important;
-        /* 確保有一定的最小高度 */
-        gap: 8px 25px !important;
-        /* 圖標與文字的間距稍微拉開 */
-        text-align: left !important;
+    }
+
+    .dashboard-grid-4>.category-card:nth-of-type(1) {
+        grid-column: 3 !important;
+        grid-row: 1 !important;
+    }
+
+    .dashboard-grid-4>.category-card:nth-of-type(2) {
+        grid-column: 3 !important;
+        grid-row: 2 !important;
+    }
+
+    .dashboard-reservoir .reservoir-label {
+        font-size: 0.55rem !important;
+        margin-top: 1px !important;
+        width: 100%;
+        text-align: center;
+    }
+
+    .dashboard-reservoir .reservoir-value {
+        font-size: 0.5rem !important;
+        white-space: normal !important;
+        line-height: 1 !important;
+        width: 100%;
+        text-align: center;
+    }
+
+    /* 圖示與文字置中直排：優化垂直排列與字體 */
+    .category-card-inner {
+        flex-direction: column !important;
+        gap: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        height: 100% !important;
+        flex: 1 !important;
+        padding: 6px 4px !important;
     }
 
     .category-icon {
-        grid-area: icon;
-        font-size: 3.5rem !important;
-        /* 圖標放大一點點 */
-        margin-bottom: 0 !important;
+        font-size: 1.15rem !important;
+        margin: 0 !important;
         color: #94a3b8 !important;
+        /* 恢復偏亮灰藍色 */
+    }
+
+    .category-text {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
     }
 
     .category-name {
-        grid-area: name;
-        font-size: 1.3rem !important;
-        /* 標題放大一點點 */
-        margin-bottom: 0 !important;
-        font-weight: 500 !important;
-        align-self: end !important;
-        /* 讓名字靠下貼近說明 */
+        font-size: 0.85rem !important;
+        font-weight: 700 !important;
+        line-height: 1.3 !important;
+        /* 取代 letter-spacing 的字距效果 */
+        text-align: center !important;
+        writing-mode: horizontal-tb !important;
+        /* 回歸水平排版避免位移 */
+        width: 1em !important;
+        /* 精準限制為 1 個字元寬 */
+        word-break: break-all !important;
+        /* 強制換行 */
+        margin: 0 auto !important;
+        /* 絕對置中 */
+        padding: 0 !important;
+        color: var(--text-dark) !important;
+        /* 恢復深灰字 */
     }
 
     .category-desc {
-        grid-area: desc;
-        font-size: 0.85rem !important;
-        line-height: 1.3 !important;
-        align-self: start !important;
-        /* 讓說明靠上貼近名字 */
-        color: #888 !important;
+        display: none !important;
     }
 
-    /* ===== 手機版財務報表 (Financial Reports) RWD 修正 ===== */
+    /* 其它手機版補強 */
     .kpi-row {
         grid-template-columns: repeat(2, 1fr) !important;
-        /* 變為雙欄雙列排列 */
-        gap: 12px !important;
-        margin-bottom: 20px !important;
-        padding: 0 5px !important;
-        /* 原本 padding: 0 10px，縮小變貼邊 */
-    }
-
-    .kpi-card {
-        padding: 15px !important;
-        /* 縮小卡片內部留白讓圖表變大 */
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .kpi-value {
-        font-size: 1.6rem !important;
+        gap: 10px !important;
+        padding: 0 !important;
     }
 
     .charts-grid {
         grid-template-columns: 1fr !important;
-        /* 變為單欄垂直排列 */
-        gap: 15px !important;
-        padding: 0 5px !important;
-        /* 縮小兩側邊距貼近邊緣 */
+        padding: 0 !important;
+    }
+
+    .modal-content {
+        width: 100% !important;
+        border-radius: 12px 12px 0 0 !important;
+        position: fixed !important;
+        bottom: 0 !important;
+    }
+
+    /* END MEDIA QUERY */
+
+    /* 全域小修正 */
+    #modal-body .detail-value[style*="1.6rem"] {
+        font-size: 1.1rem !important;
+    }
+
+    .btn-close-inline,
+    .btn-print {
+        font-size: 0.75rem !important;
+        padding: 4px 8px !important;
+    }
+
+    #modal-body [style*="fafafa"],
+    #modal-body [style*="f9f9f9"] {
+        padding: 4px 6px !important;
+        font-size: 0.78rem !important;
+    }
+}
+
+/* Financial Reports Charts Grid & Responsive Layout */
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.chart-box {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 768px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
     }
 
     .chart-box {
-        padding: 12px !important;
-        /* 卡片內容留白變小 */
-        width: 100% !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-        /* 防止圖表溢出 */
+        padding: 15px;
     }
 
     .chart-box h4 {
-        margin-bottom: 10px !important;
+        font-size: 1rem;
     }
+}
 
-    .trend-toggle-group {
-        flex-wrap: wrap !important;
-        justify-content: center !important;
-        margin-bottom: 5px !important;
-    }
+/* Financial Report Button Toggles - Global Rules */
+#reports-module.mode-single .btn-period-unit[data-unit="month"] {
+    display: none !important;
+}
 
-    /* 歷史訂單在手機版為單欄 */
-    .history-month-body.show {
-        grid-template-columns: 1fr !important;
-        gap: 12px !important;
-        padding: 10px 0 !important;
-    }
-
-    /* 強制財務與歷史模組在手機版左右貼齊螢幕邊緣 */
-    #history-module,
-    #reports-module,
-    .history-content {
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-    }
-
-    .kpi-row,
-    .charts-grid {
-        padding-left: 0 !important;
-        padding-right: 0 !important;
-    }
-
-    .history-month-header,
-    .history-order-card,
-    .chart-box {
-        border-radius: 0 !important;
-        border-right: none !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-    }
+#reports-module.mode-trend .btn-period-unit[data-unit="day"],
+#reports-module.mode-trend .btn-period-unit[data-unit="week"] {
+    display: none !important;
 }
