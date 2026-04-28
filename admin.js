@@ -755,16 +755,17 @@ window.renderInventoryDashboard = function () {
 
         const MAX_HEALTH_MAP = { 20: 120000, 30: 240000, 40: 240000 };
         let health = { 20: 0, 30: 0, 40: 0 };
-        const ALUMINUM_ALLOW_LIST = ["2020型", "2040型", "3030輕型", "3060輕型", "3030重型", "3060重型", "4040輕型", "4080輕型", "4040重型", "4080重型"];
+        const ALUMINUM_ALLOW_LIST = ["2020型", "2040型", "3030輕型", "3060輕型", "3030重型", "3060重型", "6060輕型", "6060重型", "4040輕型", "4080輕型", "4040重型", "4080重型"];
         let accessories = [];
 
         window.allInventory.forEach(item => {
             const rawName = (findValue(item, ['name', '品項名稱', '品項']) || "").toString().trim();
             if (!rawName) return;
 
-            // 1. Precise Aluminum Matching
+            // 1. Precise Aluminum Matching - 6060 belongs to Series 30
             let series = 0;
-            if (rawName.match(/^20/)) series = 20;
+            if (rawName.includes('6060')) series = 30; // 6060型屬於 30 系列
+            else if (rawName.match(/^20/)) series = 20;
             else if (rawName.match(/^30/)) series = 30;
             else if (rawName.match(/^40/)) series = 40;
 
@@ -1961,6 +1962,7 @@ function detectVehicleType(detailsStr) {
     const weightMap = {
         '2020型': 0.458, '2040型': 0.862, '2060型': 1.266, '2080型': 1.7,
         '3030輕型': 0.693, '3030重型': 1.07, '3060輕型': 1.218, '3060重型': 1.844,
+        '6060輕型': 1.908, '6060重型': 2.763,
         '6060型': 2.45,
         '4040輕型': 1.298, '4040重型': 1.923, '4080輕型': 2.265, '4080重型': 3.505,
         '8080型': 5.2
@@ -2801,7 +2803,7 @@ const PRODUCT_MAP = {
 
 window.detectSeries = function (name) {
     if (name.match(/^20/)) return 20;
-    if (name.match(/^30/)) return 30;
+    if (name.match(/^30/) || name.match(/^6060/)) return 30;
     if (name.match(/^40/) || name.match(/^80/)) return 40;
     if (name.includes('M3') || name.includes('M4') || name.includes('M5')) return 20;
     if (name.includes('M6')) return 30;
@@ -2904,8 +2906,9 @@ window.convertToInventoryKey = function (name, series) {
 
 window.isScrewOrNut = function (name) {
     const n = name.toLowerCase();
-    // 排除組合配件包本體進入合計區
+    // 排除組合配件包本體（舊格式：含螺絲，新格式：xx枚/包）
     if (n.includes('(含') || n.includes('（含') || n.includes('(組') || n.includes('（組')) return false;
+    if (n.includes('/包') || n.includes('枚/') || n.includes('包裝')) return false; // 新格式：螺絲組合包
     return n.includes('螺絲') || n.includes('螺母') || n.includes('螺帽') || n.includes('滑塊') || n.includes('彈片');
 };
 
@@ -4505,7 +4508,7 @@ window.currentInventorySeries = 'all';
 // Strict list of aluminum profiles based on user spreadsheet
 const ALUMINUM_ALLOW_LIST = [
     "2020型", "2040型",
-    "3030輕型", "3060輕型", "3030重型", "3060重型",
+    "3030輕型", "3060輕型", "3030重型", "3060重型", "6060輕型", "6060重型",
     "4040輕型", "4080輕型", "4040重型", "4080重型"
 ];
 
@@ -4612,10 +4615,12 @@ function renderInventory(inventory, isPartial = false) {
         if (currentCat === 'aluminum' && !isAluminum) return false;
         if (currentCat === 'accessory' && isAluminum) return false;
 
-        // 配件額外過濾前端顯示行
+        // 配件額外過濾：名稱有前綴 OR 有系列欄
         if (!isAluminum) {
-            const isBackendRow = name.match(/^(20|30|40)-/);
-            if (!isBackendRow) return false;
+            const hasPrefix = name.match(/^(20|30|40)-(uff|.+)/);
+            const seriesCol = (findValue(item, ['series', '產品類型', '系列']) || '').toString().replace('系列', '').trim();
+            const hasSeriesCol = ['20', '30', '40'].includes(seriesCol);
+            if (!hasPrefix && !hasSeriesCol) return false;
         }
 
         return true;
@@ -4641,6 +4646,7 @@ function renderInventory(inventory, isPartial = false) {
     let html = '<div class="inventory-grid">';
 
     let accessoryIndex = 0; // Track index for accessories only (重置)
+    let svgMaskCounter = 0; // Global unique counter for SVG clipPath IDs
 
     // 先對配件進行分組（按商品類型）
     const accessoryGroups = new Map(); // key: baseName, value: array of items with different series
@@ -4649,9 +4655,11 @@ function renderInventory(inventory, isPartial = false) {
     inventory.forEach(item => {
         const name = (findValue(item, ['name', '品項名稱', '品項']) || "").toString().trim();
         const isAluminum = ALUMINUM_ALLOW_LIST.some(model => name.includes(model));
+        const seriesCol = (findValue(item, ['series', '產品類型', '系列']) || '').toString().replace('系列', '').trim();
+        const hasSeriesCol = ['20', '30', '40'].includes(seriesCol);
 
-        // 過濾前端顯示行
-        if (!isAluminum && !name.match(/^(20|30|40)-/)) return;
+        // 過濾：必須是錘材 OR 名稱有前綴 OR 有系列欄
+        if (!isAluminum && !name.match(/^(20|30|40)-/) && !hasSeriesCol) return;
 
         if (isAluminum) {
             aluminumItems.push(item);
@@ -4679,6 +4687,7 @@ function renderInventory(inventory, isPartial = false) {
         const nameB = (findValue(b, ['name', '品項名稱', '品項']) || "").toString().trim();
 
         const getSeriesNumber = (name) => {
+            if (name.includes('6060')) return 30; // 6060型屬於 30 系列
             if (name.includes('20')) return 20;
             if (name.includes('30')) return 30;
             if (name.includes('40')) return 40;
@@ -4736,8 +4745,10 @@ function renderInventory(inventory, isPartial = false) {
 
             ['20', '30', '40'].forEach(s => {
                 const itemEntry = seriesItems.find(it => {
-                    const n = (findValue(it, ['name', '品項名稱']) || "").toString();
-                    return n.startsWith(s + '-');
+                    const n = (findValue(it, ['name', '品項名稱', '品項']) || "").toString();
+                    const seriesCol = (findValue(it, ['series', '產品類型', '系列']) || "").toString().replace('系列', '').trim();
+                    // Match by prefix (old format: "20-三角連結塊") OR by series column (new format)
+                    return n.startsWith(s + '-') || seriesCol === s;
                 });
 
                 const rawStock = itemEntry ? parseNum(findValue(itemEntry, ['qty', 'stock', '庫存數量', '數量'])) : 0;
@@ -4758,8 +4769,8 @@ function renderInventory(inventory, isPartial = false) {
                 let textColor = hasItem ? '#475569' : '#cbd5e1';
                 if (hasItem && rawStock < 0) textColor = 'var(--dusty-rose)';
 
-                const radius = 22, viewBox = `0 0 60 60`, center = 30; // Shrunk for side-by-side
-                const maskId = `mask-${baseName.replace(/\s+/g, '')}-${s}`;
+                const radius = 22, viewBox = `0 0 60 60`, center = 30;
+                const maskId = `acc-mask-${svgMaskCounter++}`; // Unique numeric ID, no Chinese chars
                 const fillY = center + radius - (fillLevel / 100) * (radius * 2);
 
                 html += `
@@ -4799,16 +4810,19 @@ function renderInventory(inventory, isPartial = false) {
             if (currentCategory === 'aluminum' && !isActuallyAluminum) return;
             if (currentCategory === 'accessory' && isActuallyAluminum) return;
 
-            // 判定系列 (修正：使用更嚴謹的正則判定，確保 2040 不會被誤判為 40)
+            // 判定系列 (修正：6060明確指單到 30 系列，避免 fallback 失效)
             let series = 20;
-            const seriesMatch = name.match(/(20|30|40)\d{2}/); // 尋找 2020, 2040, 3030 等格式
-            if (seriesMatch) {
-                series = parseInt(seriesMatch[1]);
+            if (name.includes('6060')) {
+                series = 30; // 6060 錢屬 30 系列
             } else {
-                // 備用：檢查前綴或包含
-                if (name.includes('40')) series = 40;
-                else if (name.includes('30')) series = 30;
-                else series = 20;
+                const seriesMatch = name.match(/(20|30|40)\d{2}/); // 尋找 2020, 2040, 3030 等格式
+                if (seriesMatch) {
+                    series = parseInt(seriesMatch[1]);
+                } else {
+                    if (name.includes('40')) series = 40;
+                    else if (name.includes('30')) series = 30;
+                    else series = 20;
+                }
             }
 
             // 插入鋁材系列分隔標題 & 換行
@@ -6034,7 +6048,7 @@ function parseOrderItemsRobust(o) {
         if (!cleanName || cleanName.length < 2 || cleanName.match(/^[-=\s*]*$/) || cleanName === "[]" || cleanName === "[ ]") return;
 
         if (sku.match(/^A\d{2}/i)) isProfile = false;
-        else if (sku.match(/2020|2040|2080|3030|3060|30135|3045|4040|4080|8080/)) isProfile = true;
+        else if (sku.match(/2020|2040|2080|3030|3060|6060|30135|3045|4040|4080|8080/)) isProfile = true;
         else {
             if (itemStr.match(/cm|長度|L=|\d角槽|鋁材/i)) isProfile = true;
             else if (itemStr.match(/螺|連接|連結|把手|輪|鉸鏈|絞鍊|蓋|墊|角件|封邊|角柱|層板|滑塊|固定器|扣板|支撐架/)) isProfile = false;
@@ -6046,10 +6060,10 @@ function parseOrderItemsRobust(o) {
         else if (itemStr.match(/30系列|30系/)) series = "30";
         else if (itemStr.match(/40系列|40系/)) series = "40";
         else if (sku.match(/^A20|2020|2040|2080/i)) series = "20";
-        else if (sku.match(/^A30|3030|3060|30135|3045/i)) series = "30";
+        else if (sku.match(/^A30|3030|3060|30135|3045|6060/i)) series = "30";
         else if (sku.match(/^A40|8080|4040|4080/i)) series = "40";
         else if (itemStr.match(/2020|2040|2080|A20/i)) series = "20";
-        else if (itemStr.match(/3030|3060|30135|3045|A30/i)) series = "30";
+        else if (itemStr.match(/3030|3060|30135|3045|A30|6060/i)) series = "30";
         else if (itemStr.match(/4040|4080|8080|A40/i)) series = "40";
 
         if (series === "30") stats.count30++;
