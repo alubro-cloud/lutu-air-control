@@ -1,4 +1,4 @@
-﻿// Link to the same API
+// Link to the same API
 const ADMIN_API_URL = "https://script.google.com/macros/s/AKfycbxEn0_QHCdDmA24QNrXOfFVg2lSlvdt9R7opPpLmOrxEZGxm0L7t73CWneKlaHHo8ZV/exec";
 
 // Global Error Handler for debugging
@@ -65,11 +65,24 @@ window.getInventoryKey = function (rawName, series) {
             return simple.substring(0, 4) + "型";
         }
 
-        // 處理 30/40 系列輕重型
-        if (simple.includes("(輕量型)")) return simple.replace(" (輕量型)", "輕型").trim();
-        if (simple.includes("(標準型)")) return simple.replace(" (標準型)", "重型").trim();
+        // 處理 6060 系列 (屬於 30 系列，但名稱可能不同)
+        if (simple.includes("6060")) {
+            let base = "6060";
+            if (simple.includes("輕")) return base + "輕型";
+            if (simple.includes("重")) return base + "重型";
+            return base + "型";
+        }
 
-        // 處理已經是 "3030輕型" 格式的
+        // 處理 30/40 系列輕重型
+        if (simple.includes("(輕量型)") || simple.includes("輕型") || simple.includes("輕量")) {
+             let base = simple.substring(0, 4);
+             return base + "輕型";
+        }
+        if (simple.includes("(標準型)") || simple.includes("重型") || simple.includes("標準")) {
+             let base = simple.substring(0, 4);
+             return base + "重型";
+        }
+
         return simple;
     }
 
@@ -753,7 +766,7 @@ window.renderInventoryDashboard = function () {
             </div>`;
         };
 
-        const MAX_HEALTH_MAP = { 20: 120000, 30: 240000, 40: 240000 };
+        const MAX_HEALTH_MAP = { 20: 120000, 30: 360000, 40: 240000 };
         let health = { 20: 0, 30: 0, 40: 0 };
         const ALUMINUM_ALLOW_LIST = ["2020型", "2040型", "3030輕型", "3060輕型", "3030重型", "3060重型", "6060輕型", "6060重型", "4040輕型", "4080輕型", "4040重型", "4080重型"];
         let accessories = [];
@@ -874,7 +887,14 @@ window.renderInventoryDashboard = function () {
                     const valueLabel = `${item.qty}件`;
                     const mainLabel = item.displaySku || "未知";
 
+                    // [同步配色] 根據品名偵測系列並上色
+                    const s = window.detectSeries(item.name);
+                    const sColors = { 20: '#94a3b8', 30: '#b5926c', 40: '#9db39d' };
+                    const activeColor = sColors[s] || '#94a3b8';
+
                     return generateReservoirHTML(`acc-${index}`, pct, valueLabel, mainLabel, {
+                        activeColor: activeColor,
+                        textColor: activeColor,
                         isCritical: pct < 25,
                         className: 'dashboard-reservoir'
                     });
@@ -2376,67 +2396,80 @@ window.advanceStatus = function (orderId, nextStatus) {
 
         const lines = target.details.split('\n'); // Assuming 'lines' should come from target.details
 
+        let currentContextSeries = 99;
+
         lines.forEach(line => {
-            // [Fix] Skip empty lines immediately
             if (!line.trim()) return;
-            if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型') || line.includes('銘材') || line.match(/\d{4}型/)) return;
+
+            // 辨識當前行的系列 (包含 SKU 偵測)
+            let series = window.detectSeries(line);
+            
+            const isProfile = line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型') || line.includes('銘材') || line.match(/\d{4}型/);
+
+            // 更新上下文
+            if (isProfile) {
+                if (series !== 99) currentContextSeries = series;
+                return; // 鋁材不參與配件扣帳
+            }
+
+            // 配件繼承上下文
+            if (series === 99) {
+                series = currentContextSeries;
+            }
 
             // 1. 解析原始數量
             let qty = 1;
             const qMatch = line.match(/\( x (\d+) \)/);
             if (qMatch) qty = parseInt(qMatch[1]);
 
-            // 2. 獲取品名並偵測系列 (同步 renderDetailCards 邏輯)
-            let series = 99;
-            let foundKey = Object.keys(PRODUCT_MAP).find(key => line.includes(key));
-            if (foundKey) {
-                series = parseInt(PRODUCT_MAP[foundKey]);
-            }
-
             let itemName = line.replace(/^【.*?】\s*/, '').replace(/\s*--\s*\$[0-9]+/g, '').replace(/\( x \d+ \)/, '').trim();
-            // [Fix] Double check if itemName is meaningful after stripping
             if (!itemName) return;
 
-            if (series === 99) {
-                series = window.detectSeries(itemName);
-            }
-
-            // 3. 合計括號內的零件 (如 M4螺絲x2) -> 跳過平頭螺絲
-            window.extractAndAddScrewNutsToMap(itemName, qty, series, deductionMap);
-
-            // 4. 合計主品項 (優先找 [SKU]，若無則主動去 inventory 找身分證)
-            let key = itemName; // Fallback
+            // 3. 嘗試獲取 SKU 或識別身分
             const skuMatch = line.match(/\[(.*?)\]/);
-
+            let resolved = { sku: '', finalKey: itemName, cleanBase: itemName, series: series };
+            
             if (skuMatch) {
-                key = '[' + skuMatch[1].trim() + ']';
+                resolved.sku = skuMatch[1].trim();
+                resolved.finalKey = '[' + resolved.sku + ']';
+                // SKU 再次反推系列 (雙重保險)
+                if (resolved.sku.includes('M4')) resolved.series = 20;
+                else if (resolved.sku.includes('M6')) resolved.series = 30;
+                else if (resolved.sku.includes('M8')) resolved.series = 40;
+            } else if (window.allInventory && window.allInventory.length > 0) {
+                resolved = window.resolveItemInfo(itemName, series);
             } else {
-                // B2C 或舊單：主動查表換證 (三個身份證之一的主件身份)
-                if (window.allInventory && window.allInventory.length > 0) {
-                    const inventoryKey = window.convertToInventoryKey(itemName, series);
-                    const invMatch = window.fuzzyMatchInventoryKey(inventoryKey, window.allInventory);
-                    if (invMatch) {
-                        const actualName = (invMatch.name || invMatch.品項名稱 || "").toString();
-                        const foundSku = window.parseSKU(actualName);
-                        if (foundSku) {
-                            key = '[' + foundSku + ']'; // 強制轉為 [SKU] 格式扣帳
-                        } else {
-                            key = actualName;
-                        }
-                    } else {
-                        key = inventoryKey;
-                    }
-                } else {
-                    key = window.getInventoryKey(itemName, series);
-                }
+                resolved.finalKey = window.getInventoryKey(itemName, series);
             }
+
+            const key = resolved.finalKey;
+            const finalSeries = resolved.series;
             if (key.includes('平頭螺絲')) return;
 
-            const current = deductionMap.get(key) || 0;
-            deductionMap.set(key, current + qty);
+            // 4. [修復] 扣帳策略：
+            if (resolved.sku) {
+                const current = deductionMap.get(key) || { qty: 0, series: finalSeries };
+                const currentQty = typeof current === 'object' ? current.qty : current;
+                deductionMap.set(key, { qty: currentQty + qty, series: finalSeries });
+            } else {
+                const hasBundle = itemName.includes('(含') || itemName.includes('（含');
+                if (hasBundle) {
+                    window.extractAndAddScrewNutsToMap(itemName, qty, finalSeries, deductionMap);
+                } else {
+                    const current = deductionMap.get(key) || { qty: 0, series: finalSeries };
+                    const currentQty = typeof current === 'object' ? current.qty : current;
+                    deductionMap.set(key, { qty: currentQty + qty, series: finalSeries });
+                }
+            }
         });
 
-        const finalDeductList = Array.from(deductionMap.entries()).map(([name, qty]) => ({ name, qty }));
+        const finalDeductList = Array.from(deductionMap.entries()).map(([name, data]) => {
+            // data 可能是數量(number) 或者是含 series 的物件
+            if (typeof data === 'object') {
+                return { name, qty: data.qty, series: data.series };
+            }
+            return { name, qty: data, series: 99 }; // Fallback
+        });
 
         console.log('📦 最終扣庫存清單:', finalDeductList);
 
@@ -2474,7 +2507,7 @@ window.advanceStatus = function (orderId, nextStatus) {
 
                     if (success) {
                         // Mark as deducted
-                        localStorage.setItem(`deducted_acc_${orderId} `, 'true');
+                        localStorage.setItem(`deducted_acc_${orderId}`, 'true');
 
                         target.status = nextStatus;
                         applyFilter();
@@ -2737,9 +2770,10 @@ window.viewOrder = function (order) {
                      </button>
                      ` : order.status === 'picking' ? `
                      <button id="btn-finish-check" class="btn-finish-check" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-warehouse); color:#fff;">
-                         ✓ 核對完成 → 前進至包裝
-                     </button>
-                     ` : order.status === 'packing' ? `
+                         ✓ 核對完成 window.detectSeries = function (name) {
+
+                      </button>
+                      ` : order.status === 'packing' ? `
                      <button id="btn-finish-check" class="btn-finish-check active" onclick="finishCheck()" style="flex:2; margin-top:0; background:var(--accent-40); color:#fff;">
                          ✓ 確認無誤 → 前進至待出貨
                      </button>
@@ -2802,15 +2836,32 @@ const PRODUCT_MAP = {
 // --- Global Parsing Tools ---
 
 window.detectSeries = function (name) {
-    if (name.match(/^20/)) return 20;
-    if (name.match(/^30/) || name.match(/^6060/)) return 30;
-    if (name.match(/^40/) || name.match(/^80/)) return 40;
-    if (name.includes('M3') || name.includes('M4') || name.includes('M5')) return 20;
-    if (name.includes('M6')) return 30;
-    if (name.includes('M8')) return 40;
-    if (name.includes('3mm')) return 20;
-    if (name.includes('5mm')) return 30;
-    if (name.includes('6mm')) return 40;
+    if (!name) return 99;
+    const cleanName = name.toUpperCase();
+    
+    // 1. [最強 B 欄對位] 根據鋁材型號前兩碼判定
+    if (cleanName.includes('2020') || cleanName.includes('2040') || cleanName.includes('2060') || cleanName.includes('2080')) return 20;
+    if (cleanName.includes('3030') || cleanName.includes('3060') || cleanName.includes('3090') || cleanName.includes('6060')) return 30;
+    if (cleanName.includes('4040') || cleanName.includes('4080') || cleanName.includes('8080')) return 40;
+
+    // 2. 根據 SKU 關鍵字判定 (HR-0001~0002 是 20系, 0003~0008 是 30系, 0009~0012 是 40系)
+    if (cleanName.includes('HR-0001') || cleanName.includes('HR-0002')) return 20;
+    if (cleanName.includes('HR-0003') || cleanName.includes('HR-0004') || cleanName.includes('HR-0005') || cleanName.includes('HR-0006') || cleanName.includes('HR-0007') || cleanName.includes('HR-0008')) return 30;
+    if (cleanName.includes('HR-0009') || cleanName.includes('HR-0010') || cleanName.includes('HR-0011') || cleanName.includes('HR-0012')) return 40;
+
+    // 3. 配件關鍵字 (M4->20, M6->30, M8->40)
+    if (cleanName.includes('M3') || cleanName.includes('M4') || cleanName.includes('M5')) {
+        if (cleanName.includes('30用') || cleanName.includes('30系列')) return 30;
+        if (cleanName.includes('40用') || cleanName.includes('40系列')) return 40;
+        return 20;
+    }
+    if (cleanName.includes('M6')) return 30;
+    if (cleanName.includes('M8')) return 40;
+
+    if (cleanName.includes('20系列')) return 20;
+    if (cleanName.includes('30系列') || cleanName.includes('60系列')) return 30;
+    if (cleanName.includes('40系列') || cleanName.includes('80系列')) return 40;
+    
     return 99;
 };
 
@@ -2826,11 +2877,13 @@ window.removeSKU = function (name) {
 
 // 統一的項目辨識與 SKU 查找函數
 window.resolveItemInfo = function (rawName, series) {
+    if (!rawName) return { sku: '', finalKey: '', cleanBase: '' };
+    
     // Extract original SKU before stripping it, as a reliable fallback
     const originalSkuMatch = window.parseSKU(rawName);
 
     const cleanBase = window.removeSKU(rawName)
-        .replace(/\s*--\s*\$[0-9]+/g, '')
+        .replace(/\s*--\s*\$[0-9,]+/g, '')
         .replace(/\( x \d+ \)/g, '')
         .replace(/\(含[^)]+\)/g, '')
         .replace(/（含[^）]+）/g, '')
@@ -2839,28 +2892,30 @@ window.resolveItemInfo = function (rawName, series) {
     let sku = originalSkuMatch || '';
     let finalKey = cleanBase;
 
-    // Hardcoded fallback for known screws/nuts to force merging even if inventory is missing them
+    // Hardcoded fallbacks for very common items if inventory match fails
     if (!sku) {
-        if (cleanBase.includes('M4六角螺絲')) sku = 'A20-1M4';
-        else if (cleanBase.includes('M4螺母')) sku = 'A20-0M4';
-        else if (cleanBase.includes('M5六角螺絲') || (series === 20 && cleanBase.includes('M5螺絲'))) sku = 'A20-1M5'; // Assuming 20 series M5 exists, otherwise 30
-        else if (cleanBase.includes('M6六角螺絲')) sku = 'A30-1M6';
-        else if (cleanBase.includes('M6螺母')) sku = 'A30-0M6';
-        else if (cleanBase.includes('M8六角螺絲')) sku = 'A40-1M8';
-        else if (cleanBase.includes('M8螺母')) sku = 'A40-0M8';
-        else if (cleanBase.includes('M4螺絲')) sku = 'A20-1M4'; // Generic names
-        else if (cleanBase.includes('M5螺絲') && series === 30) sku = 'A30-1M5';
-        else if (cleanBase.includes('M6螺絲')) sku = 'A30-1M6';
-        else if (cleanBase.includes('M8螺絲')) sku = 'A40-1M8';
+        const n = cleanBase.toUpperCase();
+        if (n.includes('M4六角螺絲') || n.includes('M4螺絲')) sku = 'A20-1M4';
+        else if (n.includes('M4螺母')) sku = 'A20-0M4';
+        else if (n.includes('M5六角螺絲')) sku = (series === 30) ? 'A30-1M5' : 'A20-1M5';
+        else if (n.includes('M5螺母')) sku = (series === 30) ? 'A30-0M5' : 'A20-0M5';
+        else if (n.includes('M6六角螺絲') || n.includes('M6螺絲')) sku = 'A30-1M6';
+        else if (n.includes('M6螺母')) sku = 'A30-0M6';
+        else if (n.includes('M8六角螺絲') || n.includes('M8螺絲')) {
+            if (n.includes('包') || n.includes('10枚')) sku = 'M8-IOOO';
+            else sku = 'A40-1M8';
+        }
+        else if (n.includes('M8螺母')) sku = 'A40-0M8';
     }
 
-    // If we already have a reliable SKU from the front-end or hardcoded fallback, finalKey can be immediately mapped
     if (sku) {
         finalKey = `[${sku}]`;
     }
 
-    if (window.allInventory) {
-        // 嘗試多種組合查找：1. 系列-名稱 2. 純名稱 3. 標準化後的名稱
+    let resolvedSeries = series;
+
+    if (window.allInventory && window.allInventory.length > 0) {
+        // 嘗試多種組合查找
         const normalized = window.normalizeScrewName(cleanBase);
         const searchKeys = [
             series !== 99 ? `${series}-${cleanBase}` : null,
@@ -2870,17 +2925,23 @@ window.resolveItemInfo = function (rawName, series) {
         ].filter(Boolean);
 
         for (const sKey of searchKeys) {
-            const match = window.fuzzyMatchInventoryKey(sKey, window.allInventory);
+            // [重要] 傳入 series 協助定位正確的產品類型
+            const match = window.fuzzyMatchInventoryKey(sKey, window.allInventory, series);
             if (match) {
                 const pname = (match.name || match.品項名稱 || "").toString();
                 const invSku = window.parseSKU(pname);
+                
+                // [反向修正] 從庫存中識別正確的系列
+                const invSeriesStr = (match.series || match.產品類型 || "").toString();
+                if (invSeriesStr.includes('20')) resolvedSeries = 20;
+                else if (invSeriesStr.includes('30') || invSeriesStr.includes('6060')) resolvedSeries = 30;
+                else if (invSeriesStr.includes('40') || invSeriesStr.includes('80')) resolvedSeries = 40;
 
                 if (invSku) {
                     sku = invSku;
-                    finalKey = `[${sku}]`; // 找到 SKU 則以 SKU 為唯一鍵值
+                    finalKey = `[${sku}]`;
                     break;
                 } else if (originalSkuMatch) {
-                    // 如果庫存系統沒登錄 SKU，但前端有給，就相信前端的資料
                     sku = originalSkuMatch;
                     finalKey = `[${sku}]`;
                     break;
@@ -2888,11 +2949,21 @@ window.resolveItemInfo = function (rawName, series) {
             }
         }
     }
-    return { sku, finalKey, cleanBase };
+    return { sku, finalKey, cleanBase, series: resolvedSeries };
 };
 
 window.normalizeScrewName = function (name) {
+    if (!name) return "";
     let n = name.trim();
+    
+    // [修復] 同義詞處理：統一將華司轉為墊司
+    n = n.replace(/華司/g, '墊司');
+    
+    // [修復] 螺絲包識別：如果是包裝類項目，不要轉化為單顆螺絲名，否則會誤導 SKU 匹配
+    if (n.includes('包') || n.includes('10枚')) {
+        return n;
+    }
+
     // 擴大匹配：只要包含螺絲/螺母等關鍵字，就轉為資料庫標準型
     if (n.includes('螺絲')) n = n.replace(/M(\d+).*/, 'M$1六角螺絲');
     if (n.includes('螺母') || n.includes('螺帽')) n = n.replace(/M(\d+).*/, 'M$1螺母');
@@ -3816,6 +3887,7 @@ function buildScene() {
 
             for (let i = 0; i < laneCars.length; i++) {
                 const car = laneCars[i];
+
                 const leader = laneCars[i - 1]; // The car in front
 
                 let targetSpeed = car.userData.maxSpeed;
@@ -3927,35 +3999,55 @@ window.removeSKU = function (name) {
 };
 
 /**
- * 模糊匹配庫存項目（忽略 SKU 編碼，向後兼容）
- * @param {string} generatedKey - 系統產生的標準鍵值（如 "20-三角連結塊"）
+ * 模糊匹配庫存項目 (多維度比對：品名 + 系列)
+ * @param {string} generatedKey - 系統產生的標準鍵值
  * @param {Array} inventoryList - 庫存陣列
- * @returns {Object|null} - 匹配的庫存項目或 null
+ * @param {number} targetSeries - 目標系列 (20, 30, 40)
+ * @returns {Object|null} - 匹配的庫存項目
  */
-window.fuzzyMatchInventoryKey = function (generatedKey, inventoryList) {
+window.fuzzyMatchInventoryKey = function (generatedKey, inventoryList, targetSeries) {
     if (!inventoryList || !Array.isArray(inventoryList)) return null;
 
-    // Helper: 取得品項名稱（兼容多種欄位名）
     const getName = (item) => (item.name || item.品項名稱 || item['品項名稱'] || "").toString().trim();
+    const getSeries = (item) => (item.series || item.產品類型 || item['產品類型'] || "").toString().trim();
 
-    // 將 generatedKey 先做一次清理 (移除括號內容，便於比對)
-    const cleanGenerated = generatedKey.replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
+    // 正規化目標 Key
+    const normalizedGenerated = window.normalizeScrewName(generatedKey);
+    const cleanGenerated = normalizedGenerated.replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
 
-    // 1. 精確匹配（向後兼容舊格式，無 SKU）
-    let exactMatch = inventoryList.find(item => {
+    // 1. 第一輪：過濾出正確系列的項目 (如果 targetSeries 有效)
+    let filteredList = inventoryList;
+    if (targetSeries && targetSeries !== 99) {
+        filteredList = inventoryList.filter(item => {
+            const s = getSeries(item);
+            // 匹配 "20系列", "20系列 ", "20" 等格式
+            return s.includes(targetSeries.toString());
+        });
+        // 如果過濾後沒東西，退回到全表匹配 (防止產品類型填錯)
+        if (filteredList.length === 0) filteredList = inventoryList;
+    }
+
+    // 2. 精確匹配
+    let exactMatch = filteredList.find(item => {
         let n = getName(item);
-        return n === generatedKey || n === cleanGenerated;
+        return n === generatedKey || n === cleanGenerated || n === normalizedGenerated;
     });
     if (exactMatch) return exactMatch;
 
-    // 2. 模糊匹配：移除 SKU 編碼後比對
-    // 同時移除庫存品名中的 (含...)，這能讓 B2C 的 "三角連結塊" 對上 B2B 的 "三角連結塊(含M4...)"
-    let fuzzyMatch = inventoryList.find(item => {
+    // 3. 模糊匹配：移除 SKU 編碼與前綴後比對
+    let fuzzyMatch = filteredList.find(item => {
         let invName = getName(item);
         let nameWithoutSKU = window.removeSKU(invName);
-        let nameCore = nameWithoutSKU.replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
+        
+        // 移除庫存名稱中的系列前綴 (如 "20-", "30-") 並做正規化
+        let nameCore = nameWithoutSKU.replace(/^\d{2}-/, '').replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
+        const normInvCore = window.normalizeScrewName(nameCore);
+        const normInvWithoutSKU = window.normalizeScrewName(nameWithoutSKU);
 
-        return nameCore === cleanGenerated || nameCore === generatedKey || nameWithoutSKU === generatedKey;
+        return normInvCore === cleanGenerated || 
+               normInvCore === normalizedGenerated || 
+               normInvWithoutSKU === normalizedGenerated ||
+               window.normalizeScrewName(nameWithoutSKU.replace(/^\d{2}-/, '')) === cleanGenerated;
     });
 
     return fuzzyMatch || null;
@@ -3972,6 +4064,9 @@ function renderDetailCards(detailsStr, status) {
 
     // 第一輪：收集所有項目並進行分類與合計
     let normalItems = [];
+    
+    // 記憶上下文系列 (用來判斷沒標註系列的配件)
+    let currentContextSeries = 99;
 
     lines.forEach(line => {
         let type = 'other';
@@ -3988,23 +4083,25 @@ function renderDetailCards(detailsStr, status) {
         if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型')) type = 'profile';
         else if (line.includes('【配件】') || line.includes('配件')) type = 'accessory';
 
-        // 嘗試從地名偵測系列
-        let foundKey = Object.keys(PRODUCT_MAP).find(key => line.includes(key));
-        if (foundKey) {
-            series = parseInt(PRODUCT_MAP[foundKey]);
-            if (foundKey.includes('鋁擠型')) type = 'profile';
+        // 1. [強化] 直接從「整行文字」偵測系列提示 (包含 SKU)
+        series = window.detectSeries(line);
+
+        // 2. [強化] 如果是鋁材，更新當前上下文系列
+        if (type === 'profile' && series !== 99) {
+            currentContextSeries = series;
+        }
+
+        // 3. [強化] 如果配件沒抓到系列，則繼承上下文
+        if (type === 'accessory' && series === 99) {
+            series = currentContextSeries;
         }
 
         let itemName = line.replace(/^【.*?】\s*/, '').trim();
-        // 取得乾淨品名 (不含 SKU, 不含數量, 不含價格)
+        // 取得乾淨品名
         let cleanBaseName = window.removeSKU(itemName)
             .replace(/\( x \d+ \)/g, '')
-            .replace(/\s*--\s*\$[0-9]+/g, '')
+            .replace(/\s*--\s*\$[0-9,]+/g, '')
             .trim();
-
-        if (series === 99) {
-            series = window.detectSeries(cleanBaseName);
-        }
 
         // 強制判定 type (根據名稱關鍵字強化)
         if (window.isScrewOrNut(itemName)) {
@@ -4034,9 +4131,10 @@ function renderDetailCards(detailsStr, status) {
                 let formatted = `【配件】 <span style="font-weight:bold;">${simplifiedName}</span>${skuHtml}`;
                 if (qtyMatch) formatted += ` <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`;
 
+                const displaySeries = info.series !== 99 ? info.series : series;
                 normalItems.push({
-                    raw: formatted, type, series,
-                    seriesClass: (series !== 99) ? `series-${series}` : ''
+                    raw: formatted, type, series: displaySeries,
+                    seriesClass: (displaySeries !== 99) ? `series-${displaySeries}` : ''
                 });
             }
         } else {
@@ -4412,20 +4510,24 @@ async function deductInventory(items) {
 
         let actualName = i.name;
         if (window.allInventory && window.allInventory.length > 0) {
-            let invItem = window.allInventory.find(inv => {
-                let invName = (inv.name || inv.品項名稱 || "").toString();
-                // If i.name is literally a bracketed SKU like "[A20-L]", .includes will match exactly that SKU
-                // Add strict check to avoid invName.includes("") which is always true
-                return invName === i.name || (i.name.length > 0 && invName.includes(i.name));
-            });
+            let invItem = window.fuzzyMatchInventoryKey(i.name, window.allInventory, i.series || 99);
+            
             if (invItem) {
                 actualName = invItem.name || invItem.品項名稱 || i.name;
+            } else if (i.name.startsWith('[') && i.name.endsWith(']')) {
+                const sku = i.name.slice(1, -1);
+                invItem = window.allInventory.find(inv => {
+                    let n = (inv.name || inv.品項名稱 || "").toString();
+                    return n.includes(`[${sku}]`);
+                });
+                if (invItem) actualName = invItem.name || invItem.品項名稱 || i.name;
             }
         }
         payloadItems.push({
             name: actualName,
             qty: i.qty,
-            originalName: i.name // For debug
+            originalName: i.name,
+            series: i.series || 99
         });
     });
 
@@ -4577,6 +4679,10 @@ function renderInventory(inventory, isPartial = false) {
     // Helper to find value by multiple possible keys (ignoring spaces/case/partial)
     const findValue = (obj, keys) => {
         const objKeys = Object.keys(obj);
+        // Debug: Log if we are looking for SKU and what keys we have
+        if (keys.includes('sku')) {
+            console.log("Looking for SKU in object keys:", objKeys, "Data:", obj);
+        }
         // 1. Exact or Trimmed Match
         for (const k of objKeys) {
             const cleanK = k.trim().toLowerCase();
@@ -4667,12 +4773,19 @@ function renderInventory(inventory, isPartial = false) {
             // 配件：提取基礎名稱（去掉系列前綴和SKU）
             let baseName = window.removeSKU(name).replace(/^(20|30|40|80)-/, '').trim();
 
+            // [New] 提取 SKU 並存入物件中供後續使用
+            // 優先找 '內部編號(SKU)' 或是 'J' 欄位的內容
+            let rowSku = (findValue(item, ['內部編號(SKU)', 'sku', '內部編號', '編號', 'SKU']) || "").toString();
+            if (!rowSku) {
+                const m = name.match(/\[(.*?)\]/);
+                if (m) rowSku = m[1];
+            }
+            item._sku = rowSku; 
+            console.log(`Checking Item: ${name}, Found SKU: ${rowSku}`); // Debug line
+
             // 【統一螺絲螺母板手】移除規格前綴
-            // M4/M6/M8六角螺絲 → 六角螺絲
-            // M4/M6/M8螺母 → 螺母
-            // 3mm/5mm/6mm六角板手 → 六角板手
-            baseName = baseName.replace(/^M\d+/, '').trim();     // 移除 M4, M6, M8
-            baseName = baseName.replace(/^\d+mm/, '').trim();    // 移除 3mm, 5mm, 6mm
+            baseName = baseName.replace(/^M\d+/, '').trim();
+            baseName = baseName.replace(/^\d+mm/, '').trim();
 
             if (!accessoryGroups.has(baseName)) {
                 accessoryGroups.set(baseName, []);
@@ -4710,7 +4823,8 @@ function renderInventory(inventory, isPartial = false) {
         })
     ];
 
-    // 追蹤當前系列和類型，用於插入分隔標題
+    // --- [2. 開始組合最終 HTML] ---
+    // (已移除列表頁上方的短缺警報區塊，保持頁面簡潔)
     let lastSeries = null;
     let lastType = null;
 
@@ -4719,11 +4833,68 @@ function renderInventory(inventory, isPartial = false) {
         const isAccessoryGroup = Array.isArray(item);
 
         if (isAccessoryGroup) {
-            const [baseName, seriesItems] = item; // <<< THIS WAS MISSING
+            const [baseName, seriesItems] = item; 
 
             if (lastType !== 'accessory') {
                 lastType = 'accessory';
             }
+
+            // [Shortage Alert Section]
+            seriesItems.forEach(item => {
+                const name = (findValue(item, ['name', '品項名稱', '品項']) || "").toString().trim();
+                const rawStock = parseNum(findValue(item, ['qty', 'stock', '庫存數量', '數量', '庫存']));
+                const defaultMax = 100;
+                const percentage = Math.round((rawStock / defaultMax) * 100);
+
+                if (percentage < 20) {
+                    let series = '20'; // Default
+                    // 智能推斷系列 (從名稱或 SKU)
+                    const lowerName = name.toLowerCase();
+                    const skuVal = (item._sku || findValue(item, ['內部編號(SKU)', 'sku', '內部編號', '編號', 'SKU']) || "").toString().toLowerCase();
+                    
+                    if (lowerName.includes('m4') || lowerName.includes('20') || skuVal.includes('m4') || skuVal.includes('20')) series = '20';
+                    else if (lowerName.includes('m6') || lowerName.includes('30') || skuVal.includes('m6') || skuVal.includes('30')) series = '30';
+                    else if (lowerName.includes('m8') || lowerName.includes('40') || skuVal.includes('m8') || skuVal.includes('40')) series = '40';
+
+                    const fillLevel = Math.max(0, Math.min(percentage, 100));
+                    const maskId = `crit-mask-${svgMaskCounter++}`;
+                    
+                    const sColors = {
+                        '20': { color: '#b3c7d9', label: '20' },
+                        '30': { color: '#c6a682', label: '30' },
+                        '40': { color: '#b8ccb8', label: '40' }
+                    };
+                    const seriesConfig = sColors[series] || sColors['20'];
+                    const rowSku = (item._sku || findValue(item, ['內部編號(SKU)', 'sku', '內部編號', '編號', 'SKU']) || "");
+
+                    if (!html.includes('id="critical-items-box"')) {
+                        html = `<div id="critical-items-box" class="critical-items-container" style="background: #fff; border: 1px solid #fecaca; border-radius: 12px; padding: 20px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                                <h3 style="color: var(--status-quoted); font-size: 1.1rem; margin-top: 0; margin-bottom: 20px; display: flex; align-items: center;">
+                                    <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i> 短缺警報
+                                </h3>
+                                <div style="display: flex; gap: 20px; flex-wrap: wrap;">` + html;
+                    }
+
+                    // 修改渲染樣式：圓圈內放數量，標籤上色
+                    const critItemHtml = `
+                    <div class="critical-item" style="text-align: center; min-width: 90px; flex: 0 0 auto;">
+                        <svg width="55" height="55" viewBox="0 0 70 70">
+                            <circle cx="35" cy="35" r="28" fill="#fef2f2" stroke="#fee2e2" stroke-width="1.5" />
+                            <defs><clipPath id="${maskId}"><circle cx="35" cy="35" r="28" /></clipPath></defs>
+                            <g clip-path="url(#${maskId})">
+                                <rect x="0" y="${70 - (fillLevel * 0.7)}" width="70" height="70" fill="var(--status-quoted)" opacity="0.8" />
+                            </g>
+                            <text x="35" y="40" text-anchor="middle" font-size="16" font-weight="bold" fill="${fillLevel > 50 ? '#fff' : 'var(--status-quoted)'}">${rawStock}</text>
+                        </svg>
+                        <div style="margin-top: 8px;">
+                            <span style="font-size: 0.6rem; color: #fff; background: ${seriesConfig.color}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-family: 'Consolas', monospace; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">${rowSku || baseName}</span>
+                        </div>
+                    </div>`;
+
+                    const insertionIdx = html.indexOf('<div style="display: flex; gap: 20px; flex-wrap: wrap;">') + '<div style="display: flex; gap: 20px; flex-wrap: wrap;">'.length;
+                    html = html.slice(0, insertionIdx) + critItemHtml + html.slice(insertionIdx);
+                }
+            });
 
             const checkIsScrewOrNutSet = (name) => {
                 const n = name.toLowerCase();
@@ -4752,6 +4923,8 @@ function renderInventory(inventory, isPartial = false) {
                 });
 
                 const rawStock = itemEntry ? parseNum(findValue(itemEntry, ['qty', 'stock', '庫存數量', '數量'])) : 0;
+                let sku = itemEntry ? (itemEntry._sku || (findValue(itemEntry, ['sku', '內部編號', '編號', '內部編號(SKU)', 'SKU']) || "")) : "";
+                
                 const percentage = Math.round((rawStock / defaultMax) * 100);
                 const hasItem = !!itemEntry;
                 const displayPercent = hasItem ? percentage + '%' : 'N/A';
@@ -4773,6 +4946,17 @@ function renderInventory(inventory, isPartial = false) {
                 const maskId = `acc-mask-${svgMaskCounter++}`; // Unique numeric ID, no Chinese chars
                 const fillY = center + radius - (fillLevel / 100) * (radius * 2);
 
+                // --- [Dashboard Shortage Alert Fix] ---
+                let dashboardSeries = '20';
+                const lowerName = (findValue(item, ['name', '品項名稱', '品項']) || "").toString().toLowerCase();
+                const skuVal = (sku || "").toString().toLowerCase();
+                
+                if (lowerName.includes('m4') || lowerName.includes('20') || skuVal.includes('m4') || skuVal.includes('20')) dashboardSeries = '20';
+                else if (lowerName.includes('m6') || lowerName.includes('30') || skuVal.includes('m6') || skuVal.includes('30')) dashboardSeries = '30';
+                else if (lowerName.includes('m8') || lowerName.includes('40') || skuVal.includes('m8') || skuVal.includes('40')) dashboardSeries = '40';
+
+                const seriesConfig = sColors[dashboardSeries] || sColors['20'];
+
                 html += `
                 <div class="reservoir-circle-container" style="opacity: ${hasItem ? 1 : 0.6}; flex: 1; min-width: 0;">
                     <div class="reservoir-label" style="font-size: 0.65rem; margin-bottom: 2px;">${config.label}</div>
@@ -4788,13 +4972,15 @@ function renderInventory(inventory, isPartial = false) {
                                 ` : ''}
                             </g>
                         </g>
-                        <text x="${center}" y="${center + 4}" text-anchor="middle" font-size="${hasItem ? 11 : 12}" font-weight="400" 
-                               fill="${hasItem && fillLevel > 50 ? '#fff' : textColor}" 
-                               style="text-shadow: ${hasItem && fillLevel > 50 ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'}; pointer-events: none; opacity: ${hasItem ? 1 : 0.5}">
-                            ${displayPercent}
+                        <text x="${center}" y="${center + 4}" text-anchor="middle" font-size="${hasItem ? 13 : 11}" font-weight="bold" 
+                               fill="${(hasItem && fillLevel < 50) ? '#94a3b8' : '#fff'}" 
+                               style="pointer-events: none; opacity: ${hasItem ? 1 : 0.8}">
+                            ${hasItem ? rawStock : 'N/A'}
                         </text>
                     </svg>
-                    <div class="reservoir-value" style="color: ${textColor}; font-size: 0.75rem;">${hasItem ? rawStock : '-'}</div>
+                    <div class="reservoir-value" style="margin-top:6px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 1.5em;">
+                        ${sku ? `<span style="font-size: 0.6rem; color: #fff; background: ${seriesConfig.color}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-family: 'Consolas', monospace; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">${sku}</span>` : ''}
+                    </div>
                 </div>`;
             });
             html += `</div></div>`;
@@ -4882,11 +5068,11 @@ function renderInventory(inventory, isPartial = false) {
             <div class="aluminum-tube-card" style="grid-column: span 1; border: ${isWarning ? '1px solid rgba(231,76,60,0.3)' : '1px solid transparent'};">
                 <div class="tube-header">
                     <div style="text-align: left;">
-                        <div class="sku-badge">${sku}</div>
+                        <div class="sku-badge" style="background: ${config.color}; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold;">${sku}</div>
                         <div style="font-size: 0.95rem; font-weight: 300; color: #1e293b; margin-top: 6px;">${cleanName}</div>
                     </div>
                     <div class="offcut-drawer">
-                        <div class="offcut-badge"><i class="fas fa-scissors"></i> ${offcutCount} 片餘料</div>
+                        <div class="offcut-badge" style="background: ${config.color}; color: #fff; opacity: 0.9; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold;"><i class="fas fa-scissors"></i> ${offcutCount} 片餘料</div>
                         ${offcutCount > 0 ? `
                         <div class="offcut-tooltip">
                             <div style="font-size: 0.75rem; font-weight: 300; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 5px;">餘料分布 (cm)</div>
@@ -4902,9 +5088,11 @@ function renderInventory(inventory, isPartial = false) {
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <div class="tube-container" style="flex: 1;">
-                        <div class="tube-text" style="color: ${fillWidth > 60 ? '#fff' : '#475569'}">${rawStock} cm/600m</div>
-                        <div class="tube-filler" style="width: ${fillWidth}%; background: ${tubeColor}; position: relative; overflow: hidden;">
+                    <div class="tube-container" style="flex: 1; border-radius: 2px; background: #f1f5f9; height: 24px; position: relative; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
+                        <div class="tube-text" style="color: ${fillWidth > 60 ? '#fff' : '#475569'}; z-index: 2; position: absolute; width: 100%; text-align: center; line-height: 24px; font-weight: bold; font-size: 0.75rem; text-shadow: ${fillWidth > 60 ? '0 1px 2px rgba(0,0,0,0.2)' : 'none'}; pointer-events: none;">${rawStock} cm/600m</div>
+                        <div class="tube-filler" style="width: ${fillWidth}%; height: 100%; background: ${tubeColor}; border-radius: 0; position: relative; overflow: hidden; transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);">
+                            <!-- 模擬鋁材金屬光澤的漸層層 -->
+                            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 45%, rgba(0,0,0,0.15) 100%);"></div>
                         </div>
                     </div>
                     <div style="text-align: right; min-width: 50px;">
@@ -5277,10 +5465,11 @@ window.runCuttingOptimization = async function () {
         });
 
         // 判定系列颜色
-        let seriesColor = '#2980b9'; // 默认蓝色 (20系列)
-        if (model.includes('30')) seriesColor = '#d35400'; // 橙色
-        else if (model.includes('40')) seriesColor = '#27ae60'; // 绿色
-        else if (model.includes('80')) seriesColor = '#27ae60'; // 80也用绿色
+        // [莫蘭迪配色] 使用系統 CSS 變數確保配色統一
+        let s = window.detectSeries(model);
+        let seriesColor = 'var(--accent-20)'; // 莫蘭迪藍
+        if (s === 30) seriesColor = 'var(--accent-30)'; // 莫蘭迪橘
+        else if (s === 40) seriesColor = 'var(--accent-40)'; // 莫蘭迪綠
 
         // 灰色系（余料/废料）
         const grayColors = {
@@ -5479,16 +5668,32 @@ window.recordCuttingPlanToInventory = async function () {
         // Map back to the exact name (with SKU) existing in backend
         if (window.allInventory && window.allInventory.length > 0) {
             let invItem;
+            // A. First Priority: Absolute SKU Match
             if (skuMatch) {
-                const sku = skuMatch[1].trim();
+                const sku = skuMatch[1].trim().toUpperCase();
                 invItem = window.allInventory.find(inv => {
-                    let invName = (inv.name || inv.品項名稱 || "").toString();
+                    let invName = (inv.name || inv.品項名稱 || "").toString().toUpperCase();
                     return invName.includes(`[${sku}]`);
                 });
             }
+            // B. Second Priority: Exact Match (Case Insensitive)
+            if (!invItem) {
+                invItem = window.allInventory.find(inv => {
+                    let invName = (inv.name || inv.品項名稱 || "").toString().trim();
+                    return invName === modelName;
+                });
+            }
+            // C. Third Priority: Standardized Key Match (Strict for 30/40/6060 series)
             if (!invItem) {
                 invItem = window.allInventory.find(inv => {
                     let invName = (inv.name || inv.品項名稱 || "").toString();
+                    let standardInv = window.getInventoryKey(invName, 99);
+                    
+                    // 關鍵修復：如果是 6060/30/40 等有輕重分型的，標準化 key 必須完全一致
+                    if (stdName.includes('輕') || stdName.includes('重')) {
+                        return standardInv === stdName;
+                    }
+                    
                     return invName === stdName || invName.includes(stdName);
                 });
             }
@@ -6047,24 +6252,23 @@ function parseOrderItemsRobust(o) {
 
         if (!cleanName || cleanName.length < 2 || cleanName.match(/^[-=\s*]*$/) || cleanName === "[]" || cleanName === "[ ]") return;
 
+        // [強化分類邏輯] 確保 [M4-6] 板手等配件不會被誤認成鋁材
         if (sku.match(/^A\d{2}/i)) isProfile = false;
-        else if (sku.match(/2020|2040|2080|3030|3060|6060|30135|3045|4040|4080|8080/)) isProfile = true;
+        else if (sku.match(/^M\d/i)) isProfile = false; // M4, M6, M8 開頭的 SKU 通常是配件
+        else if (sku.match(/2020|2040|2080|3030|3060|6060|30135|3045|4040|4080|8080|HR-/i)) isProfile = true;
         else {
-            if (itemStr.match(/cm|長度|L=|\d角槽|鋁材/i)) isProfile = true;
-            else if (itemStr.match(/螺|連接|連結|把手|輪|鉸鏈|絞鍊|蓋|墊|角件|封邊|角柱|層板|滑塊|固定器|扣板|支撐架/)) isProfile = false;
-            else isProfile = true;
+            // 透過關鍵字深度辨識
+            const isAccessoryText = itemStr.match(/螺|連接|連結|把手|輪|鉸鏈|絞鍊|蓋|墊|角件|封邊|角柱|層板|滑塊|固定器|扣板|支撐架|板手|扳手|工具|組/);
+            const isProfileText = itemStr.match(/cm|長度|L=|\d角槽|鋁材|型|支/i);
+            
+            if (isAccessoryText) isProfile = false;
+            else if (isProfileText) isProfile = true;
+            else isProfile = false; // 預設改為配件，避免污染鋁材統計
         }
 
-        let series = "";
-        if (itemStr.match(/20系列|20系/)) series = "20";
-        else if (itemStr.match(/30系列|30系/)) series = "30";
-        else if (itemStr.match(/40系列|40系/)) series = "40";
-        else if (sku.match(/^A20|2020|2040|2080/i)) series = "20";
-        else if (sku.match(/^A30|3030|3060|30135|3045|6060/i)) series = "30";
-        else if (sku.match(/^A40|8080|4040|4080/i)) series = "40";
-        else if (itemStr.match(/2020|2040|2080|A20/i)) series = "20";
-        else if (itemStr.match(/3030|3060|30135|3045|A30|6060/i)) series = "30";
-        else if (itemStr.match(/4040|4080|8080|A40/i)) series = "40";
+        // [同步報表判斷] 統一使用 global 偵測器，確保同步後的 SKU [M8-XXX] 能被正確認識
+        let sNum = window.detectSeries(itemStr);
+        let series = (sNum !== 99) ? sNum.toString() : "";
 
         if (series === "30") stats.count30++;
         else if (series === "40") stats.count40++;
@@ -6236,11 +6440,12 @@ window.renderFinancialReports = function () {
             if (!top10Map[key]) top10Map[key] = 0;
             top10Map[key] += itemsInfo.itemsMapTotal[key];
 
+            // [同步配色邏輯] 讓 Top 10 圖表也能認出 [M8-XXX] 等新格式並塗上正確的莫蘭迪色
             let cleanName = key;
-            let color = '#94a3b8'; // Standard Gray
-            if (cleanName.match(/^\[A?30/i) || cleanName.match(/\[30135\]|\[3045\]/)) color = '#c6a682'; // var(--accent-30)
-            else if (cleanName.match(/^\[A?40/i) || cleanName.match(/\[8080\]/)) color = '#b8ccb8'; // var(--accent-40)
-            else if (cleanName.match(/^\[A?20/i)) color = '#b3c7d9'; // var(--accent-20)
+            let s = window.detectSeries(cleanName);
+            let color = '#b3c7d9'; // 默認 20系列 (莫蘭迪藍)
+            if (s === 30) color = '#c6a682'; // 30系列 (莫蘭迪橘)
+            else if (s === 40) color = '#b8ccb8'; // 40系列 (莫蘭迪綠)
             topItemsColorMap[key] = color;
         });
     });

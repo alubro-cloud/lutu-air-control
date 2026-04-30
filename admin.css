@@ -158,6 +158,27 @@
     background: #7f8c8d;
 }
 
+/* SKU Tags styling */
+.d-sku {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 6px;
+    border: 1px solid #e2e8f0;
+    vertical-align: middle;
+    letter-spacing: 0.5px;
+    font-family: monospace;
+}
+
+/* Series specific SKU colors */
+.series-20 .d-sku { background: #f0f4f8; color: #8ba2b8; border-color: #d1dae5; }
+.series-30 .d-sku { background: #f8f4f0; color: #c4b097; border-color: #e8ded1; }
+.series-40 .d-sku { background: #f0f8f0; color: #9cb39c; border-color: #d5e8d5; }
+
 body {
     font-family: "Noto Sans TC", sans-serif;
     font-weight: 300;
@@ -1355,7 +1376,8 @@ body {
         height: auto !important;
         overflow: visible !important;
         display: block !important;
-        width: 100%;
+        width: 100% !important;
+        box-sizing: border-box !important; /* Fix horizontal overflow */
     }
 
     .top-bar,
@@ -3321,9 +3343,12 @@ body {
     }
 
     /* ===== 手機版極致優化：全螢幕邊對邊 (Edge-to-Edge Control Room) v6 (Unified) ===== */
-    .module-page#inventory-section {
-        padding: 60px 0 0 0 !important;
+    #inventory-section {
+        padding: 65px 0 20px 0 !important; /* 加大頂部避開 topbar，並加上底部留白防截斷 */
+        margin: 0 !important; 
+        width: 100% !important;
         overflow-x: hidden !important;
+        box-sizing: border-box !important;
     }
 
     /* inventory-details custom header — replaces module-topbar to avoid all CSS conflicts */
@@ -3368,32 +3393,60 @@ body {
         margin: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
-        overflow: hidden !important;
+        overflow: visible !important; /* 允許內容自然超出，避免切斷圓角 */
+        height: auto !important; 
+        min-height: calc(100dvh - 100px) !important; 
     }
 
+    /* ---- 庫存 Hub 手機版：滿版 4 卡片 ---- */
     .dashboard-grid-4 {
         display: grid !important;
-        grid-template-columns: 1.5fr 1.5fr 1fr !important;
-        /* 調整比例，讓右側按鈕有足夠空間不被擠壓成直行 */
-        grid-template-rows: 1fr 1fr !important;
-        gap: 0 !important;
-        height: calc(100vh - 60px) !important;
+        grid-template-columns: 1fr 1fr !important;
+        grid-template-rows: 1fr 115px !important; /* 下方卡片固定 115px */
+        gap: 12px !important; 
+        height: auto !important; /* 改為 auto，讓內容決定是否撐開 */
+        min-height: calc(100dvh - 110px) !important; /* 確保至少有滿版的高度 */
+        padding: 0 !important; 
+        box-sizing: border-box !important;
         margin: 0 !important;
         border: none !important;
     }
 
-    /* CRITICAL: ensure hub truly hides when .hidden is toggled via JS */
+    /* 健康度佔左上，短缺佔右上 */
+    .panel-gauges {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        overflow: hidden !important;
+    }
+
+    .panel-alerts {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        overflow: hidden !important;
+    }
+
+    /* 選單卡片：下方左右各一 */
+    .dashboard-grid-4 > .category-card:nth-of-type(1) {
+        grid-column: 1 !important;
+        grid-row: 2 !important;
+    }
+
+    .dashboard-grid-4 > .category-card:nth-of-type(2) {
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+    }
+
+    /* CRITICAL: hub 隱藏 */
     #inventory-hub.hidden {
         display: none !important;
     }
 
-
+    /* panel 與 card 統一圓角樣式 */
     .dashboard-panel,
     .category-card {
         border-radius: 12px !important;
-        /* Unified rounded corners */
         border: 1px solid #f1f5f9 !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05) !important;
         margin: 0 !important;
         display: flex !important;
         flex-direction: column !important;
@@ -3401,116 +3454,100 @@ body {
         overflow: hidden !important;
     }
 
-    /* 讓右邊捷徑更像按鈕，並保持一致性 */
-    .dashboard-grid-4>.category-card {
-        margin: 4px !important;
+    .dashboard-grid-4 > .category-card {
         cursor: pointer;
-        transition: transform 0.1s, box-shadow 0.1s;
+        transition: transform 0.15s, box-shadow 0.15s;
     }
 
-    .dashboard-grid-4>.category-card:active {
+    .dashboard-grid-4 > .category-card:active {
         transform: scale(0.96);
         box-shadow: none !important;
     }
 
-
     .dashboard-panel .panel-title {
         background: #f8fafc;
-        padding: 6px 2px !important;
-        /* 縮小左右 padding 貼邊 */
+        padding: 8px 10px !important;
         margin: 0 !important;
-        font-size: 0.55rem !important;
+        font-size: 0.7rem !important;
         font-weight: 700 !important;
-        text-align: center;
         border-bottom: 1px solid #eef2f6;
         width: 100%;
-    }
-
-    .panel-gauges,
-    .panel-alerts {
-        grid-row: 1 / span 2 !important;
     }
 
     .gauges-container,
     #low-stock-bars {
         flex: 1;
-        overflow-y: hidden !important;
-        /* No scroll — all items must fit */
-        padding: 2px 0 !important;
-        gap: 4px !important;
+        overflow: hidden !important;
+        padding: 4px 6px !important;
+        gap: 2px !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
         width: 100% !important;
         justify-content: space-evenly !important;
-        /* Distribute 5 items evenly in available height */
     }
 
-    /* Make each dashboard-reservoir item fit in 1/5 of panel height */
     .dashboard-reservoir {
         width: 100% !important;
         min-width: 0 !important;
-        padding: 0 !important;
+        padding: 2px 0 !important;
         margin: 0 !important;
-        flex: 1 !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
-        max-height: 20% !important;
     }
 
     .dashboard-reservoir svg {
-        width: 100% !important;
-        /* 寬度自動撐滿卡片 */
-        max-width: 38px !important;
-        /* Reduced from 55px */
+        max-width: 44px !important;
         height: auto !important;
     }
 
-    .dashboard-grid-4>.category-card:nth-of-type(1) {
-        grid-column: 3 !important;
-        grid-row: 1 !important;
-    }
-
-    .dashboard-grid-4>.category-card:nth-of-type(2) {
-        grid-column: 3 !important;
-        grid-row: 2 !important;
-    }
-
     .dashboard-reservoir .reservoir-label {
-        font-size: 0.55rem !important;
-        margin-top: 1px !important;
-        width: 100%;
+        font-size: 0.6rem !important;
+        margin-top: 2px !important;
         text-align: center;
     }
 
     .dashboard-reservoir .reservoir-value {
-        font-size: 0.5rem !important;
-        white-space: normal !important;
-        line-height: 1 !important;
-        width: 100%;
+        font-size: 0.55rem !important;
         text-align: center;
     }
 
-    /* 圖示與文字置中直排：優化垂直排列與字體 */
+    /* ---- category-card：大圖淡化背景 + 文字置中 ---- */
+    .dashboard-grid-4 > .category-card {
+        position: relative !important;
+        overflow: hidden !important;
+        padding: 0 !important; /* 徹底移除桌面版繼承的 padding，確保內部空間不受限 */
+    }
+
     .category-card-inner {
+        position: relative !important;
         flex-direction: column !important;
-        gap: 8px !important;
+        gap: 4px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         width: 100% !important;
         height: 100% !important;
-        flex: 1 !important;
-        padding: 6px 4px !important;
+        padding: 0 !important; /* 移除 padding 防止影響置中與絕對定位 */
+        box-sizing: border-box !important;
+        z-index: 1 !important;
     }
 
+    /* 圖示：絕對定位，放大淡化做水印 */
     .category-icon {
-        font-size: 1.15rem !important;
-        margin: 0 !important;
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        font-size: 5rem !important;
         color: #94a3b8 !important;
-        /* 恢復偏亮灰藍色 */
+        opacity: 0.08 !important;
+        z-index: 0 !important;
+        pointer-events: none !important;
+        flex-shrink: 0 !important;
+        margin: 0 !important;
     }
 
     .category-text {
@@ -3518,31 +3555,30 @@ body {
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
-        width: 100% !important;
+        position: relative !important;
+        z-index: 1 !important;
+        width: 100% !important; /* 確保文字容器佔滿並置中 */
     }
 
     .category-name {
-        font-size: 0.85rem !important;
-        font-weight: 700 !important;
+        font-size: 1rem !important;
+        font-weight: 600 !important;
         line-height: 1.3 !important;
-        /* 取代 letter-spacing 的字距效果 */
         text-align: center !important;
         writing-mode: horizontal-tb !important;
-        /* 回歸水平排版避免位移 */
-        width: 1em !important;
-        /* 精準限制為 1 個字元寬 */
-        word-break: break-all !important;
-        /* 強制換行 */
-        margin: 0 auto !important;
-        /* 絕對置中 */
+        word-break: normal !important;
+        white-space: nowrap !important;
+        width: 100% !important; /* 確保文字容器置中 */
         padding: 0 !important;
-        color: var(--text-dark) !important;
-        /* 恢復深灰字 */
+        margin: 0 !important;
+        color: var(--text-dark, #1e293b) !important;
+        letter-spacing: 0 !important; /* 移除 letter-spacing 避免視覺重心右移 */
     }
 
     .category-desc {
         display: none !important;
     }
+
 
     /* 其它手機版補強 */
     .kpi-row {
