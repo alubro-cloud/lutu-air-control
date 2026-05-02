@@ -1588,7 +1588,7 @@ async function generateConsolidatedCuttingList() {
     <tr style="border-bottom:1px solid var(--border);">
                     <td style="padding:12px 8px; font-weight:bold; color:${seriesColor};">${item.series}系列</td>
                     <td style="padding:12px 8px;">${item.name}</td>
-                    <td style="padding:12px 8px; font-weight:bold; color:var(--text);">${item.length} cm</td>
+                    <td style="padding:12px 8px; font-weight:bold; color:var(--text);">${item.length * 10} mm</td>
                     <td style="padding:12px 8px; font-weight:bold; font-size:1.1em; color:var(--accent-30);">${item.qty} 支</td>
                     <td style="padding:12px 8px; font-size:0.8em; color:var(--ash-gray);">${item.orders.join(', ')}</td>
                 </tr>
@@ -1766,7 +1766,7 @@ window.switchCutTab = function (tab) {
         const reqSummaryList = document.getElementById('opt-req-list');
 
         // 1. Render Summary
-        let summary = list.map(i => `${i.name} (${i.length}cm)x${i.qty} `).join(' | ');
+        let summary = list.map(i => `${i.name} (${i.length * 10}mm)x${i.qty} `).join(' | ');
         reqSummaryList.innerText = summary || "選單中無待切鋁材";
 
         // 2. Render Parameter Rows for each unique model
@@ -1893,7 +1893,7 @@ window.runCuttingOptimization = function () {
         if (modelSeries === 30) sColor = 'var(--accent-30)';
         if (modelSeries === 40) sColor = 'var(--accent-40)';
 
-        html += `<h3 style="border-left:5px solid ${sColor}; padding-left:10px; margin-top:30px; color:${sColor}; font-weight:bold;">【${modelName}】 切割計畫 <span style="font-size:0.75em; color:var(--ash-gray); font-weight:normal;">(原料:${stockLen} cm, 餘料:${offcuts.length}支)</span></h3>`;
+        html += `<h3 style="border-left:5px solid ${sColor}; padding-left:10px; margin-top:30px; color:${sColor}; font-weight:bold;">【${modelName}】 切割計畫 <span style="font-size:0.75em; color:var(--ash-gray); font-weight:normal;">(原料:${stockLen * 10} mm, 餘料:${offcuts.length}支)</span></h3>`;
         html += renderCuttingVisuals(bins, stockLen);
     }
 
@@ -1928,14 +1928,14 @@ function renderCuttingVisuals(bins, stockLen) {
             if (cut.series === 40) bgColor = 'var(--accent-40)'; // Moss Green
 
             cutsHtml += `
-    <div class="cut-block" style="width:${widthPerc}%; background-color:${bgColor};" title="${cut.name} (${cut.length}cm)">
-        <span class="cut-len">${cut.length}</span>
+    <div class="cut-block" style="width:${widthPerc}%; background-color:${bgColor};" title="${cut.name} (${cut.length * 10}mm)">
+        <span class="cut-len">切 ${cut.length * 10} mm</span>
                 </div>
     `;
             // Kerf visual?
             let kerfPerc = (0.5 / originalLen) * 100;
             cutsHtml += `
-    <div class="cut-kerf" style="width:${kerfPerc}%;" title="鋸路 0.5cm"></div>
+    <div class="cut-kerf" style="width:${kerfPerc}%;" title="鋸路 5mm"></div>
         `;
         });
 
@@ -1947,8 +1947,8 @@ function renderCuttingVisuals(bins, stockLen) {
             let typeClass = remainLen < 10 ? 'waste' : 'leftover';
             let label = remainLen < 10 ? '廢' : '餘';
             cutsHtml += `
-        <div class="cut-remain ${typeClass}" style="width:${remainPerc}%;" title="剩餘 ${remainLen.toFixed(1)}cm">
-            <span class="remain-len">${label} ${remainLen.toFixed(1)}</span>
+        <div class="cut-remain ${typeClass}" style="width:${remainPerc}%;" title="剩餘 ${(remainLen * 10).toFixed(0)}mm">
+            <span class="remain-len">${label} ${(remainLen * 10).toFixed(0)}</span>
                 </div>
     `;
         }
@@ -1958,7 +1958,7 @@ function renderCuttingVisuals(bins, stockLen) {
 
         html += `
     <div class="cut-row" style="${bgStyle}">
-                <div class="cut-label">${label} <span style="font-size:0.8em; color:#666;">(${originalLen}cm)</span></div>
+                <div class="cut-label">${label} <span style="font-size:0.8em; color:#666;">(${originalLen * 10}mm)</span></div>
                 <div class="cut-bar-container">
                     ${cutsHtml}
                 </div>
@@ -4149,7 +4149,7 @@ function renderDetailCards(detailsStr, status) {
             const lenMatch = line.match(/\((?:L=|長度)(\d+)cm\)/);
             // Replace the hardcoded (L=xx) in cleanBase to prevent duplicates
             formatted = formatted.replace(/\(L=\d+cm\)/g, '').replace(/\(長度\d+cm\)/g, '').trim();
-            if (lenMatch) formatted += ` <span style="color:#c0392b; font-weight:bold;">(長度${lenMatch[1]}cm)</span>`;
+            if (lenMatch) formatted += ` <span style="color:#c0392b; font-weight:bold;">(長度${Number(lenMatch[1]) * 10}mm)</span>`;
             if (qtyMatch) formatted += ` <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`;
 
             normalItems.push({
@@ -4377,7 +4377,7 @@ window.printOrder = function () {
             let formattedBase = cleanBaseNoSKU.replace(/\(L=\d+cm\)/g, '').replace(/\(長度\d+cm\)/g, '').trim();
 
             let formatted = `【鋁材】 <b>${formattedBase}</b>${skuText}`;
-            if (lenMatch) formatted += ` <b style="color:#c0392b">(${lenMatch[1]}cm)</b>`;
+            if (lenMatch) formatted += ` <b style="color:#c0392b">(${Number(lenMatch[1]) * 10}mm)</b>`;
             formatted += ` <b>(x${qty})</b>`;
             items.push({ raw: formatted, type, series });
         }
@@ -5491,20 +5491,26 @@ window.runCuttingOptimization = async function () {
                 let remain = bin.remain < 0 ? 0 : bin.remain; // clamp
                 let widthPct = (bin.capacity / 600) * 100; // Relative to 600 for scale
 
-                visualsHtml += `<div class="cut-row" style="display:flex; align-items:center; margin-bottom:5px; border:1px solid #94a3b8; border-left:3px solid #94a3b8; padding:5px; border-radius:4px; background:#f8f9fa;">`;
-                visualsHtml += `<div class="bin-header" style="width:80px; font-weight:bold; color:#64748b;">餘料 ${bin.sourceLen}cm</div>`;
-                visualsHtml += `<div style="flex:1; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden; max-width:${widthPct}%">`;
+                visualsHtml += `<div class="cut-row" style="display:flex; flex-direction:column; margin-bottom:10px; border:1px solid #94a3b8; border-left:3px solid #94a3b8; padding:5px; border-radius:4px; background:#f8f9fa;">`;
+                let cutCounts = {};
+                bin.cuts.forEach(c => { let k = (c * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
+                let cutListStr = Object.keys(cutCounts).map(k => `${k} x${cutCounts[k]}`).join(', ');
+                visualsHtml += `<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:5px;">`;
+                visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#64748b; margin-right:10px;">餘料 ${bin.sourceLen * 10}mm</div>`;
+                visualsHtml += `<div style="font-size:0.85rem; color:#555; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
+                visualsHtml += `</div>`;
+                visualsHtml += `<div style="width:100%; max-width:${widthPct}%; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
 
                 bin.cuts.forEach(c => {
                     let pct = (c / bin.capacity) * 100;
-                    visualsHtml += `<div class="cut-segment" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #fff; color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center;" title="切割 ${c}cm">
-        ${c}
+                    visualsHtml += `<div class="cut-segment" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #fff; color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center;" title="切割 ${c * 10}mm">
+        切 ${c * 10} mm
                      </div>`;
                 });
                 if (remain > 0) {
                     let rPct = (remain / bin.capacity) * 100;
-                    visualsHtml += `<div class="cut-remain leftover" style="width:${rPct}%; background:${grayColors.offcut}; opacity:0.7; font-size:10px; display:flex; align-items:center; justify-content:center; color:#fff;" title="剩餘 ${remain.toFixed(1)}cm (餘料)">
-        ${remain.toFixed(1)}
+                    visualsHtml += `<div class="cut-remain leftover" style="width:${rPct}%; background:${grayColors.offcut}; opacity:0.7; font-size:10px; display:flex; align-items:center; justify-content:center; color:#fff;" title="剩餘 ${(remain * 10).toFixed(0)}mm (餘料)">
+        ${(remain * 10).toFixed(0)}
                      </div>`;
                 }
                 visualsHtml += `</div></div>`;
@@ -5518,15 +5524,20 @@ window.runCuttingOptimization = async function () {
                 let remain = bin.remain;
                 let isRemCheck = remain >= 10;
 
-                visualsHtml += `<div class="cut-row" style="display:flex; align-items:center; margin-bottom:5px; border:1px solid ${seriesColor}; border-left:3px solid ${seriesColor}; padding:5px; border-radius:4px; background:#fff;">`;
-                visualsHtml += `<div class="bin-header" style="width:80px; font-weight:bold; color:${seriesColor};">新料 #${idx + 1}</div>`;
-
-                visualsHtml += `<div style="flex:1; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
+                visualsHtml += `<div class="cut-row" style="display:flex; flex-direction:column; margin-bottom:10px; border:1px solid ${seriesColor}; border-left:3px solid ${seriesColor}; padding:5px; border-radius:4px; background:#fff;">`;
+                let cutCounts = {};
+                bin.cuts.forEach(c => { let k = (c * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
+                let cutListStr = Object.keys(cutCounts).map(k => `${k} x${cutCounts[k]}`).join(', ');
+                visualsHtml += `<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:5px;">`;
+                visualsHtml += `<div class="bin-header" style="font-weight:bold; color:${seriesColor}; margin-right:10px;">新料 #${idx + 1}</div>`;
+                visualsHtml += `<div style="font-size:0.85rem; color:#555; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
+                visualsHtml += `</div>`;
+                visualsHtml += `<div style="width:100%; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
 
                 bin.cuts.forEach(cutLen => {
                     let pct = (cutLen / 600) * 100;
-                    visualsHtml += `<div class="cut-block" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #fff; color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center;" title="切割 ${cutLen}cm">
-                        <span>${cutLen}</span>
+                    visualsHtml += `<div class="cut-block" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #fff; color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center;" title="切割 ${cutLen * 10}mm">
+                        <span>切 ${cutLen * 10} mm</span>
                     </div>`;
                 });
 
@@ -5536,8 +5547,8 @@ window.runCuttingOptimization = async function () {
                     let type = isRemCheck ? '余料' : '废料';
                     let cls = isRemCheck ? 'cut-remain leftover' : 'cut-remain waste';
 
-                    visualsHtml += `<div class="${cls}" style="width:${rPct}%; background:${color}; color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center; opacity:0.8;" title="剩余 ${remain.toFixed(1)}cm (${type})">
-                        ${remain.toFixed(1)} cm
+                    visualsHtml += `<div class="${cls}" style="width:${rPct}%; background:${color}; color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center; opacity:0.8;" title="剩余 ${(remain * 10).toFixed(0)}mm (${type})">
+                        ${(remain * 10).toFixed(0)} mm
                     </div>`;
                 }
 
@@ -5580,6 +5591,11 @@ window.printCuttingList = function () {
             <title>切料表列印</title>
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
             <style>
+                :root {
+                    --accent-20: #b3c7d9;
+                    --accent-30: #c6a682;
+                    --accent-40: #b8ccb8;
+                }
                 * { 
                     box-sizing: border-box;
                     -webkit-print-color-adjust: exact !important;
@@ -5597,11 +5613,9 @@ window.printCuttingList = function () {
                     page-break-after: avoid;
                 }
                 .cutting-model-section {
-                    page-break-before: always;
+                    page-break-before: auto;
                     page-break-inside: avoid;
-                }
-                .cutting-model-section:first-child {
-                    page-break-before: avoid;
+                    margin-bottom: 20px;
                 }
                 .cut-row {
                     margin-bottom: 8px !important;
@@ -5610,11 +5624,9 @@ window.printCuttingList = function () {
                 @media print {
                     body { padding: 0; }
                     .cutting-model-section {
-                        page-break-before: always;
+                        page-break-before: auto;
                         page-break-inside: avoid;
-                    }
-                    .cutting-model-section:first-child {
-                        page-break-before: avoid;
+                        margin-bottom: 20px;
                     }
                 }
             </style>
