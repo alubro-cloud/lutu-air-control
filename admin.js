@@ -2401,8 +2401,8 @@ window.advanceStatus = function (orderId, nextStatus) {
         lines.forEach(line => {
             if (!line.trim()) return;
 
-            // 辨識當前行的系列 (包含 SKU 偵測)
-            let series = window.detectSeries(line);
+            // 辨識當前行的系列 (先移除 SKU 再偵測，防止 [M4-333] 等 SKU 干擾系列判斷)
+            let series = window.detectSeries(window.removeSKU ? window.removeSKU(line) : line);
             
             const isProfile = line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型') || line.includes('銘材') || line.match(/\d{4}型/);
 
@@ -2906,6 +2906,27 @@ window.resolveItemInfo = function (rawName, series) {
             else sku = 'A40-1M8';
         }
         else if (n.includes('M8螺母')) sku = 'A40-0M8';
+
+        // [修復] 系列對應配件 SKU 備用查找（當庫存資料未載入時使用）
+        if (!sku && series !== 99) {
+            const cn = cleanBase;
+            if (cn.includes('三角連結塊')) {
+                if (series === 20) sku = 'M4-333';
+                else if (series === 30) sku = 'M6-333';
+                else if (series === 40) sku = 'M8-333';
+            } else if (cn.includes('平板連結片')) {
+                if (series === 20) sku = 'M4-L';
+                else if (series === 30) sku = 'M6-L';
+                else if (series === 40) sku = 'M8-L';
+            } else if (cn.includes('靜音輪') || cn.includes('腳杯固定器')) {
+                if (series === 30) sku = 'M6-FEET';
+                else if (series === 40) sku = 'M8-FEET';
+            } else if (cn.includes('六角板手')) {
+                if (series === 20) sku = 'M4-6';
+                else if (series === 30) sku = 'M6-6';
+                else if (series === 40) sku = 'M8-6';
+            }
+        }
     }
 
     if (sku) {
@@ -4083,8 +4104,8 @@ function renderDetailCards(detailsStr, status) {
         if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型')) type = 'profile';
         else if (line.includes('【配件】') || line.includes('配件')) type = 'accessory';
 
-        // 1. [強化] 直接從「整行文字」偵測系列提示 (包含 SKU)
-        series = window.detectSeries(line);
+        // 1. [強化] 直接從「整行文字」偵測系列提示（先移除 SKU，防止 [M4-333] 等干擾系列判斷）
+        series = window.detectSeries(window.removeSKU ? window.removeSKU(line) : line);
 
         // 2. [強化] 如果是鋁材，更新當前上下文系列
         if (type === 'profile' && series !== 99) {
