@@ -2432,10 +2432,25 @@ window.advanceStatus = function (orderId, nextStatus) {
             if (skuMatch) {
                 resolved.sku = skuMatch[1].trim();
                 resolved.finalKey = '[' + resolved.sku + ']';
-                // SKU 再次反推系列 (雙重保險)
-                if (resolved.sku.includes('M4')) resolved.series = 20;
-                else if (resolved.sku.includes('M6')) resolved.series = 30;
-                else if (resolved.sku.includes('M8')) resolved.series = 40;
+
+                // SKU 反推系列
+                let skuImpliedSeries = 99;
+                if (resolved.sku.includes('M4')) skuImpliedSeries = 20;
+                else if (resolved.sku.includes('M6')) skuImpliedSeries = 30;
+                else if (resolved.sku.includes('M8')) skuImpliedSeries = 40;
+
+                // [修復] 交叉驗證：若 SKU 隱含系列與上下文系列衝突，以上下文為準重新查找
+                if (skuImpliedSeries !== 99 && series !== 99 && skuImpliedSeries !== series) {
+                    console.warn(`[SKU Mismatch] SKU=${resolved.sku} 隱含 ${skuImpliedSeries}系，但上下文是 ${series}系，以上下文為準重新解析`);
+                    resolved.series = series;
+                    const reResolved = window.resolveItemInfo(window.removeSKU ? window.removeSKU(itemName) : itemName, series);
+                    if (reResolved.sku) {
+                        resolved.sku = reResolved.sku;
+                        resolved.finalKey = '[' + resolved.sku + ']';
+                    }
+                } else {
+                    resolved.series = skuImpliedSeries !== 99 ? skuImpliedSeries : series;
+                }
             } else if (window.allInventory && window.allInventory.length > 0) {
                 resolved = window.resolveItemInfo(itemName, series);
             } else {
