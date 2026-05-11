@@ -5084,9 +5084,12 @@ function renderInventory(inventory, isPartial = false) {
             const percentage = Math.round((rawStock / defaultMaxLength) * 100);
             const fillWidth = Math.max(0, Math.min(percentage, 100));
 
-            // 3. 餘料解析
+            // 3. 餘料與廢料解析
             const offcuts = offcutsStr ? offcutsStr.split(/[,，、 ]+/).filter(s => s.trim() !== "").map(s => parseFloat(s)).filter(n => !isNaN(n)).sort((a, b) => b - a) : [];
             const offcutCount = offcuts.length;
+
+            const wasteStr = (findValue(item, ['waste', '廢料']) || "").toString();
+            const wasteValue = parseFloat(wasteStr) || 0;
 
             const sColors = {
                 20: { color: '#b3c7d9', label: '20 系列' },
@@ -5104,11 +5107,42 @@ function renderInventory(inventory, isPartial = false) {
             <div class="aluminum-tube-card" style="grid-column: span 1; border: ${isWarning ? '1px solid rgba(231,76,60,0.3)' : '1px solid transparent'};">
                 <div class="tube-header">
                     <div style="text-align: left;">
-                        <div class="sku-badge" style="background: ${config.color}; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold;">${sku}</div>
-                        <div style="font-size: 0.95rem; font-weight: 300; color: #1e293b; margin-top: 6px;">${cleanName}</div>
+                        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
+                            <div class="sku-badge" style="background: ${config.color}; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold;">${sku}</div>
+                            ${(() => {
+                                const spec = {
+                                    '2020型': { weight: 0.458, priceCm: 1.3 },
+                                    '2040型': { weight: 0.862, priceCm: 2.4 },
+                                    '3030輕型': { weight: 0.693, priceCm: 1.9 },
+                                    '3030重型': { weight: 1.07, priceCm: 2.9 },
+                                    '3060輕型': { weight: 1.218, priceCm: 3.3 },
+                                    '3060重型': { weight: 1.844, priceCm: 5.0 },
+                                    '6060輕型': { weight: 1.908, priceCm: 5.1 },
+                                    '6060重型': { weight: 2.763, priceCm: 7.5 },
+                                    '4040輕型': { weight: 1.298, priceCm: 3.6 },
+                                    '4040重型': { weight: 1.923, priceCm: 5.2 },
+                                    '4080輕型': { weight: 2.265, priceCm: 6.2 },
+                                    '4080重型': { weight: 3.505, priceCm: 9.5 }
+                                }[cleanName];
+                                if (!spec) return '';
+                                const pricePerKg = Math.round((spec.priceCm * 100) / spec.weight);
+                                return `
+                                    <div style="font-size: 0.65rem; background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 4px;">
+                                        <i class="fas fa-weight-hanging"></i> ${spec.weight} kg/m
+                                    </div>
+                                    <div style="font-size: 0.65rem; background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; border: 1px solid #fde68a; display: flex; align-items: center; gap: 4px;">
+                                        <i class="fas fa-coins"></i> $${pricePerKg}/kg
+                                    </div>
+                                `;
+                            })()}
+                        </div>
+                        <div style="font-size: 0.95rem; font-weight: 300; color: #1e293b;">${cleanName}</div>
                     </div>
                     <div class="offcut-drawer">
-                        <div class="offcut-badge" style="background: ${config.color}; color: #fff; opacity: 0.9; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold;"><i class="fas fa-scissors"></i> ${offcutCount} 片餘料</div>
+                        <div style="display: flex; gap: 4px; align-items: center; justify-content: flex-end;">
+                            <div class="offcut-badge" style="background: ${config.color}; color: #fff; opacity: 0.9; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold;"><i class="fas fa-scissors"></i> ${offcutCount} 片餘料</div>
+                            ${wasteValue > 0 ? `<div style="background: #475569; color: #fff; opacity: 0.85; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold; border-radius: 12px; padding: 2px 8px; font-size: 0.7rem; display: flex; align-items: center;"><i class="fas fa-trash-alt" style="margin-right:4px;"></i> ${wasteValue} cm 廢料</div>` : ''}
+                        </div>
                         ${offcutCount > 0 ? `
                         <div class="offcut-tooltip">
                             <div style="font-size: 0.75rem; font-weight: 300; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 5px;">餘料分布 (cm)</div>
