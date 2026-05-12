@@ -2907,6 +2907,18 @@ window.resolveItemInfo = function (rawName, series) {
     let sku = originalSkuMatch || '';
     let finalKey = cleanBase;
 
+    // [Fix] Handle SKU and Series mismatch (e.g. M4-333 in a 30 series order should be M6-333)
+    if (sku && series && series !== 99) {
+        let skuImpliedSeries = 99;
+        if (sku.includes('M4')) skuImpliedSeries = 20;
+        else if (sku.includes('M6')) skuImpliedSeries = 30;
+        else if (sku.includes('M8')) skuImpliedSeries = 40;
+        
+        if (skuImpliedSeries !== 99 && skuImpliedSeries !== series) {
+            sku = ''; // Reset SKU to force regeneration based on correct series
+        }
+    }
+
     // Hardcoded fallbacks for very common items if inventory match fails
     if (!sku) {
         const n = cleanBase.toUpperCase();
@@ -2954,6 +2966,8 @@ window.resolveItemInfo = function (rawName, series) {
         // 嘗試多種組合查找
         const normalized = window.normalizeScrewName(cleanBase);
         const searchKeys = [
+            sku ? `${cleanBase} [${sku}]` : null,
+            sku ? `${normalized} [${sku}]` : null,
             series !== 99 ? `${series}-${cleanBase}` : null,
             series !== 99 ? `${series}-${normalized}` : null,
             cleanBase,
@@ -4119,8 +4133,14 @@ function renderDetailCards(detailsStr, status) {
         if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型')) type = 'profile';
         else if (line.includes('【配件】') || line.includes('配件')) type = 'accessory';
 
-        // 1. [強化] 直接從「整行文字」偵測系列提示（先移除 SKU，防止 [M4-333] 等干擾系列判斷）
-        series = window.detectSeries(window.removeSKU ? window.removeSKU(line) : line);
+        // 1. [強化] 直接從「整行文字」偵測系列提示
+        //    注意：必須先移除 SKU 和價格，避免 "$2040" 裡的 "20" 誤判為 20系列
+        const lineForSeries = (window.removeSKU ? window.removeSKU(line) : line)
+            .replace(/--\s*\$[0-9,]+/g, '')   // 移除價格
+            .replace(/\( x \d+ \)/g, '')        // 移除數量
+            .replace(/→\s*\$[0-9,]+/g, '');    // 移除另一種價格格式
+        series = window.detectSeries(lineForSeries);
+
 
         // 2. [強化] 如果是鋁材，更新當前上下文系列
         if (type === 'profile' && series !== 99) {
@@ -4132,12 +4152,69 @@ function renderDetailCards(detailsStr, status) {
             series = currentContextSeries;
         }
 
+        // 4. [新增] 如果系列仍是 99，嘗試從行內的明確 SKU 反推系列
+        //    例如 [M6-333] → M6 → 30 系列；[M8-FEET] → M8 → 40 系列
+        if (series === 99 && type === 'accessory') {
+            const skuInLine = window.parseSKU ? window.parseSKU(line) : null;
+            if (skuInLine) {
+                if (skuInLine.startsWith('M4')) series = 20;
+                else if (skuInLine.startsWith('M6')) series = 30;
+                else if (skuInLine.startsWith('M8')) series = 40;
+            }
+        }
+
+        // 5. [新增] 如果系列仍是 99，從「單價」反推系列
+        //    Sheet 訂單格式: 三角連結塊 ( x 300 ) -- $4500
+        //    $4500 / 300 = $15/個 → 30系列 → M6-333
+        if (series === 99 && type === 'accessory' && qty > 0) {
+            const priceRawMatch = line.match(/--\s*\$([0-9,]+)/);
+            if (priceRawMatch) {
+                const subtotal = parseInt(priceRawMatch[1].replace(/,/g, ''));
+                const unitPrice = Math.round(subtotal / qty);
+                // 配件單價對照表 (固定定價，直接判斷)
+                const accessoryPriceMap = {
+                    // 三角連結塊
+                    10: 20, 15: 30, 20: 40,
+                    // 螺絲包
+                    40: 20, 60: 30, 80: 40,
+                    // 六角板手
+                    12: 30,
+                    // 腳杯/靜音輪
+                    30: 30,
+                };
+                // 更精確：用品名+單價雙重確認
+                const cleanForPrice = (window.removeSKU ? window.removeSKU(line) : line)
+                    .replace(/^【.*?】\s*/, '').replace(/\( x \d+ \)/g, '').replace(/--\s*\$[0-9,]+/g, '').trim();
+
+                if (cleanForPrice.includes('三角連結塊')) {
+                    if (unitPrice === 10) series = 20;
+                    else if (unitPrice === 15) series = 30;
+                    else if (unitPrice === 20) series = 40;
+                } else if (cleanForPrice.includes('平板連結片')) {
+                    if (unitPrice === 20) series = 30;
+                } else if (cleanForPrice.includes('靜音輪') || cleanForPrice.includes('腳杯固定器')) {
+                    if (unitPrice === 30) series = 30;
+                    else if (unitPrice === 40) series = 40;
+                } else if (cleanForPrice.includes('六角板手')) {
+                    if (unitPrice === 10) series = 20;
+                    else if (unitPrice === 12) series = 30;
+                    else if (unitPrice === 15) series = 40;
+                } else if (cleanForPrice.includes('內六角螺絲') || cleanForPrice.includes('10枚/包')) {
+                    if (unitPrice === 40) series = 20;
+                    else if (unitPrice === 60) series = 30;
+                    else if (unitPrice === 80) series = 40;
+                }
+            }
+        }
+
+
         let itemName = line.replace(/^【.*?】\s*/, '').trim();
         // 取得乾淨品名
         let cleanBaseName = window.removeSKU(itemName)
             .replace(/\( x \d+ \)/g, '')
             .replace(/\s*--\s*\$[0-9,]+/g, '')
             .trim();
+
 
         // 強制判定 type (根據名稱關鍵字強化)
         if (window.isScrewOrNut(itemName)) {
@@ -4373,6 +4450,16 @@ window.printOrder = function () {
             .trim();
 
         if (series === 99) series = window.detectSeries(cleanBaseName);
+
+        // [Fix] 如果系列仍是 99，嘗試從行內明確 SKU 反推 (與 renderDetailCards 同步)
+        if (series === 99 && type === 'accessory') {
+            const skuInLine = window.parseSKU ? window.parseSKU(line) : null;
+            if (skuInLine) {
+                if (skuInLine.startsWith('M4')) series = 20;
+                else if (skuInLine.startsWith('M6')) series = 30;
+                else if (skuInLine.startsWith('M8')) series = 40;
+            }
+        }
 
         if (window.isScrewOrNut(itemName)) {
             type = 'accessory';

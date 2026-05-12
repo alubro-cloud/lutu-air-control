@@ -122,6 +122,16 @@
                     <div class="hub-card-arrow"><i class="fas fa-chevron-right"></i></div>
                 </div>
             </div>
+
+            <!-- Fixed Calendar Button (Sticky at bottom) -->
+            <div class="hub-calendar-fixed" onclick="navigateTo('calendar')">
+                <div class="cal-icon"><i class="far fa-calendar-alt"></i></div>
+                <div class="cal-text">
+                    <h3>行程與外派排程</h3>
+                    <p id="hub-cal-preview">載入中...</p>
+                </div>
+                <div class="cal-arrow"><i class="fas fa-arrow-right"></i></div>
+            </div>
         </div>
     </div>
 
@@ -539,7 +549,86 @@
         </div>
     </div>
 
+    <!-- ========== Calendar Module ========== -->
+    <div id="calendar-module" class="module-page hidden">
+        <div class="module-topbar">
+            <div class="module-topbar-left">
+                <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-th-large"></i> 主選單</button>
+                <h2><i class="far fa-calendar-alt"></i> 行程排程</h2>
+            </div>
+            <div class="module-topbar-right">
+                <button class="btn-add-event" onclick="showAddEventModal()">
+                    <i class="fas fa-plus"></i> 新增行程
+                </button>
+            </div>
+        </div>
+        
+        <div class="calendar-layout">
+            <!-- Left: Calendar Grid -->
+            <div class="calendar-left">
+                <div class="calendar-header">
+                    <button class="cal-nav-btn" onclick="changeCalMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+                    <h3 id="cal-month-title">--</h3>
+                    <button class="cal-nav-btn" onclick="changeCalMonth(1)"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="calendar-grid">
+                    <div class="cal-weekdays">
+                        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                    </div>
+                    <div class="cal-days" id="cal-days">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Event List -->
+            <div class="calendar-right">
+                <div class="event-list-header">
+                    <h3 id="cal-selected-date-title">-- 行程</h3>
+                </div>
+                <div class="event-list-body" id="cal-event-list">
+                    <div style="padding:40px; text-align:center; color:#999;">請選擇日期</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Add Modal -->
+    <div id="event-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-calendar-plus"></i> 新增行程</h3>
+                <button class="close-modal" onclick="closeEventModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-group">
+                    <label class="detail-label">日期</label>
+                    <input type="date" id="event-date" class="form-input">
+                </div>
+                <div class="detail-group">
+                    <label class="detail-label">類型</label>
+                    <div class="event-type-options">
+                        <label class="type-radio"><input type="radio" name="event-type" value="outbound" checked> <span class="tag tag-out">🔴 出差/施工</span></label>
+                        <label class="type-radio"><input type="radio" name="event-type" value="inbound"> <span class="tag tag-in">🟢 客戶來訪</span></label>
+                        <label class="type-radio"><input type="radio" name="event-type" value="meeting"> <span class="tag tag-meet">🔵 內部會議</span></label>
+                    </div>
+                </div>
+                <div class="detail-group">
+                    <label class="detail-label">行程標題</label>
+                    <input type="text" id="event-title" class="form-input" placeholder="例如：A客戶-台中案場出發">
+                </div>
+                <div class="detail-group">
+                    <label class="detail-label">人員與備註</label>
+                    <textarea id="event-notes" class="form-input" rows="3" placeholder="例如：記得帶樣板..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeEventModal()">取消</button>
+                <button class="btn-save-event" onclick="saveEvent()">儲存行程</button>
+            </div>
+        </div>
+    </div>
+
     <script src="admin.js"></script>
 </body>
-
 </html>
