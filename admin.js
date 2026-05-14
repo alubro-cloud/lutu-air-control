@@ -96,49 +96,180 @@ window.showPriceModal = function (order, nextStatus) {
     const modal = document.getElementById('modal');
     if (!modal || !modalBody) return;
 
+    // 安全獲取訂單資料
+    let target = ordersData.find(o => String(o.timestamp) === String(order.timestamp));
+    if (!target) return;
+
+    // 【防呆機制】：精準取得「系統原始料件小計」，避免重複開啟報價時發生疊加錯誤
+    let currentTotal = parseInt(String(target.total).replace(/[^0-9]/g, '') || 0);
+    let sysTotal = 0;
+    
+    // 如果之前有存過 sysTotal 就用存的，沒有的話就用 (總計 - 運費) 來推算
+    if (target.sysTotal !== undefined) {
+        sysTotal = target.sysTotal;
+    } else {
+        let existingShipping = parseInt(String(target.shippingFee || 0).replace(/[^0-9]/g, '') || 0);
+        sysTotal = currentTotal - existingShipping;
+    }
+    if (sysTotal < 0) sysTotal = 0;
+
+    // 讀取可能已經填寫過的擴充資料 (如果是第二次打開)
+    let prevCost = target.costPrice || 0;
+    let prevOutsource = target.outsourcePrice || 0;
+    let prevAssembly = target.assemblyFee || 0;
+    let prevShipping = target.shippingFee || 0;
+    let prevDiscount = target.discountAmount || 0; // 新增折扣欄位
+    let prevTaxType = target.taxType || 'inclusive';
+
     modalBody.innerHTML = `
-        <div style="padding:20px; text-align:center;">
-            <h3 style="color:var(--accent-30);"><i class="fas fa-calculator"></i> 準備移至「已報價」</h3>
-            <p style="color:var(--text); opacity:0.8;">請輸入運費金額 (若免運請填0)：</p>
-            <input type="number" id="quote-shipping-input" value="0" style="font-size:1.5rem; padding:12px; width:220px; text-align:center; border:2px solid var(--border); border-radius:12px; background:#f9fafb; color:var(--text); outline:none; transition:border-color 0.2s;">
+        <div style="padding:15px 25px; text-align:left; color:var(--text);">
+            <h3 style="color:var(--accent-30); text-align:center; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:10px;"><i class="fas fa-calculator"></i> 報價精算面板</h3>
+            
+            <div style="background:#f8fafc; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:bold; color:#64748b;">系統料件小計 (鋁材/自家配件)</span>
+                <span style="font-size:1.2rem; font-weight:bold; color:var(--primary);">NT$ <span id="quote-sys-total">${formatPrice(sysTotal).replace('NT$','').trim()}</span></span>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
+                <!-- 成本區 (不對外顯示) -->
+                <div style="background:#fff1f2; padding:15px; border-radius:8px; border:1px dashed #fecdd3;">
+                    <h4 style="margin:0 0 10px 0; color:#e11d48; font-size:0.95rem;"><i class="fas fa-eye-slash"></i> 內部成本區 (會計用)</h4>
+                    <div style="margin-bottom:10px;">
+                        <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">外購進貨成本 (板材/五金等)</label>
+                        <!-- 新增：輸入成本自動算出 1.2倍 -->
+                        <input type="number" id="quote-cost-input" value="${prevCost}" oninput="document.getElementById('quote-outsource-input').value = Math.ceil((this.value || 0) * 1.2); updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #fecdd3; border-radius:4px; outline:none; font-size:1.1rem; text-align:right;">
+                    </div>
+                </div>
+
+                <!-- 報價區 (向客收費) -->
+                <div style="background:#f0fdf4; padding:15px; border-radius:8px; border:1px dashed #bbf7d0;">
+                    <h4 style="margin:0 0 10px 0; color:#16a34a; font-size:0.95rem;"><i class="fas fa-file-invoice-dollar"></i> 向客收費區 (給客人的報價)</h4>
+                    
+                    <div style="margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:4px;">
+                            <label style="font-size:0.8rem; color:#888;">外購品報價 (預設 1.2倍)</label>
+                            <!-- 變成平轉按鈕 -->
+                            <button onclick="document.getElementById('quote-outsource-input').value = document.getElementById('quote-cost-input').value || 0; updateQuotePreview();" style="font-size:0.75rem; padding:2px 8px; background:#e2e8f0; border:none; border-radius:4px; cursor:pointer;">平轉 (原價)</button>
+                        </div>
+                        <input type="number" id="quote-outsource-input" value="${prevOutsource}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.1rem; text-align:right;">
+                    </div>
+
+                    <div style="margin-bottom:10px;">
+                        <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">加工與組裝費</label>
+                        <input type="number" id="quote-assembly-input" value="${prevAssembly}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.1rem; text-align:right;">
+                    </div>
+
+                    <div style="margin-bottom:10px;">
+                        <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">向客收運費</label>
+                        <input type="number" id="quote-shipping-input" value="${prevShipping}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.1rem; text-align:right;">
+                    </div>
+                    
+                    <!-- 新增：折扣優惠框 -->
+                    <div style="margin-bottom:10px;">
+                        <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#e11d48; font-weight:bold;">折扣優惠 (減去金額)</label>
+                        <input type="number" id="quote-discount-input" value="${prevDiscount}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #fecdd3; border-radius:4px; outline:none; font-size:1.1rem; text-align:right; color:#e11d48; background:#fff1f2;" placeholder="例如: 1100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 稅金選項 -->
+            <div style="margin-bottom:15px; padding:10px 15px; border:1px solid #eee; border-radius:8px; background:#fff;">
+                 <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:8px; color:var(--text);">營業稅金計算：</label>
+                 <div style="display:flex; gap:20px; font-size:0.9rem;">
+                     <label style="cursor:pointer;"><input type="radio" name="tax_type" value="none" ${(!prevTaxType || prevTaxType === 'none') ? 'checked' : ''} onchange="updateQuotePreview()"> 未稅 (不開發票)</label>
+                     <label style="cursor:pointer;"><input type="radio" name="tax_type" value="inclusive" ${prevTaxType === 'inclusive' ? 'checked' : ''} onchange="updateQuotePreview()"> 含稅 (開發票，自行吸收5%)</label>
+                     <label style="cursor:pointer;"><input type="radio" name="tax_type" value="exclusive" ${prevTaxType === 'exclusive' ? 'checked' : ''} onchange="updateQuotePreview()"> 含稅 (開發票，外加5%)</label>
+                 </div>
+                 <div id="tax-amount-display" style="font-size:0.85rem; color:#e11d48; margin-top:8px; display:none; font-weight:bold;">+ 稅金 NT$ 0</div>
+            </div>
+
+            <div style="background:#334155; color:white; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <span style="font-size:1.1rem;">給客人的最終報價總計</span>
+                <span style="font-size:1.6rem; font-weight:bold; color:#fbbf24;">NT$ <span id="quote-final-total">${formatPrice(sysTotal).replace('NT$','').trim()}</span></span>
+            </div>
+            <div style="text-align:right; font-size:0.85rem; color:#94a3b8; margin-top:8px; padding-right:5px;">
+                <i class="fas fa-info-circle"></i> 附加毛利(外包差價+加工費)：NT$ <span id="quote-profit-preview">0</span>
+            </div>
+
             <div style="margin-top:25px; display:flex; justify-content:center; gap:12px;">
                  <button class="btn-secondary" onclick="closeModal()" style="padding:10px 20px; border-radius:8px;">取消</button>
                  <button id="btn-confirm-price" onclick="confirmQuotePrice('${order.timestamp}', '${nextStatus}')" 
                     style="flex:1; padding:12px; background:var(--accent-30); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">
-                確認報價並發送郵件
+                確認並發送報價信
             </button>
             </div>
         </div>
     `;
     modal.style.display = 'flex';
+    
+    // 定義動態更新總計的函數
+    window.updateQuotePreview = function() {
+        let currentSys = parseInt(document.getElementById('quote-sys-total').innerText.replace(/,/g, '')) || 0;
+        let cost = parseInt(document.getElementById('quote-cost-input').value) || 0;
+        let outsource = parseInt(document.getElementById('quote-outsource-input').value) || 0;
+        let assembly = parseInt(document.getElementById('quote-assembly-input').value) || 0;
+        let shipping = parseInt(document.getElementById('quote-shipping-input').value) || 0;
+        let discount = parseInt(document.getElementById('quote-discount-input').value) || 0;
+        
+        let subtotal = currentSys + outsource + assembly + shipping - discount;
+        let taxType = document.querySelector('input[name="tax_type"]:checked').value;
+        let taxAmount = 0;
+        let finalTotal = subtotal;
+
+        const taxDisplay = document.getElementById('tax-amount-display');
+        
+        if (taxType === 'exclusive') {
+            taxAmount = Math.round(subtotal * 0.05);
+            finalTotal = subtotal + taxAmount;
+            taxDisplay.innerText = '+ 稅金 NT$ ' + taxAmount.toLocaleString();
+            taxDisplay.style.color = '#e11d48';
+            taxDisplay.style.display = 'block';
+        } else if (taxType === 'inclusive') {
+            taxAmount = subtotal - Math.round(subtotal / 1.05);
+            taxDisplay.innerText = '(內含稅金約 NT$ ' + taxAmount.toLocaleString() + '，由我方吸收)';
+            taxDisplay.style.color = '#888';
+            taxDisplay.style.display = 'block';
+        } else {
+            taxDisplay.style.display = 'none';
+        }
+
+        document.getElementById('quote-final-total').innerText = finalTotal.toLocaleString();
+        
+        // 附加毛利計算絕對「不包含折扣」，反映真實的外包加工利潤
+        let profit = (outsource - cost) + assembly; 
+        document.getElementById('quote-profit-preview').innerText = profit.toLocaleString();
+    };
+
+    // 觸發第一次計算
+    window.updateQuotePreview();
+
     setTimeout(() => {
         const input = document.getElementById('quote-shipping-input');
-        if (input) { input.focus(); input.select(); }
+        if (input) { input.focus(); }
     }, 100);
 };
 
-// [New] Helper for detailed email body
-window.generateMailBody = function (name, total, shippingFee, details, truncate = false) {
-    let parsedTotal = parseInt(String(total).replace(/[^0-9]/g, '') || 0);
-    let parsedShipping = parseInt(String(shippingFee).replace(/[^0-9]/g, '') || 0);
-    let itemTotal = parsedTotal - parsedShipping;
-    if (itemTotal < 0) itemTotal = 0;
-
-    let shippingDisplay = (parsedShipping > 0) ? formatPrice(parsedShipping) : "免運費";
-
+// 生成 Email 報價內容
+window.generateMailBody = function (name, sysTotal, outsource, assembly, shippingFee, discount, taxType, taxAmount, finalTotal, details, truncate = false) {
     let formattedDetails = (details || "無詳細明細");
 
-    // Auto-truncate if flag is passed (to prevent 400 Bad Request on URL length limit)
-    // 1200 chars allows ~20-25 lines of items, safely under the ~2000 char URL limit when completely URL encoded
     if (truncate && formattedDetails.length > 1200) {
-        // Find the last newline before the cutoff to avoid splitting a word/line in half
         let cutoff = formattedDetails.lastIndexOf('\n', 1200);
         if (cutoff === -1) cutoff = 1200;
         formattedDetails = formattedDetails.substring(0, cutoff);
     }
-
-    // Format details: Replace \n or <br> with %0D%0A for mailto
     formattedDetails = formattedDetails.replace(/\\n/g, '\n').replace(/\n/g, '\n');
+
+    let extraLines = "";
+    if (outsource > 0) extraLines += `外購品/客製品項： ${formatPrice(outsource)}\n`;
+    if (assembly > 0) extraLines += `加工與組裝費： ${formatPrice(assembly)}\n`;
+    if (discount > 0) extraLines += `折扣優惠： -${formatPrice(discount)}\n`; // Email內顯示折扣
+    
+    let shippingDisplay = (shippingFee > 0) ? formatPrice(shippingFee) : "免運費";
+    let taxLine = (taxType === 'exclusive') ? `營業稅 (5%)： ${formatPrice(taxAmount)}\n` : "";
+    let taxNote = "";
+    if (taxType === 'exclusive') taxNote = "(本報價含外加5%營業稅)";
+    if (taxType === 'inclusive') taxNote = "(本報價為含稅價)";
 
     return `您好，LUTU鋁圖已收到您的訂單。
 
@@ -146,10 +277,10 @@ window.generateMailBody = function (name, total, shippingFee, details, truncate 
 ${formattedDetails}
 
 -------------------
-商品小計： ${formatPrice(itemTotal)}
-運費金額： ${shippingDisplay}
-總計金額： ${formatPrice(parsedTotal)}
--------------------
+鋁材與配件小計： ${formatPrice(sysTotal)}
+${extraLines}運費金額： ${shippingDisplay}
+${taxLine}-------------------
+總計金額： ${formatPrice(finalTotal)} ${taxNote}
 
 匯款資訊如下：
 銀行代碼：xxx
@@ -157,53 +288,73 @@ ${formattedDetails}
 };
 
 window.confirmQuotePrice = function (orderId, nextStatus) {
-    const input = document.getElementById('quote-shipping-input');
-    let val = parseInt(input.value);
-    if (isNaN(val)) val = 0;
+    // 獲取所有填寫的金額
+    let sysTotal = parseInt(document.getElementById('quote-sys-total').innerText.replace(/,/g, '')) || 0;
+    let cost = parseInt(document.getElementById('quote-cost-input').value) || 0;
+    let outsource = parseInt(document.getElementById('quote-outsource-input').value) || 0;
+    let assembly = parseInt(document.getElementById('quote-assembly-input').value) || 0;
+    let shipping = parseInt(document.getElementById('quote-shipping-input').value) || 0;
+    let discount = parseInt(document.getElementById('quote-discount-input').value) || 0;
+    let taxType = document.querySelector('input[name="tax_type"]:checked').value;
 
-    if (val === 0) {
+    if (shipping === 0) {
         if (!confirm("運費為 0，確定是免運嗎？")) return;
     }
 
     let target = ordersData.find(o => String(o.timestamp) === String(orderId));
     if (target) {
-        let currentTotal = parseInt(String(target.total).replace(/[^0-9]/g, '') || 0);
-        let existingShippingFee = parseInt(String(target.shippingFee || 0).replace(/[^0-9]/g, '') || 0);
+        let subtotal = sysTotal + outsource + assembly + shipping - discount;
+        let taxAmount = 0;
+        if (taxType === 'exclusive') taxAmount = Math.round(subtotal * 0.05);
+        if (taxType === 'inclusive') taxAmount = subtotal - Math.round(subtotal / 1.05);
+        let finalTotal = (taxType === 'exclusive') ? subtotal + taxAmount : subtotal;
 
-        // Remove existing shipping fee before adding the new one to prevent double counting
-        let newTotal = currentTotal - existingShippingFee + val;
-
-        target.total = newTotal;
-        target.shippingFee = val; // [Fix] Ensure shipping fee is updated locally
+        // 更新本地資料 (嚴格儲存分解數值，防呆)
+        target.total = finalTotal;
+        target.shippingFee = shipping; 
         target.status = nextStatus;
+        target.sysTotal = sysTotal;
+        target.costPrice = cost;
+        target.outsourcePrice = outsource;
+        target.assemblyFee = assembly;
+        target.discountAmount = discount;
+        target.taxType = taxType;
+        target.taxAmount = taxAmount;
+
         applyFilter();
         window.lastActiveOrderId = orderId;
 
-        // [New] Call Backend to Update Spreadsheet
+        // 送資料到後端 (擴充欄位，含 discountAmount)
         fetch(ADMIN_API_URL, {
             method: 'POST',
             mode: 'no-cors',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
                 action: 'updateOrderPrice',
-                orderId: orderId, // Timestamp as ID
-                newTotal: newTotal,
-                shippingFee: val, // [New] Send shipping fee for stats
-                status: nextStatus // [New] Persist Status to Column J
+                orderId: orderId, 
+                newTotal: finalTotal,
+                shippingFee: shipping, 
+                status: nextStatus,
+                costPrice: cost,             
+                outsourcePrice: outsource,   
+                assemblyFee: assembly,       
+                taxType: taxType,            
+                taxAmount: taxAmount,
+                discountAmount: discount,
+                sysTotal: sysTotal,
+                projectId: target.projectId
             })
-        }).then(() => console.log('Price update sent to backend'))
-            .catch(e => console.error('Failed to update backend price', e));
+        }).then(() => console.log('Advanced price update sent to backend'))
+          .catch(e => console.error('Failed to update backend price', e));
 
-        // [New] Auto-open Gmail after quoting
-        // [New] Auto-open Gmail after quoting
+        // 開啟 Gmail
         if (target.email) {
             let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name}`);
-            let rawBody = window.generateMailBody(target.name, newTotal, val, target.details);
+            let rawBody = window.generateMailBody(target.name, sysTotal, outsource, assembly, shipping, discount, taxType, taxAmount, finalTotal, target.details);
             let mailBody = encodeURIComponent(rawBody);
 
-            // Limit URL length to avoid 400 Bad Request (Gmail URL limit ~2000)
             if (mailBody.length > 1800) {
-                rawBody = window.generateMailBody(target.name, newTotal, val, target.details, true);
+                rawBody = window.generateMailBody(target.name, sysTotal, outsource, assembly, shipping, discount, taxType, taxAmount, finalTotal, target.details, true);
                 mailBody = encodeURIComponent(rawBody);
             }
             window.openGmail(target.email, mailSubject, mailBody);
@@ -662,6 +813,7 @@ function navigateTo(module, subView) {
                                 if (savedStatuses[key]) order.status = savedStatuses[key];
                                 return order;
                             });
+                            window.assignProjectIds(); // 補上全域專案編號
                             performRouting(); // 立即顯示快取資料
                             fetchOrders();   // 背景悄悄更新
                         } else {
@@ -1104,6 +1256,22 @@ function logout() {
     location.reload();
 }
 
+window.assignProjectIds = function() {
+    if (!ordersData || ordersData.length === 0) return;
+    const allSorted = [...ordersData].sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
+    const dateCounts = {};
+    allSorted.forEach(order => {
+        const d = window.safeParseDate(order.timestamp);
+        const dateKey = d.getFullYear().toString() + (d.getMonth() + 1).toString().padStart(2, '0') + d.getDate().toString().padStart(2, '0');
+        dateCounts[dateKey] = (dateCounts[dateKey] || 0) + 1;
+        
+        // 如果原本已經有編號（從後端載入或已生成過），則保留，否則生成新編號
+        if (!order.projectId) {
+            order.projectId = `B${dateKey}${dateCounts[dateKey].toString().padStart(3, '0')}`;
+        }
+    });
+};
+
 async function fetchOrders() {
     // 預先載入庫存資訊，確保 renderDetailCards 能顯示 SKU (自動轉譯)
     if (!window.allInventory || window.allInventory.length === 0) {
@@ -1137,6 +1305,7 @@ async function fetchOrders() {
                 localStorage.setItem('orders_cache_time', Date.now());
             } catch (e) { /* localStorage 空間不足時靜默失敗 */ }
 
+            window.assignProjectIds(); // 計算全域專案流水號
             applyFilter();
             document.getElementById('last-update').innerText = "最後更新: " + new Date().toLocaleTimeString();
         } else {
@@ -1290,23 +1459,6 @@ function renderKanban(data) {
     html += `</div>`;
     board.innerHTML = html;
 
-    // [New] Global Chromological Sequence Calculation (MMDD-NN)
-    // 1. Sort all currently filtered data by timestamp
-    const chronologicalData = [...data].sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
-
-    // 2. Map timestamps to formatted sequence strings
-    const orderIdMap = new Map();
-    const dateCounts = {};
-
-    chronologicalData.forEach(order => {
-        const d = window.safeParseDate(order.timestamp);
-        const dateKey = (d.getMonth() + 1).toString().padStart(2, '0') + d.getDate().toString().padStart(2, '0');
-
-        dateCounts[dateKey] = (dateCounts[dateKey] || 0) + 1;
-        const sequenceStr = `${dateKey}-${dateCounts[dateKey].toString().padStart(2, '0')}`;
-        orderIdMap.set(order.timestamp, sequenceStr);
-    });
-
     // Distribute Cards & Update Counts
     let counts = {};
     data.forEach(order => {
@@ -1314,8 +1466,8 @@ function renderKanban(data) {
         const body = document.getElementById(`col-${status}`);
         if (body) {
             counts[status] = (counts[status] || 0) + 1;
-            const dailyId = orderIdMap.get(order.timestamp) || '#';
-            body.appendChild(createCard(order, dailyId, status));
+            const displayId = order.projectId || '#';
+            body.appendChild(createCard(order, displayId, status));
         }
     });
 
@@ -2587,9 +2739,10 @@ window.advanceStatus = function (orderId, nextStatus) {
         body: JSON.stringify({
             action: 'updateOrderPrice',
             orderId: orderId,
-            newTotal: target.total || 0, // Keep existing total
-            shippingFee: target.shippingFee || 0, // Keep existing fee
-            status: nextStatus // Use the new status for all transitions
+            newTotal: target.total || 0,
+            shippingFee: target.shippingFee || 0,
+            status: nextStatus,
+            projectId: target.projectId
         })
     }).then(() => console.log(`Status ${nextStatus} saved to backend`)).catch(console.error);
 
@@ -2734,6 +2887,24 @@ window.viewOrder = function (order) {
                 <span style="color:#aaa; font-size:0.76rem; width:72px; flex-shrink:0;">訂單總額</span>
                 <span style="color:var(--accent-delivery); font-size:1.05rem; font-weight:400;">${formatPrice(order.total)}</span>
             </div>
+            
+            ${(order.sysTotal || order.outsourcePrice || order.assemblyFee || order.discountAmount || order.shippingFee !== undefined) ? `
+            <div style="margin-top: 10px; padding: 12px; background: #fafafa; border-radius: 6px; border: 1px solid #eee;">
+                <div style="font-size: 0.85rem; font-weight: bold; color: #333; margin-bottom: 8px; border-bottom: 2px solid #ddd; padding-bottom: 4px;">報價明細拆解</div>
+                
+                ${order.sysTotal ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>鋁材與配件小計:</span> <span>NT$ ${order.sysTotal}</span></div>` : ''}
+                ${order.outsourcePrice ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>外購品/客製品項:</span> <span>NT$ ${order.outsourcePrice}</span></div>` : ''}
+                ${order.assemblyFee ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>加工與組裝費:</span> <span>NT$ ${order.assemblyFee}</span></div>` : ''}
+                ${order.discountAmount ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--dusty-rose); font-weight:bold; padding: 3px 0;"><span>折扣優惠:</span> <span>-NT$ ${order.discountAmount}</span></div>` : ''}
+                ${order.shippingFee !== undefined && order.shippingFee !== "" ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>運費金額:</span> <span>NT$ ${order.shippingFee}</span></div>` : ''}
+                ${(order.taxType === '外加 5%' || order.taxType === 'exclusive') ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>稅金 (外加 5%):</span> <span>NT$ ${order.taxAmount || 0}</span></div>` : ''}
+                ${(order.taxType === 'inclusive') ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#999; padding: 3px 0;"><span>(內含稅金):</span> <span>(NT$ ${order.taxAmount || 0})</span></div>` : ''}
+                
+                <div style="border-top: 1px dashed #ccc; margin-top: 8px; padding-top: 8px; display:flex; justify-content:space-between; align-items:baseline; font-weight:bold; color:#333;">
+                    <span style="font-size:0.85rem;">總計金額:</span> 
+                    <span style="font-size:1.05rem; color:var(--accent-delivery);">NT$ ${order.total} <span style="font-size:0.75em; color:#888; font-weight:normal;">${(order.taxType === '外加 5%' || order.taxType === 'exclusive') ? '(含 5% 外加稅)' : (order.taxType === 'inclusive' ? '(含稅價)' : '')}</span></span>
+                </div>
+            </div>` : ''}
         </div>
 
         <hr style="border:0; border-top:1px dashed #ddd; margin: 8px 0;">
