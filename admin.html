@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUTU 管理後台</title>
+    <title>ALUMIBRO 管理後台</title>
     <link rel="stylesheet" href="admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
@@ -33,7 +33,7 @@
     <div id="admin-hub" class="admin-hub hidden">
         <div class="hub-header">
             <div class="hub-brand">
-                <i class="fas fa-cube"></i> LUTU 管理後台
+                <i class="fas fa-cube"></i> ALUMIBRO 管理後台
             </div>
             <div class="hub-header-right">
                 <span id="hub-datetime" class="hub-datetime"></span>
@@ -140,7 +140,7 @@
         <main class="main-content">
             <div class="module-topbar">
                 <div class="module-topbar-left">
-                    <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-th-large"></i> 主選單</button>
+                    <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-arrow-left"></i> 返回</button>
                     <h2 id="page-title">全部訂單</h2>
                 </div>
                 <div class="module-topbar-right">
@@ -265,7 +265,7 @@
     <div id="history-module" class="module-page hidden">
         <div class="module-topbar">
             <div class="module-topbar-left">
-                <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-th-large"></i> 主選單</button>
+                <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-arrow-left"></i> 返回</button>
                 <h2><i class="fas fa-archive"></i> 歷史訂單</h2>
             </div>
             <div class="module-topbar-right">
@@ -283,7 +283,7 @@
     <div id="reports-module" class="module-page hidden">
         <div class="module-topbar">
             <div class="module-topbar-left">
-                <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-th-large"></i> 主選單</button>
+                <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-arrow-left"></i> 返回</button>
                 <h2><i class="fas fa-chart-pie"></i> 財務報表</h2>
             </div>
             <div class="module-topbar-right">
@@ -553,7 +553,7 @@
     <div id="calendar-module" class="module-page hidden">
         <div class="module-topbar">
             <div class="module-topbar-left">
-                <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-th-large"></i> 主選單</button>
+                <button class="btn-back-hub-top" onclick="backToHub()"><i class="fas fa-arrow-left"></i> 返回</button>
                 <h2><i class="far fa-calendar-alt"></i> 行程排程</h2>
             </div>
             <div class="module-topbar-right">
@@ -593,38 +593,89 @@
         </div>
     </div>
 
-    <!-- Event Add Modal -->
+    <!-- Event Add/Edit Modal -->
     <div id="event-modal" class="modal-overlay">
-        <div class="modal-content" style="max-width: 450px;">
+        <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
-                <h3><i class="fas fa-calendar-plus"></i> 新增行程</h3>
+                <h3 id="event-modal-title"><i class="fas fa-calendar-plus"></i> 新增行程</h3>
                 <button class="close-modal" onclick="closeEventModal()">×</button>
             </div>
             <div class="modal-body">
-                <div class="detail-group">
-                    <label class="detail-label">日期</label>
-                    <input type="date" id="event-date" class="form-input">
-                </div>
-                <div class="detail-group">
-                    <label class="detail-label">類型</label>
-                    <div class="event-type-options">
-                        <label class="type-radio"><input type="radio" name="event-type" value="outbound" checked> <span class="tag tag-out">🔴 出差/施工</span></label>
-                        <label class="type-radio"><input type="radio" name="event-type" value="inbound"> <span class="tag tag-in">🟢 客戶來訪</span></label>
-                        <label class="type-radio"><input type="radio" name="event-type" value="meeting"> <span class="tag tag-meet">🔵 內部會議</span></label>
+                <input type="hidden" id="event-id" value="">
+                
+                <div class="detail-group" style="display:flex; gap:12px;">
+                    <div style="flex:1;">
+                        <label class="detail-label">開始日期</label>
+                        <input type="date" id="event-start-date" class="form-input">
+                    </div>
+                    <div style="flex:1;">
+                        <label class="detail-label">結束日期</label>
+                        <input type="date" id="event-end-date" class="form-input">
                     </div>
                 </div>
+
+                <div class="detail-group">
+                    <label class="detail-label">類別</label>
+                    <select id="event-type" class="form-input">
+                        <option value="出差">🚗 出差</option>
+                        <option value="丈量">📏 丈量</option>
+                        <option value="施工">🔧 施工</option>
+                        <option value="出車">🚚 出車</option>
+                        <option value="客戶來訪">👥 客戶來訪</option>
+                        <option value="內部會議">💼 內部會議</option>
+                        <option value="外部會議">🤝 外部會議</option>
+                        <option value="事假">📝 事假</option>
+                        <option value="特休">🏖️ 特休</option>
+                        <option value="病假">🤒 病假</option>
+                        <option value="喪假">🕊️ 喪假</option>
+                        <option value="員旅">✈️ 員旅</option>
+                        <option value="國定假日">🎌 國定假日</option>
+                    </select>
+                </div>
+
                 <div class="detail-group">
                     <label class="detail-label">行程標題</label>
-                    <input type="text" id="event-title" class="form-input" placeholder="例如：A客戶-台中案場出發">
+                    <input type="text" id="event-title" class="form-input" placeholder="例如：A客戶-台中案場安裝">
                 </div>
+
                 <div class="detail-group">
-                    <label class="detail-label">人員與備註</label>
-                    <textarea id="event-notes" class="form-input" rows="3" placeholder="例如：記得帶樣板..."></textarea>
+                    <label class="detail-label">參與人員 <span style="color:#f0c4c4; font-size:0.85rem; margin-left:2px;">*</span> <span style="font-size:0.75rem; color:rgba(255,255,255,0.4); margin-left:6px;">(至少 1 人，可多選)</span></label>
+                    <div id="event-members" style="display:flex; flex-wrap:wrap; gap:6px; padding:10px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; min-height:42px;">
+                        <span style="color:rgba(255,255,255,0.4); font-size:0.85rem;">載入中...</span>
+                    </div>
+                </div>
+
+                <div class="detail-group">
+                    <label class="detail-label">備註</label>
+                    <textarea id="event-notes" class="form-input" rows="3" placeholder="例如：記得帶樣板、油壓鑽..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+                <button id="btn-delete-event" onclick="deleteCurrentEvent()" style="background:rgba(212,160,160,0.18); border:1px solid rgba(212,160,160,0.35); color:#f0c4c4; padding:8px 16px; border-radius:8px; cursor:pointer; display:none;">
+                    <i class="fas fa-trash"></i> 刪除
+                </button>
+                <div style="margin-left:auto; display:flex; gap:8px;">
+                    <button class="btn-secondary" onclick="closeEventModal()">取消</button>
+                    <button class="btn-save-event" onclick="saveEvent()">儲存行程</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Who Are You Modal (進後台第一次跳出) -->
+    <div id="who-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-circle"></i> 你是誰？</h3>
+            </div>
+            <div class="modal-body">
+                <p style="color:rgba(255,255,255,0.7); font-size:0.9rem; margin-bottom:14px;">為了記錄誰建立或修改了哪些行程，請選擇你的名字（瀏覽器會記住，下次自動填入）。</p>
+                <div id="who-members-list" style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <span style="color:rgba(255,255,255,0.4); font-size:0.85rem;">載入人員清單...</span>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeEventModal()">取消</button>
-                <button class="btn-save-event" onclick="saveEvent()">儲存行程</button>
+                <button class="btn-secondary" onclick="document.getElementById('who-modal').style.display='none';">稍後再選</button>
             </div>
         </div>
     </div>

@@ -1,5 +1,5 @@
 // Link to the same API
-const ADMIN_API_URL = "https://script.google.com/macros/s/AKfycbxEn0_QHCdDmA24QNrXOfFVg2lSlvdt9R7opPpLmOrxEZGxm0L7t73CWneKlaHHo8ZV/exec";
+const ADMIN_API_URL = "https://script.google.com/macros/s/AKfycbx2mqPe1ilOWDQ45JYDGJ2KaAUZ9dyH0fT-NwIDOdqUNmz1Dn3-tsL70urJT2cYYI5Q/exec";
 
 // Global Error Handler for debugging
 // Global Error Handler removed to prevent generic script errors from alerting
@@ -271,7 +271,7 @@ window.generateMailBody = function (name, sysTotal, outsource, assembly, shippin
     if (taxType === 'exclusive') taxNote = "(本報價含外加5%營業稅)";
     if (taxType === 'inclusive') taxNote = "(本報價為含稅價)";
 
-    return `您好，LUTU鋁圖已收到您的訂單。
+    return `您好，ALUMIBRO 鋁材兄弟已收到您的訂單。
 
 訂單明細如下：
 ${formattedDetails}
@@ -349,7 +349,7 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
 
         // 開啟 Gmail
         if (target.email) {
-            let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name}`);
+            let mailSubject = encodeURIComponent(`ALUMIBRO訂購報價回覆 - ${target.name}`);
             let rawBody = window.generateMailBody(target.name, sysTotal, outsource, assembly, shipping, discount, taxType, taxAmount, finalTotal, target.details);
             let mailBody = encodeURIComponent(rawBody);
 
@@ -730,6 +730,22 @@ function showAdminHub() {
 
         // Start background fetch for accurate stats
         fetchOrders().then(() => updateHubStats()).catch(e => console.error("Update Stats Error:", e));
+
+        // Preload calendar so hub preview shows today's events
+        if (typeof window.preloadCalendarForHub === 'function') {
+            window.preloadCalendarForHub();
+        }
+
+        // 第一次進後台沒有選名字，跳「你是誰？」對話框
+        setTimeout(() => {
+            if (typeof window.getCurrentUser === 'function' && !window.getCurrentUser()) {
+                if (typeof window.fetchCalendarMembers === 'function') {
+                    window.fetchCalendarMembers().then(() => {
+                        if (typeof window.showWhoModal === 'function') window.showWhoModal();
+                    });
+                }
+            }
+        }, 800);
     } catch (e) {
         console.error("Show Admin Hub Error:", e);
     }
@@ -783,6 +799,8 @@ function navigateTo(module, subView) {
             targetEl = document.getElementById('history-module');
         } else if (module === 'reports') {
             targetEl = document.getElementById('reports-module');
+        } else if (module === 'calendar') {
+            targetEl = document.getElementById('calendar-module');
         }
 
         // Prepare fade-in
@@ -832,6 +850,10 @@ function navigateTo(module, subView) {
             } else if (module === 'reports') {
                 if (ordersData.length > 0) renderFinancialReports();
                 fetchOrders().then(() => renderFinancialReports());
+            } else if (module === 'calendar') {
+                if (typeof window.initCalendarModule === 'function') {
+                    window.initCalendarModule();
+                }
             }
 
             setTimeout(() => {
@@ -960,28 +982,45 @@ window.renderInventoryDashboard = function () {
             }
         });
 
-        // Update Aluminum Gauges (Left Side)
+        // Update Aluminum Gauges (Left Side) — 細長條版
         const aluminumContainer = document.querySelector('.gauges-container');
         if (aluminumContainer) {
-            const aluminumColors = { 20: '#94a3b8', 30: '#b5926c', 40: '#9db39d' };
-            const aluminumHealthHTML = [20, 30, 40].map(s => {
+            const aluColors = { 20: 'rgba(179,199,217,0.55)', 30: 'rgba(198,166,130,0.55)', 40: 'rgba(184,204,184,0.55)' };
+            let totalCurrent = 0, totalMax = 0;
+            const rows = [20, 30, 40].map(s => {
                 const maxHealth = MAX_HEALTH_MAP[s] || 240000;
                 const currentCm = health[s] || 0;
+                totalCurrent += currentCm;
+                totalMax += maxHealth;
                 const pct = Math.round((currentCm / maxHealth) * 100);
-                const valueLabel = `${(currentCm / 100).toFixed(1)}m / ${(maxHealth / 100).toFixed(0)}m`;
-                const mainLabel = `${s} 系列`;
-
-                return generateReservoirHTML(`alu-${s}`, pct, valueLabel, mainLabel, {
-                    activeColor: aluminumColors[s],
-                    textColor: aluminumColors[s],
-                    circleColor: '#e2e8f0',
-                    isCritical: pct < 20,
-                    className: 'dashboard-reservoir'
-                });
+                const fillWidth = Math.max(0, Math.min(pct, 100));
+                const isLow = pct < 20;
+                const barColor = isLow ? 'rgba(212,160,160,0.6)' : aluColors[s];
+                const pctColor = isLow ? '#f0c4c4' : 'rgba(255,255,255,0.85)';
+                return `
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:0.7rem; color:rgba(255,255,255,0.5); min-width:36px;">${s} 系</span>
+                    <div style="flex:1; height:6px; background:rgba(255,255,255,0.06); border-radius:99px; overflow:hidden;">
+                        <div style="height:100%; width:${fillWidth}%; background:${barColor}; border-radius:99px; transition:width 1.2s cubic-bezier(0.4,0,0.2,1);"></div>
+                    </div>
+                    <div style="display:flex; align-items:baseline; gap:3px; min-width:40px; justify-content:flex-end;">
+                        <span style="font-size:0.85rem; font-weight:500; color:${pctColor}; font-variant-numeric:tabular-nums;">${pct}</span>
+                        <span style="font-size:0.65rem; color:rgba(255,255,255,0.4);">%</span>
+                    </div>
+                </div>`;
             }).join('');
-            aluminumContainer.innerHTML = aluminumHealthHTML;
+            const totalM = (totalCurrent / 100).toFixed(0);
+            const totalMaxM = (totalMax / 100).toFixed(0);
+            aluminumContainer.innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:9px; width:100%;">
+                    ${rows}
+                </div>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.06); font-size:0.65rem; color:rgba(255,255,255,0.35); font-variant-numeric:tabular-nums; width:100%;">
+                    總長度 ${Number(totalM).toLocaleString()} / ${Number(totalMaxM).toLocaleString()} m
+                </div>`;
             aluminumContainer.style.display = 'flex';
-            aluminumContainer.style.justifyContent = 'space-around';
+            aluminumContainer.style.flexDirection = 'column';
+            aluminumContainer.style.justifyContent = 'flex-start';
             aluminumContainer.style.width = '100%';
         }
 
@@ -1025,31 +1064,38 @@ window.renderInventoryDashboard = function () {
                 barsContainer.innerHTML = '<div style="color:#aaa; text-align:center;">目前無配件資料</div>';
             } else {
                 barsContainer.style.display = 'flex';
-                barsContainer.style.flexDirection = 'row';
-                barsContainer.style.justifyContent = 'space-around';
-                barsContainer.style.alignItems = 'center';
-                barsContainer.style.gap = '10px';
+                barsContainer.style.flexDirection = 'column';
+                barsContainer.style.justifyContent = 'flex-start';
+                barsContainer.style.alignItems = 'stretch';
+                barsContainer.style.gap = '8px';
                 barsContainer.style.flexWrap = 'nowrap';
-                barsContainer.style.overflowX = 'auto';
-                barsContainer.style.paddingBottom = '10px';
-                barsContainer.style.height = '100%';
+                barsContainer.style.overflow = 'visible';
+                barsContainer.style.paddingBottom = '0';
+                barsContainer.style.height = 'auto';
+                barsContainer.style.width = '100%';
 
+                const sBadge = {
+                    20: { bg: 'rgba(179,199,217,0.12)', text: 'rgba(179,199,217,0.9)', border: 'rgba(179,199,217,0.25)' },
+                    30: { bg: 'rgba(198,166,130,0.12)', text: 'rgba(198,166,130,0.9)', border: 'rgba(198,166,130,0.25)' },
+                    40: { bg: 'rgba(184,204,184,0.12)', text: 'rgba(184,204,184,0.9)', border: 'rgba(184,204,184,0.25)' }
+                };
                 barsContainer.innerHTML = top5.map((item, index) => {
                     const pct = Math.round(item.pctFilled || 0);
-                    const valueLabel = `${item.qty}件`;
+                    const fillWidth = Math.max(0, Math.min(pct, 100));
                     const mainLabel = item.displaySku || "未知";
-
-                    // [同步配色] 根據品名偵測系列並上色
                     const s = window.detectSeries(item.name);
-                    const sColors = { 20: '#94a3b8', 30: '#b5926c', 40: '#9db39d' };
-                    const activeColor = sColors[s] || '#94a3b8';
-
-                    return generateReservoirHTML(`acc-${index}`, pct, valueLabel, mainLabel, {
-                        activeColor: activeColor,
-                        textColor: activeColor,
-                        isCritical: pct < 25,
-                        className: 'dashboard-reservoir'
-                    });
+                    const badge = sBadge[s] || sBadge[20];
+                    return `
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-family:'Consolas',monospace; font-size:0.62rem; color:${badge.text}; background:${badge.bg}; padding:2px 5px; border-radius:4px; border:1px solid ${badge.border}; min-width:90px; max-width:90px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${mainLabel}</span>
+                        <div style="flex:1; height:6px; background:rgba(255,255,255,0.06); border-radius:99px; overflow:hidden;">
+                            <div style="height:100%; width:${fillWidth}%; background:rgba(212,160,160,0.6); border-radius:99px;"></div>
+                        </div>
+                        <div style="display:flex; align-items:baseline; gap:3px; min-width:50px; justify-content:flex-end;">
+                            <span style="font-size:0.85rem; font-weight:500; color:#f0c4c4; font-variant-numeric:tabular-nums;">${item.qty}</span>
+                            <span style="font-size:0.65rem; color:rgba(255,255,255,0.4);">件</span>
+                        </div>
+                    </div>`;
                 }).join('');
             }
         }
@@ -1067,10 +1113,11 @@ function backToHub() {
     const dashboard = document.getElementById('dashboard');
     const historyMod = document.getElementById('history-module');
     const reportsMod = document.getElementById('reports-module');
+    const calendarMod = document.getElementById('calendar-module');
     const hub = document.getElementById('admin-hub');
 
     // Find which module is currently visible
-    const activeModule = [dashboard, historyMod, reportsMod].find(el => el && !el.classList.contains('hidden'));
+    const activeModule = [dashboard, historyMod, reportsMod, calendarMod].find(el => el && !el.classList.contains('hidden'));
 
     // [Step 0] Start restoring 3D background IMMEDIATELY so it fades in during module fade-out
     const bg = document.getElementById('three-canvas-container');
@@ -1095,6 +1142,7 @@ function backToHub() {
         dashboard.classList.add('hidden');
         historyMod.classList.add('hidden');
         reportsMod.classList.add('hidden');
+        if (calendarMod) calendarMod.classList.add('hidden');
         if (activeModule) {
             activeModule.style.opacity = '';
             activeModule.style.transition = '';
@@ -1873,7 +1921,7 @@ window.printCuttingList = function () {
         <body>
             <div style="margin-bottom:20px; border-bottom:3px solid #000; padding-bottom:10px; display:flex; justify-content:space-between; align-items:flex-end;">
                 <div>
-                    <h1 style="margin:0; font-size:1.8rem;">LUTU 鋁圖 - 合併切料工單</h1>
+                    <h1 style="margin:0; font-size:1.8rem;">ALUMIBRO 鋁材兄弟 - 合併切料工單</h1>
                     <div style="font-size:0.9em; color:#666;">產生時間: ${new Date().toLocaleString()}</div>
                 </div>
             </div>
@@ -1927,7 +1975,7 @@ window.switchCutTab = function (tab) {
         container.innerHTML = uniqueModels.map(model => {
             const item = list.find(i => i.name === model);
             const series = item ? item.series : 99;
-            let seriesColor = '#2c3e50';
+            let seriesColor = '#4A5A6B';
             if (series === 20) seriesColor = '#6b8db0';
             if (series === 30) seriesColor = '#b08850';
             if (series === 40) seriesColor = '#5e8a5e';
@@ -2187,7 +2235,7 @@ window.triggerGmailReply = function (orderId) {
     }
 
     // Generate body on-the-fly to avoid syntax errors in HTML attributes
-    let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name}`);
+    let mailSubject = encodeURIComponent(`ALUMIBRO訂購報價回覆 - ${target.name}`);
     let rawBody = window.generateMailBody(target.name, target.total, target.shippingFee || 0, target.details);
     let mailBody = encodeURIComponent(rawBody);
 
@@ -2356,7 +2404,7 @@ function createCard(order, index, currentStatus) {
             </button> `;
     }
 
-    let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${order.name}`);
+    let mailSubject = encodeURIComponent(`ALUMIBRO訂購報價回覆 - ${order.name}`);
     let rawBody = window.generateMailBody(order.name, order.total, order.shippingFee || 0, order.details);
     let mailBody = encodeURIComponent(rawBody);
 
@@ -2475,7 +2523,7 @@ window.advanceStatus = function (orderId, nextStatus) {
 
             // ... rest of logic ...
             if (target.email) {
-                let mailSubject = encodeURIComponent(`LUTU訂購報價回覆 - ${target.name} `);
+                let mailSubject = encodeURIComponent(`ALUMIBRO訂購報價回覆 - ${target.name} `);
                 let rawBody = window.generateMailBody(target.name, target.total, 0, target.details);
                 let mailBody = encodeURIComponent(rawBody);
                 window.openGmail(target.email, mailSubject, mailBody);
@@ -2708,21 +2756,21 @@ window.advanceStatus = function (orderId, nextStatus) {
 
     // [New] Shipping Email Trigger
     if (nextStatus === 'dispatched' && target.email) {
-        let subject = encodeURIComponent(`LUTU鋁圖 - 出貨通知(${target.name})`);
+        let subject = encodeURIComponent(`ALUMIBRO 鋁材兄弟 - 出貨通知(${target.name})`);
 
         // Format details for email
         let formattedDetails = (target.details || "").replace(/\\n/g, '\n').replace(/\n/g, '\n');
         let detailsClip = formattedDetails;
         let note = target.note ? target.note : "無";
 
-        let bodyText = `您好，LUTU鋁圖通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip} \n\n出貨單號 / 備註：${note} \n\n如有任何問題，歡迎隨時與我們聯絡！`;
+        let bodyText = `您好，ALUMIBRO 鋁材兄弟通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip} \n\n出貨單號 / 備註：${note} \n\n如有任何問題，歡迎隨時與我們聯絡！`;
         let body = encodeURIComponent(bodyText);
 
         if (body.length > 1800) {
             let cutoff = formattedDetails.lastIndexOf('\n', 1200);
             if (cutoff === -1) cutoff = 1200;
             detailsClip = formattedDetails.substring(0, cutoff);
-            bodyText = `您好，LUTU鋁圖通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip} \n\n出貨單號 / 備註：${note} \n\n如有任何問題，歡迎隨時與我們聯絡！`;
+            bodyText = `您好，ALUMIBRO 鋁材兄弟通知您\n\n您的訂單已出貨囉！\n\n訂單明細摘要：\n${detailsClip} \n\n出貨單號 / 備註：${note} \n\n如有任何問題，歡迎隨時與我們聯絡！`;
             body = encodeURIComponent(bodyText);
         }
 
@@ -4756,7 +4804,7 @@ window.printOrder = function () {
         <body>
             <button class="no-print" onclick="window.close()">✖ 關閉預覽</button>
             <div class="header">
-                <div class="h-left">LUTU 鋁圖 (${order.name}) <span style="font-weight:normal;">${order.phone}</span></div>
+                <div class="h-left">ALUMIBRO 鋁材兄弟 (${order.name}) <span style="font-weight:normal;">${order.phone}</span></div>
                 <div class="h-right">
                     ${new Date(order.timestamp).toLocaleString()} | ${order.address}
                 </div>
@@ -4928,6 +4976,18 @@ window.switchInventoryCategory = function (category) {
         window.currentInventorySeries = 'all';
     }
 
+    // [二級視窗] 把 topbar 的「返回」按鈕替換成「返回類別」
+    const topbarBackBtn = document.querySelector('#dashboard .module-topbar .btn-back-hub-top');
+    if (topbarBackBtn) {
+        topbarBackBtn.dataset.originalHtml = topbarBackBtn.innerHTML;
+        topbarBackBtn.dataset.originalOnclick = topbarBackBtn.getAttribute('onclick') || '';
+        topbarBackBtn.innerHTML = '<i class="fas fa-arrow-left"></i> 返回類別';
+        topbarBackBtn.setAttribute('onclick', 'backToInventoryHub()');
+    }
+    // 隱藏 inv-detail-header 內的舊「返回類別」按鈕（已移到 topbar）
+    const oldBackBtn = document.querySelector('#inventory-details .inv-detail-header .btn-back-hub-top');
+    if (oldBackBtn) oldBackBtn.style.display = 'none';
+
     filterInventory();
 };
 
@@ -4937,6 +4997,14 @@ window.backToInventoryHub = function () {
     if (hub && details) {
         hub.classList.remove('hidden');
         details.classList.add('hidden');
+    }
+    // [還原] topbar 的按鈕還原成「返回」
+    const topbarBackBtn = document.querySelector('#dashboard .module-topbar .btn-back-hub-top');
+    if (topbarBackBtn && topbarBackBtn.dataset.originalHtml) {
+        topbarBackBtn.innerHTML = topbarBackBtn.dataset.originalHtml;
+        topbarBackBtn.setAttribute('onclick', topbarBackBtn.dataset.originalOnclick || 'backToHub()');
+        delete topbarBackBtn.dataset.originalHtml;
+        delete topbarBackBtn.dataset.originalOnclick;
     }
 };
 
@@ -5198,15 +5266,20 @@ function renderInventory(inventory, isPartial = false) {
             const defaultMax = isScrewSet ? 1000 : 100;
 
 
+            const seriesBadge = {
+                '20': { bg: 'rgba(179,199,217,0.12)', text: 'rgba(179,199,217,0.9)', border: 'rgba(179,199,217,0.25)', bar: 'rgba(179,199,217,0.55)' },
+                '30': { bg: 'rgba(198,166,130,0.12)', text: 'rgba(198,166,130,0.95)', border: 'rgba(198,166,130,0.25)', bar: 'rgba(198,166,130,0.55)' },
+                '40': { bg: 'rgba(184,204,184,0.12)', text: 'rgba(184,204,184,0.95)', border: 'rgba(184,204,184,0.25)', bar: 'rgba(184,204,184,0.55)' }
+            };
+
             html += `
-            <div class="reservoir-card" style="grid-column: span 1; margin-bottom: 20px;">
-                <div style="text-align: left; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 15px;">
-                    <h3 style="margin: 0; color: #1e293b; font-size: 1.1rem; font-weight: 300; display: flex; align-items: center;">
-                        <i class="fas fa-box" style="margin-right: 8px; color: #94a3b8; font-size: 0.9rem;"></i>${baseName}
-                    </h3>
-                    <div style="font-size: 0.7rem; color: #94a3b8; margin-top: 4px;">基準量: ${defaultMax} | 超過顯示溢出</div>
+            <div class="reservoir-card" style="grid-column: span 1; margin-bottom: 14px;">
+                <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <i class="fas fa-box" style="font-size:0.8rem; color:rgba(255,255,255,0.5);"></i>
+                    <span style="font-size:1rem; font-weight:500; color:rgba(255,255,255,0.92);">${baseName}</span>
+                    <span style="font-size:0.7rem; color:rgba(255,255,255,0.4); margin-left:auto;">基準量 ${defaultMax}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 5px; width: 100%;">`;
+                <div style="display:flex; flex-direction:column; gap:9px;">`;
 
             ['20', '30', '40'].forEach(s => {
                 const itemEntry = seriesItems.find(it => {
@@ -5251,36 +5324,28 @@ function renderInventory(inventory, isPartial = false) {
 
                 const seriesConfig = sColors[dashboardSeries] || sColors['20'];
 
+                const badge = seriesBadge[s];
+                const isLow = hasItem && percentage < 20;
+                const barColor = isLow ? 'rgba(212,160,160,0.6)' : badge.bar;
+                const qtyColor = isLow ? '#f0c4c4' : 'rgba(255,255,255,0.85)';
+
                 html += `
-                <div class="reservoir-circle-container" style="opacity: ${hasItem ? 1 : 0.6}; flex: 1; min-width: 0;">
-                    <div class="reservoir-label" style="font-size: 0.65rem; margin-bottom: 2px;">${config.label}</div>
-                    <svg width="55" height="55" viewBox="${viewBox}" class="reservoir-svg" style="display: block; margin: 0 auto;">
-                        <circle cx="${center}" cy="${center}" r="${radius}" fill="#f8fafc" stroke="${hasItem ? '#e2e8f0' : '#f1f5f9'}" stroke-width="1.5" />
-                        <defs><clipPath id="${maskId}"><circle cx="${center}" cy="${center}" r="${radius}" /></clipPath></defs>
-                        <g clip-path="url(#${maskId})">
-                            <g class="reservoir-fill-group" style="transform: translateY(80px); transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.2, 1);">
-                                <rect x="-80" y="${fillY}" width="240" height="100" fill="${activeColor}" />
-                                ${hasItem && fillLevel > 0 && fillLevel < 100 ? `
-                                    <path d="M 0 ${fillY} q 15 -6 30 0 t 30 0 30 0 30 0 30 0" fill="${activeColor}" opacity="0.3" class="reservoir-wave-slow" />
-                                    <path d="M 0 ${fillY} q 15 -4 30 0 t 30 0 30 0 30 0 30 0" fill="${activeColor}" opacity="0.6" class="reservoir-wave" />
-                                ` : ''}
-                            </g>
-                        </g>
-                        <text x="${center}" y="${center + 4}" text-anchor="middle" font-size="${hasItem ? 13 : 11}" font-weight="bold" 
-                               fill="${(hasItem && fillLevel < 50) ? '#94a3b8' : '#fff'}" 
-                               style="pointer-events: none; opacity: ${hasItem ? 1 : 0.8}">
-                            ${hasItem ? rawStock : 'N/A'}
-                        </text>
-                    </svg>
-                    <div class="reservoir-value" style="margin-top:6px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 1.5em;">
-                        ${sku ? `<span style="font-size: 0.6rem; color: #fff; background: ${seriesConfig.color}; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-family: 'Consolas', monospace; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">${sku}</span>` : ''}
+                <div style="display:flex; align-items:center; gap:8px; opacity:${hasItem ? 1 : 0.5};">
+                    <span style="font-size:0.7rem; color:rgba(255,255,255,0.5); min-width:36px;">${s} 系</span>
+                    <span style="font-family:'Consolas',monospace; font-size:0.62rem; color:${badge.text}; background:${badge.bg}; padding:2px 5px; border-radius:4px; border:1px solid ${badge.border}; min-width:90px; max-width:90px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sku || '—'}</span>
+                    <div style="flex:1; height:6px; background:rgba(255,255,255,0.06); border-radius:99px; overflow:hidden;">
+                        <div style="height:100%; width:${fillLevel}%; background:${barColor}; border-radius:99px; transition:width 1.2s cubic-bezier(0.4,0,0.2,1);"></div>
+                    </div>
+                    <div style="display:flex; align-items:baseline; gap:3px; min-width:48px; justify-content:flex-end;">
+                        <span style="font-size:0.9rem; font-weight:500; color:${qtyColor}; font-variant-numeric:tabular-nums;">${hasItem ? rawStock : '—'}</span>
+                        <span style="font-size:0.65rem; color:rgba(255,255,255,0.4);">件</span>
                     </div>
                 </div>`;
             });
             html += `</div></div>`;
 
         } else {
-            // === 鋁材渲染：能量試管圖模式 ===
+            // === 鋁材渲染：細長條版 ===
             const name = (findValue(item, ['name', '品項名稱', '品項']) || "").toString().trim();
             if (!name || name === '') return;
 
@@ -5361,49 +5426,55 @@ function renderInventory(inventory, isPartial = false) {
             // 低庫存顏色，統一使用跟配件水庫一樣的 var(--status-quoted) 或 --accent-mail 警告色
             if (isWarning) tubeColor = 'var(--status-quoted)'; // Rose Red
 
+            const seriesAccent = {
+                20: { bg: 'rgba(179,199,217,0.12)', text: 'rgba(179,199,217,0.9)', border: 'rgba(179,199,217,0.25)', bar: 'rgba(179,199,217,0.55)' },
+                30: { bg: 'rgba(198,166,130,0.12)', text: 'rgba(198,166,130,0.95)', border: 'rgba(198,166,130,0.25)', bar: 'rgba(198,166,130,0.55)' },
+                40: { bg: 'rgba(184,204,184,0.12)', text: 'rgba(184,204,184,0.95)', border: 'rgba(184,204,184,0.25)', bar: 'rgba(184,204,184,0.55)' }
+            };
+            const accent = seriesAccent[series] || seriesAccent[20];
+            const barColor = isWarning ? 'rgba(212,160,160,0.6)' : accent.bar;
+            const lengthCm = rawStock.toLocaleString();
+            const lengthM = (rawStock / 100).toFixed(0);
+
+            const specData = {
+                '2020型': { weight: 0.458, priceCm: 1.3 }, '2040型': { weight: 0.862, priceCm: 2.4 },
+                '3030輕型': { weight: 0.693, priceCm: 1.9 }, '3030重型': { weight: 1.07, priceCm: 2.9 },
+                '3060輕型': { weight: 1.218, priceCm: 3.3 }, '3060重型': { weight: 1.844, priceCm: 5.0 },
+                '6060輕型': { weight: 1.908, priceCm: 5.1 }, '6060重型': { weight: 2.763, priceCm: 7.5 },
+                '4040輕型': { weight: 1.298, priceCm: 3.6 }, '4040重型': { weight: 1.923, priceCm: 5.2 },
+                '4080輕型': { weight: 2.265, priceCm: 6.2 }, '4080重型': { weight: 3.505, priceCm: 9.5 }
+            }[cleanName];
+            const specRow = specData
+                ? `<span><span style="color:rgba(255,255,255,0.75);">${specData.weight}</span> kg/m</span>
+                   <span style="color:rgba(255,255,255,0.2);">·</span>
+                   <span>$<span style="color:rgba(255,255,255,0.75);">${Math.round((specData.priceCm * 100) / specData.weight)}</span>/kg</span>`
+                : '';
+
             html += `
-            <div class="aluminum-tube-card" style="grid-column: span 1; border: ${isWarning ? '1px solid rgba(231,76,60,0.3)' : '1px solid transparent'};">
-                <div class="tube-header">
-                    <div style="text-align: left;">
-                        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
-                            <div class="sku-badge" style="background: ${config.color}; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold;">${sku}</div>
-                            ${(() => {
-                                const spec = {
-                                    '2020型': { weight: 0.458, priceCm: 1.3 },
-                                    '2040型': { weight: 0.862, priceCm: 2.4 },
-                                    '3030輕型': { weight: 0.693, priceCm: 1.9 },
-                                    '3030重型': { weight: 1.07, priceCm: 2.9 },
-                                    '3060輕型': { weight: 1.218, priceCm: 3.3 },
-                                    '3060重型': { weight: 1.844, priceCm: 5.0 },
-                                    '6060輕型': { weight: 1.908, priceCm: 5.1 },
-                                    '6060重型': { weight: 2.763, priceCm: 7.5 },
-                                    '4040輕型': { weight: 1.298, priceCm: 3.6 },
-                                    '4040重型': { weight: 1.923, priceCm: 5.2 },
-                                    '4080輕型': { weight: 2.265, priceCm: 6.2 },
-                                    '4080重型': { weight: 3.505, priceCm: 9.5 }
-                                }[cleanName];
-                                if (!spec) return '';
-                                const pricePerKg = Math.round((spec.priceCm * 100) / spec.weight);
-                                return `
-                                    <div style="font-size: 0.65rem; background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 4px;">
-                                        <i class="fas fa-weight-hanging"></i> ${spec.weight} kg/m
-                                    </div>
-                                    <div style="font-size: 0.65rem; background: #fef3c7; color: #b45309; padding: 2px 6px; border-radius: 4px; border: 1px solid #fde68a; display: flex; align-items: center; gap: 4px;">
-                                        <i class="fas fa-coins"></i> $${pricePerKg}/kg
-                                    </div>
-                                `;
-                            })()}
+            <div class="aluminum-tube-card" style="grid-column: span 1; border: 1px solid ${isWarning ? 'rgba(212,160,160,0.3)' : 'rgba(255,255,255,0.08)'};">
+                <div class="tube-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                    <div style="min-width:0; flex:1;">
+                        <div style="display:flex; align-items:baseline; gap:10px; margin-bottom:6px; flex-wrap:wrap;">
+                            <span style="font-size:1.05rem; font-weight:500; color:rgba(255,255,255,0.92); letter-spacing:0.5px;">${cleanName}</span>
+                            <span class="sku-badge" style="font-family:'Consolas',monospace; font-size:0.7rem; color:${accent.text}; background:${accent.bg}; padding:2px 8px; border-radius:4px; border:1px solid ${accent.border}; font-weight:400;">${sku.replace(/[\[\]]/g, '')}</span>
+                            ${isWarning ? `<span style="font-size:0.65rem; color:#f0c4c4; background:rgba(212,160,160,0.18); padding:2px 7px; border-radius:99px; border:1px solid rgba(212,160,160,0.35);">短缺</span>` : ''}
                         </div>
-                        <div style="font-size: 0.95rem; font-weight: 300; color: #1e293b;">${cleanName}</div>
+                        <div style="display:flex; gap:14px; font-size:0.75rem; color:rgba(255,255,255,0.5); align-items:center;">
+                            ${specRow}
+                        </div>
                     </div>
-                    <div class="offcut-drawer">
-                        <div style="display: flex; gap: 4px; align-items: center; justify-content: flex-end;">
-                            <div class="offcut-badge" style="background: ${config.color}; color: #fff; opacity: 0.9; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold;"><i class="fas fa-scissors"></i> ${offcutCount} 片餘料</div>
-                            ${wasteValue > 0 ? `<div style="background: #475569; color: #fff; opacity: 0.85; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: bold; border-radius: 12px; padding: 2px 8px; font-size: 0.7rem; display: flex; align-items: center;"><i class="fas fa-trash-alt" style="margin-right:4px;"></i> ${wasteValue} cm 廢料</div>` : ''}
+                    <div class="offcut-drawer" style="display:flex; gap:6px; flex-shrink:0; position:relative;">
+                        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 10px; text-align:center; min-width:52px;">
+                            <div style="font-size:0.95rem; font-weight:500; color:rgba(255,255,255,0.85); line-height:1;">${offcutCount}</div>
+                            <div style="font-size:0.62rem; color:rgba(255,255,255,0.4); margin-top:3px; letter-spacing:0.3px;">片餘料</div>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 10px; text-align:center; min-width:52px;">
+                            <div style="font-size:0.95rem; font-weight:500; color:rgba(255,255,255,0.85); line-height:1;">${wasteValue}</div>
+                            <div style="font-size:0.62rem; color:rgba(255,255,255,0.4); margin-top:3px; letter-spacing:0.3px;">cm 廢料</div>
                         </div>
                         ${offcutCount > 0 ? `
                         <div class="offcut-tooltip">
-                            <div style="font-size: 0.75rem; font-weight: 300; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 5px;">餘料分布 (cm)</div>
+                            <div style="font-size:0.75rem; font-weight:300; color:rgba(255,255,255,0.75); border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:5px; margin-bottom:5px;">餘料分布 (cm)</div>
                             <div class="offcut-list">
                                 ${Object.entries(offcuts.reduce((acc, len) => {
                 acc[len] = (acc[len] || 0) + 1;
@@ -5415,21 +5486,18 @@ function renderInventory(inventory, isPartial = false) {
                         </div>` : ''}
                     </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div class="tube-container" style="flex: 1; border-radius: 2px; background: #f1f5f9; height: 24px; position: relative; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
-                        <div class="tube-text" style="color: ${fillWidth > 60 ? '#fff' : '#475569'}; z-index: 2; position: absolute; width: 100%; text-align: center; line-height: 24px; font-weight: bold; font-size: 0.75rem; text-shadow: ${fillWidth > 60 ? '0 1px 2px rgba(0,0,0,0.2)' : 'none'}; pointer-events: none;">${rawStock} cm/600m</div>
-                        <div class="tube-filler" style="width: ${fillWidth}%; height: 100%; background: ${tubeColor}; border-radius: 0; position: relative; overflow: hidden; transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);">
-                            <!-- 模擬鋁材金屬光澤的漸層層 -->
-                            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(to bottom, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 45%, rgba(0,0,0,0.15) 100%);"></div>
-                        </div>
+                <div style="display:flex; align-items:center; gap:12px; margin-top:4px;">
+                    <div class="tube-container" style="flex:1; height:8px; background:rgba(255,255,255,0.06); border:none; border-radius:99px; overflow:hidden; box-shadow:none;">
+                        <div class="tube-filler" style="width:${fillWidth}%; height:100%; background:${barColor}; border-radius:99px; transition:width 1.5s cubic-bezier(0.4,0,0.2,1);"></div>
                     </div>
-                    <div style="text-align: right; min-width: 50px;">
-                        <div style="font-size: 1.1rem; font-weight: 300; color: ${isWarning ? 'var(--accent-mail)' : '#475569'};">${totalBars} <span style="font-size: 0.65rem; opacity: 0.6;">支</span></div>
+                    <div style="display:flex; align-items:baseline; gap:4px; min-width:54px; justify-content:flex-end;">
+                        <span style="font-size:1.1rem; font-weight:500; color:${isWarning ? '#f0c4c4' : 'rgba(255,255,255,0.9)'}; font-variant-numeric:tabular-nums;">${totalBars}</span>
+                        <span style="font-size:0.7rem; color:rgba(255,255,255,0.4);">支</span>
                     </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #94a3b8; font-weight: 300;">
-                    <div>${config.label} | 標配 600cm/支</div>
-                    <div style="color: ${isWarning ? 'var(--accent-mail)' : '#94a3b8'}">${percentage}% (標配庫存 600m)</div>
+                <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:rgba(255,255,255,0.4); font-variant-numeric:tabular-nums; margin-top:2px;">
+                    <span>${lengthCm} cm <span style="opacity:0.5; margin:0 4px;">/</span> ${lengthM} m</span>
+                    <span style="color:${isWarning ? '#f0c4c4' : 'rgba(255,255,255,0.55)'};">${percentage}% <span style="opacity:0.6;">標配庫存</span></span>
                 </div>
             </div>`;
         }
@@ -5559,7 +5627,7 @@ window.showMergeCuttingModal = function (list) {
     if (!modal || !body) return;
 
     let html = `<div style="padding:20px;">
-        <h2 style="color:#2c3e50; text-align:center;">合併切料運算</h2>
+        <h2 style="color:#4A5A6B; text-align:center;">合併切料運算</h2>
         <p style="text-align:center; color:#7f8c8d;">共 ${list.length} 張訂單待切料</p>
         <div style="max-height:150px; overflow-y:auto; background:#f9f9f9; padding:10px; margin-bottom:20px; border:1px solid #eee;">`;
 
@@ -6980,7 +7048,7 @@ window.renderFinancialReports = function () {
                     trSets.push({
                         label: '鋁材營收',
                         data: Object.values(monthlyDataProfile).map(v => Math.round(v)),
-                        backgroundColor: '#b3c7d9', // Morandi Slate Blue
+                        backgroundColor: 'rgba(179,199,217,0.55)', // Morandi Slate Blue
                         borderRadius: trConf.cat === 'all' ? { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 } : 4,
                         borderSkipped: false
                     });
@@ -6994,6 +7062,12 @@ window.renderFinancialReports = function () {
                         borderSkipped: false
                     });
                 }
+
+                
+            // === 深色主題 Chart.js 全域設定 ===
+            Chart.defaults.color = 'rgba(255,255,255,0.6)';
+            Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+            Chart.defaults.plugins.legend.labels.color = 'rgba(255,255,255,0.5)';
 
                 chartsInstance.trend = new Chart(ctxTrend, {
                     type: 'bar',
@@ -7026,9 +7100,9 @@ window.renderFinancialReports = function () {
                     data: {
                         labels: Object.keys(seriesMixData['20系列']),
                         datasets: [
-                            { label: '20系列', data: Object.values(seriesMixData['20系列']).map(v => Math.round(v)), backgroundColor: '#b3c7d9', borderRadius: { topLeft: 0, topRight: 0 } },
-                            { label: '30系列', data: Object.values(seriesMixData['30系列']).map(v => Math.round(v)), backgroundColor: '#c6a682' },
-                            { label: '40系列', data: Object.values(seriesMixData['40系列']).map(v => Math.round(v)), backgroundColor: '#b8ccb8', borderRadius: { topLeft: 4, topRight: 4 } }
+                            { label: '20系列', data: Object.values(seriesMixData['20系列']).map(v => Math.round(v)), backgroundColor: '#c8d8e8', borderRadius: { topLeft: 0, topRight: 0 } },
+                            { label: '30系列', data: Object.values(seriesMixData['30系列']).map(v => Math.round(v)), backgroundColor: 'rgba(198,166,130,0.55)' },
+                            { label: '40系列', data: Object.values(seriesMixData['40系列']).map(v => Math.round(v)), backgroundColor: 'rgba(184,204,184,0.55)', borderRadius: { topLeft: 4, topRight: 4 } }
                         ]
                     },
                     options: {
@@ -7200,4 +7274,681 @@ window.onload = function () {
             });
         }
     }, 1000);
+};/* ============================================================
+   ALUMIBRO Calendar Module
+   ============================================================ */
+
+// 全域狀態
+window.calendarState = {
+    currentDate: new Date(),         // 目前顯示的月份
+    selectedDate: null,              // 選中的日期（YYYY-MM-DD）
+    events: [],                      // 所有事件
+    members: [],                     // 所有人員（從 Sheets 載入）
+    editingEventId: null             // 正在編輯的事件 ID
+};
+
+// 類別配色（深色版）
+window.eventTypeColors = {
+    '出差':     { bg: 'rgba(212,160,160,0.35)', text: '#f0c4c4', border: 'rgba(212,160,160,0.5)' },
+    '丈量':     { bg: 'rgba(220,196,160,0.35)', text: '#f2dcb6', border: 'rgba(220,196,160,0.5)' },
+    '施工':     { bg: 'rgba(198,166,130,0.35)', text: '#dcc4a0', border: 'rgba(198,166,130,0.5)' },
+    '出車':     { bg: 'rgba(168,196,168,0.35)', text: '#ccdccc', border: 'rgba(168,196,168,0.5)' },
+    '客戶來訪': { bg: 'rgba(160,188,212,0.35)', text: '#c0d4e8', border: 'rgba(160,188,212,0.5)' },
+    '內部會議': { bg: 'rgba(179,199,217,0.35)', text: '#c8d8e8', border: 'rgba(179,199,217,0.5)' },
+    '外部會議': { bg: 'rgba(184,204,184,0.35)', text: '#ccdccc', border: 'rgba(184,204,184,0.5)' },
+    '事假':     { bg: 'rgba(188,170,164,0.35)', text: '#e2cdbd', border: 'rgba(188,170,164,0.5)' },
+    '特休':     { bg: 'rgba(218,178,178,0.35)', text: '#f5d6d6', border: 'rgba(218,178,178,0.5)' },
+    '病假':     { bg: 'rgba(186,129,129,0.35)', text: '#f0c4c4', border: 'rgba(186,129,129,0.5)' },
+    '喪假':     { bg: 'rgba(140,140,140,0.35)', text: '#cccccc', border: 'rgba(140,140,140,0.5)' },
+    '員旅':     { bg: 'rgba(176,196,176,0.35)', text: '#d4e0d4', border: 'rgba(176,196,176,0.5)' },
+    '國定假日': { bg: 'rgba(212,160,160,0.45)', text: '#fbe0e0', border: 'rgba(212,160,160,0.6)' }
+};
+
+
+// ===== 「你是誰？」對話框 =====
+window.getCurrentUser = function () {
+    return localStorage.getItem('admin_current_user') || '';
+};
+
+window.setCurrentUser = function (name) {
+    localStorage.setItem('admin_current_user', name);
+};
+
+window.showWhoModal = function () {
+    const modal = document.getElementById('who-modal');
+    const listEl = document.getElementById('who-members-list');
+    if (!modal || !listEl) return;
+
+    if (!window.calendarState.members || window.calendarState.members.length === 0) {
+        // 還沒載入人員，先載入
+        fetchCalendarMembers().then(() => window.showWhoModal());
+        return;
+    }
+
+    const current = window.getCurrentUser();
+    listEl.innerHTML = window.calendarState.members.map(name => {
+        const active = current === name ? 'background:rgba(198,166,130,0.3); border-color:rgba(198,166,130,0.6); color:#f2dcb6;' : 'background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.15); color:rgba(255,255,255,0.85);';
+        return `<button onclick="selectAdminUser('${name.replace(/'/g, "\\'")}')" style="${active} padding:8px 16px; border-radius:8px; cursor:pointer; font-size:0.9rem;">${name}</button>`;
+    }).join('');
+
+    modal.style.display = 'flex';
+};
+
+window.selectAdminUser = function (name) {
+    window.setCurrentUser(name);
+    document.getElementById('who-modal').style.display = 'none';
+    console.log('[Calendar] Current user set to:', name);
+};
+
+
+// ===== API: 取得人員清單 =====
+window.fetchCalendarMembers = async function () {
+    try {
+        const res = await fetch(ADMIN_API_URL + "?action=getCalendarMembers&t=" + new Date().getTime());
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.members)) {
+            window.calendarState.members = data.members;
+            console.log('[Calendar] Loaded members:', data.members);
+        } else {
+            console.warn('[Calendar] Members fetch failed:', data.error);
+            window.calendarState.members = [];
+        }
+    } catch (e) {
+        console.error('[Calendar] Members fetch error:', e);
+        window.calendarState.members = [];
+    }
+};
+
+
+// ===== API: 取得所有行程 =====
+window.fetchCalendarEvents = async function () {
+    try {
+        const res = await fetch(ADMIN_API_URL + "?action=getCalendarEvents&t=" + new Date().getTime());
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.events)) {
+            window.calendarState.events = data.events;
+            console.log('[Calendar] Loaded events:', data.events.length);
+        } else {
+            console.warn('[Calendar] Events fetch failed:', data.error);
+            window.calendarState.events = [];
+        }
+        renderCalendar();
+        renderEventList();
+        updateHubCalendarPreview();
+    } catch (e) {
+        console.error('[Calendar] Events fetch error:', e);
+        window.calendarState.events = [];
+    }
+};
+
+
+// ===== 月份切換 =====
+window.changeCalMonth = function (delta) {
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+        // 手機版：以週為單位移動
+        const d = window.calendarState.currentDate;
+        d.setDate(d.getDate() + delta * 7);
+        window.calendarState.currentDate = new Date(d);
+    } else {
+        // 桌面版：以月為單位
+        const d = window.calendarState.currentDate;
+        window.calendarState.currentDate = new Date(d.getFullYear(), d.getMonth() + delta, 1);
+    }
+    renderCalendar();
+};
+
+
+// ===== 渲染月曆網格（自動判斷桌面/手機） =====
+window.renderCalendar = function () {
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+        renderWeekCalendar();
+        renderAgendaList();
+    } else {
+        renderMonthCalendar();
+    }
+};
+
+
+// ===== 手機週曆 + agenda =====
+window.renderWeekCalendar = function () {
+    const grid = document.getElementById('cal-days');
+    const title = document.getElementById('cal-month-title');
+    if (!grid || !title) return;
+
+    // 計算當前週的週日（起點）
+    const cur = new Date(window.calendarState.currentDate);
+    const weekStart = new Date(cur);
+    weekStart.setDate(cur.getDate() - cur.getDay()); // 退到本週日
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const fmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+    const fmtFull = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    
+    // 計算是第幾週
+    const yearStart = new Date(weekStart.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((weekStart - yearStart) / 86400000 + yearStart.getDay() + 1) / 7);
+    
+    title.innerHTML = `${fmt(weekStart)} — ${fmt(weekEnd)}<div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:2px; font-weight:normal;">${weekStart.getFullYear()} 年 ${weekStart.getMonth() + 1} 月 · 第 ${weekNum} 週</div>`;
+
+    const today = new Date();
+    const todayStr = fmtFull(today);
+    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+    let html = '';
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        const dStr = fmtFull(d);
+        const isToday = dStr === todayStr;
+        const isSelected = dStr === window.calendarState.selectedDate;
+        const events = getEventsForDate(dStr);
+        const dotColor = events.length > 0 ? (window.eventTypeColors[events[0].type]?.border || 'rgba(220,196,160,0.7)') : 'transparent';
+        const dotsHTML = events.length > 0 ? `<div style="display:flex; gap:2px; justify-content:center; margin-top:3px;">${events.slice(0, 3).map(ev => {
+            const c = window.eventTypeColors[ev.type] || window.eventTypeColors['內部會議'];
+            return `<div style="width:4px; height:4px; border-radius:50%; background:${c.border};"></div>`;
+        }).join('')}${events.length > 3 ? `<div style="font-size:8px; color:rgba(255,255,255,0.5); line-height:1;">+</div>` : ''}</div>` : `<div style="height:6px;"></div>`;
+
+        const bg = isToday ? 'background:rgba(198,166,130,0.18); border:1px solid rgba(198,166,130,0.4);' : (isSelected ? 'background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2);' : 'border:1px solid transparent;');
+        const dateColor = isToday ? '#f2dcb6' : 'rgba(255,255,255,0.85)';
+        const wkColor = isToday ? '#dcc4a0' : 'rgba(255,255,255,0.45)';
+
+        html += `<div onclick="selectCalDay('${dStr}')" style="${bg} text-align:center; padding:6px 2px; border-radius:6px; cursor:pointer;">
+            <div style="font-size:10px; color:${wkColor};">${weekDays[i]}</div>
+            <div style="font-size:14px; color:${dateColor}; font-weight:${isToday ? '500' : '400'}; margin-top:2px;">${d.getDate()}</div>
+            ${dotsHTML}
+        </div>`;
+    }
+
+    // 改 grid layout 為 7 欄並排
+    grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+    grid.style.gridTemplateRows = 'auto';
+    grid.style.gap = '4px';
+    grid.innerHTML = html;
+};
+
+
+// ===== 手機 agenda 列表（未來 N 天）=====
+window.renderAgendaList = function () {
+    // 在月曆下方注入或更新 agenda 區塊
+    const calLeft = document.querySelector('.calendar-left');
+    if (!calLeft) return;
+
+    let agendaEl = document.getElementById('cal-agenda-list');
+    if (!agendaEl) {
+        agendaEl = document.createElement('div');
+        agendaEl.id = 'cal-agenda-list';
+        agendaEl.style.cssText = 'margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08);';
+        calLeft.appendChild(agendaEl);
+    }
+
+    // 取出本週起算後 30 天內所有事件（含跨日）
+    const cur = new Date(window.calendarState.currentDate);
+    const weekStart = new Date(cur);
+    weekStart.setDate(cur.getDate() - cur.getDay());
+
+    const events = window.calendarState.events || [];
+    // 按開始日期排序
+    const sorted = events.slice().sort((a, b) => (a.startDate || '').localeCompare(b.startDate || ''));
+
+    // 只取結束日 >= 本週開始的事件（不顯示過期太久的）
+    const weekStartStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
+    const upcoming = sorted.filter(ev => (ev.endDate || ev.startDate) >= weekStartStr).slice(0, 20);
+
+    if (upcoming.length === 0) {
+        agendaEl.innerHTML = `<div style="text-align:center; color:rgba(255,255,255,0.4); padding:20px; font-size:0.85rem;">
+            <i class="far fa-calendar" style="display:block; font-size:1.5rem; margin-bottom:8px; opacity:0.5;"></i>
+            未來無排程
+        </div>`;
+        return;
+    }
+
+    let html = `<div style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:8px; padding-left:2px;">即將到來</div>`;
+    let lastDate = null;
+
+    upcoming.forEach(ev => {
+        const c = window.eventTypeColors[ev.type] || window.eventTypeColors['內部會議'];
+        const isCrossDay = ev.startDate !== ev.endDate;
+        const dateLabel = isCrossDay
+            ? `${ev.startDate.slice(5).replace('-', '/')}—${ev.endDate.slice(5).replace('-', '/')}`
+            : ev.startDate.slice(5).replace('-', '/');
+
+        // Date header (只在換日時顯示)
+        if (ev.startDate !== lastDate) {
+            const [y, m, d] = ev.startDate.split('-');
+            const dobj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+            const wk = ['日', '一', '二', '三', '四', '五', '六'][dobj.getDay()];
+            html += `<div style="font-size:11px; color:rgba(255,255,255,0.5); margin:8px 0 4px; font-weight:500;">${parseInt(m)}/${parseInt(d)} ${wk}</div>`;
+            lastDate = ev.startDate;
+        }
+
+        const membersHTML = (ev.members && ev.members.length > 0)
+            ? `<div style="display:flex; flex-wrap:wrap; gap:3px; margin-top:5px;">${ev.members.map(m => `<span style="background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.8); padding:1px 7px; border-radius:99px; border:1px solid rgba(255,255,255,0.12); font-size:10px;">${m}</span>`).join('')}</div>`
+            : `<div style="font-size:10px; color:rgba(255,255,255,0.3); margin-top:3px; font-style:italic;">未指定人員</div>`;
+
+        html += `<div onclick="showEditEventModal('${ev.id}')" style="background:rgba(36,48,57,0.6); border:1px solid rgba(255,255,255,0.06); border-left:3px solid ${c.border}; border-radius:6px; padding:8px 10px; margin-bottom:5px; cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+                <span style="background:${c.bg}; color:${c.text}; padding:1px 6px; border-radius:99px; font-size:9px; border:1px solid ${c.border};">${ev.type}</span>
+                <span style="font-size:10px; color:rgba(255,255,255,0.45);">${dateLabel}</span>
+            </div>
+            <div style="font-size:0.88rem; color:rgba(255,255,255,0.92); font-weight:500; margin-bottom:2px;">${ev.title || '(未命名)'}</div>
+            ${membersHTML}
+            ${ev.notes ? `<div style="font-size:0.7rem; color:rgba(255,255,255,0.5); margin-top:5px; padding-top:5px; border-top:1px dashed rgba(255,255,255,0.06);">${ev.notes.replace(/\n/g, '<br>')}</div>` : ''}
+        </div>`;
+    });
+
+    agendaEl.innerHTML = html;
+};
+
+
+// ===== 桌面版月曆 (原本的 renderCalendar 改名) =====
+window.renderMonthCalendar = function () {
+    const grid = document.getElementById('cal-days');
+    const title = document.getElementById('cal-month-title');
+    if (!grid || !title) return;
+
+    const d = window.calendarState.currentDate;
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    title.textContent = `${year} 年 ${month + 1} 月`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    let html = '';
+
+    // 上月填白
+    for (let i = firstDay - 1; i >= 0; i--) {
+        const dayNum = prevMonthDays - i;
+        html += `<div class="cal-day empty"><span class="date-num" style="opacity:0.3;">${dayNum}</span></div>`;
+    }
+
+    // 本月日期
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = dateStr === todayStr;
+        const isSelected = dateStr === window.calendarState.selectedDate;
+        const dayEvents = getEventsForDate(dateStr);
+
+        const classes = ['cal-day'];
+        if (isToday) classes.push('today');
+        if (isSelected) classes.push('active');
+
+        let eventHTML = '';
+        if (dayEvents.length > 0) {
+            // 最多顯示 3 條 + 「+N 更多」
+            const maxShow = 3;
+            const showList = dayEvents.slice(0, maxShow);
+            const more = dayEvents.length - maxShow;
+            eventHTML = showList.map(ev => {
+                const c = window.eventTypeColors[ev.type] || window.eventTypeColors['內部會議'];
+                const memberStr = (ev.members && ev.members.length > 0) ? ev.members.slice(0, 2).join(' ') : '';
+                const label = ev.title || ev.type;
+                return `<div class="cal-event-bar" style="background:${c.bg}; color:${c.text}; border:1px solid ${c.border};" title="${ev.type}: ${ev.title || ''} (${(ev.members||[]).join(', ')})">${memberStr ? `<span style="opacity:0.85;">${memberStr}</span> ` : ''}${label}</div>`;
+            }).join('');
+            if (more > 0) {
+                eventHTML += `<div style="font-size:0.65rem; color:rgba(255,255,255,0.5); margin-top:2px; padding-left:5px;">+${more} 更多</div>`;
+            }
+        }
+
+        html += `<div class="${classes.join(' ')}" onclick="selectCalDay('${dateStr}')">
+            <span class="date-num">${day}</span>
+            <div class="cal-events-wrap">${eventHTML}</div>
+        </div>`;
+    }
+
+    // 下月填白（補到 6 列 × 7 = 42 格）
+    const totalCells = firstDay + daysInMonth;
+    const fillCount = (totalCells % 7 === 0) ? 0 : (7 - totalCells % 7);
+    for (let i = 1; i <= fillCount; i++) {
+        html += `<div class="cal-day empty"><span class="date-num" style="opacity:0.3;">${i}</span></div>`;
+    }
+
+    grid.innerHTML = html;
+};
+
+
+// ===== 取得某日期的所有事件（跨日的也算）=====
+window.getEventsForDate = function (dateStr) {
+    return window.calendarState.events.filter(ev => {
+        const start = ev.startDate;
+        const end = ev.endDate || ev.startDate;
+        return dateStr >= start && dateStr <= end;
+    });
+};
+
+
+// ===== 點選日期 =====
+window.selectCalDay = function (dateStr) {
+    window.calendarState.selectedDate = dateStr;
+    renderCalendar();
+    renderEventList();
+};
+
+
+// ===== 渲染右側事件列表 =====
+window.renderEventList = function () {
+    const titleEl = document.getElementById('cal-selected-date-title');
+    const listEl = document.getElementById('cal-event-list');
+    if (!titleEl || !listEl) return;
+
+    const dateStr = window.calendarState.selectedDate;
+    if (!dateStr) {
+        titleEl.textContent = '請選擇日期';
+        listEl.innerHTML = '<div style="padding:40px; text-align:center; color:rgba(255,255,255,0.4);">請點擊左側日期查看行程</div>';
+        return;
+    }
+
+    const [y, m, d] = dateStr.split('-');
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    const weekDay = ['日', '一', '二', '三', '四', '五', '六'][dateObj.getDay()];
+    const events = getEventsForDate(dateStr);
+
+    titleEl.innerHTML = `${parseInt(m)}/${parseInt(d)} 行程
+        <div style="font-size:0.75rem; color:rgba(255,255,255,0.4); margin-top:4px; font-weight:normal;">星期${weekDay} · 共 ${events.length} 筆</div>`;
+
+    if (events.length === 0) {
+        listEl.innerHTML = `<div style="padding:40px; text-align:center; color:rgba(255,255,255,0.4);">
+            <i class="far fa-calendar" style="font-size:2rem; margin-bottom:10px; display:block; opacity:0.5;"></i>
+            這天沒有行程
+            <button onclick="showAddEventModal('${dateStr}')" style="display:block; margin:14px auto 0; background:rgba(198,166,130,0.2); border:1px solid rgba(198,166,130,0.4); color:#dcc4a0; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem;">+ 新增行程</button>
+        </div>`;
+        return;
+    }
+
+    listEl.innerHTML = events.map(ev => {
+        const c = window.eventTypeColors[ev.type] || window.eventTypeColors['內部會議'];
+        const isCrossDay = ev.startDate !== ev.endDate;
+        const dateLabel = isCrossDay ? `${ev.startDate.slice(5).replace('-', '/')} — ${ev.endDate.slice(5).replace('-', '/')}` : ev.startDate.slice(5).replace('-', '/');
+        const membersHTML = (ev.members || []).map(m => `<span style="background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.85); padding:1px 8px; border-radius:99px; border:1px solid rgba(255,255,255,0.12); font-size:0.7rem;">${m}</span>`).join('');
+
+        return `<div class="event-card" style="background:rgba(36,48,57,0.7); border:1px solid rgba(255,255,255,0.08); border-left:3px solid ${c.border}; border-radius:8px; padding:12px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="background:${c.bg}; color:${c.text}; padding:2px 8px; border-radius:99px; border:1px solid ${c.border}; font-size:0.7rem;">${ev.type}</span>
+                    <span style="font-size:0.7rem; color:rgba(255,255,255,0.45);">${dateLabel}</span>
+                </div>
+                <button onclick="showEditEventModal('${ev.id}')" style="background:none; border:none; color:rgba(255,255,255,0.4); cursor:pointer; padding:4px 8px;"><i class="fas fa-edit"></i></button>
+            </div>
+            <div style="font-size:0.95rem; font-weight:500; color:rgba(255,255,255,0.92); margin-bottom:8px;">${ev.title || '(未命名)'}</div>
+            ${membersHTML ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px;">${membersHTML}</div>` : ''}
+            ${ev.notes ? `<div style="font-size:0.78rem; color:rgba(255,255,255,0.6); padding-top:6px; border-top:1px dashed rgba(255,255,255,0.06);">${ev.notes.replace(/\n/g, '<br>')}</div>` : ''}
+            <div style="font-size:0.65rem; color:rgba(255,255,255,0.3); margin-top:8px;">建立 ${ev.createdBy || '?'} · 最後修改 ${ev.updatedBy || '?'} ${ev.updatedAt ? new Date(ev.updatedAt).toLocaleString('zh-TW', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : ''}</div>
+        </div>`;
+    }).join('');
+};
+
+
+// ===== 開啟新增 modal =====
+window.showAddEventModal = function (presetDate) {
+    if (!window.getCurrentUser()) {
+        window.showWhoModal();
+        return;
+    }
+
+    window.calendarState.editingEventId = null;
+    document.getElementById('event-modal-title').innerHTML = '<i class="fas fa-calendar-plus"></i> 新增行程';
+    document.getElementById('btn-delete-event').style.display = 'none';
+    document.getElementById('event-id').value = '';
+
+    const dateVal = presetDate || window.calendarState.selectedDate || new Date().toISOString().slice(0, 10);
+    document.getElementById('event-start-date').value = dateVal;
+    document.getElementById('event-end-date').value = dateVal;
+    document.getElementById('event-type').value = '出差';
+    document.getElementById('event-title').value = '';
+    document.getElementById('event-notes').value = '';
+
+    renderMembersPicker([]);
+    document.getElementById('event-modal').style.display = 'flex';
+};
+
+
+// ===== 開啟編輯 modal =====
+window.showEditEventModal = function (eventId) {
+    if (!window.getCurrentUser()) {
+        window.showWhoModal();
+        return;
+    }
+
+    const ev = window.calendarState.events.find(e => e.id === eventId);
+    if (!ev) return;
+
+    window.calendarState.editingEventId = eventId;
+    document.getElementById('event-modal-title').innerHTML = '<i class="fas fa-edit"></i> 編輯行程';
+    document.getElementById('btn-delete-event').style.display = 'inline-block';
+    document.getElementById('event-id').value = ev.id;
+    document.getElementById('event-start-date').value = ev.startDate || '';
+    document.getElementById('event-end-date').value = ev.endDate || ev.startDate || '';
+    document.getElementById('event-type').value = ev.type || '出差';
+    document.getElementById('event-title').value = ev.title || '';
+    document.getElementById('event-notes').value = ev.notes || '';
+
+    renderMembersPicker(ev.members || []);
+    document.getElementById('event-modal').style.display = 'flex';
+};
+
+
+// ===== 渲染人員多選 =====
+window.renderMembersPicker = function (selectedMembers) {
+    const container = document.getElementById('event-members');
+    if (!container) return;
+
+    if (!window.calendarState.members || window.calendarState.members.length === 0) {
+        container.innerHTML = '<span style="color:rgba(255,255,255,0.4); font-size:0.85rem;">無人員資料，請在 Sheets 的「人員清單」分頁新增</span>';
+        return;
+    }
+
+    const selected = new Set(selectedMembers);
+    container.innerHTML = window.calendarState.members.map(name => {
+        const isSel = selected.has(name);
+        const style = isSel
+            ? 'background:rgba(198,166,130,0.3); border:1px solid rgba(198,166,130,0.55); color:#f2dcb6;'
+            : 'background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.7);';
+        return `<button type="button" data-member="${name}" data-selected="${isSel}" onclick="toggleMemberPick(this)" style="${style} padding:4px 12px; border-radius:99px; cursor:pointer; font-size:0.8rem;">${name}</button>`;
+    }).join('');
+};
+
+window.toggleMemberPick = function (btn) {
+    const sel = btn.dataset.selected === 'true';
+    if (sel) {
+        btn.dataset.selected = 'false';
+        btn.style.cssText = 'background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.7); padding:4px 12px; border-radius:99px; cursor:pointer; font-size:0.8rem;';
+    } else {
+        btn.dataset.selected = 'true';
+        btn.style.cssText = 'background:rgba(198,166,130,0.3); border:1px solid rgba(198,166,130,0.55); color:#f2dcb6; padding:4px 12px; border-radius:99px; cursor:pointer; font-size:0.8rem;';
+    }
+};
+
+
+// ===== 關閉 modal =====
+window.closeEventModal = function () {
+    document.getElementById('event-modal').style.display = 'none';
+    window.calendarState.editingEventId = null;
+};
+
+
+// ===== 儲存（新增 or 更新） =====
+window.saveEvent = async function () {
+    const user = window.getCurrentUser();
+    if (!user) {
+        alert('請先選擇你的名字！');
+        window.showWhoModal();
+        return;
+    }
+
+    const startDate = document.getElementById('event-start-date').value;
+    const endDate = document.getElementById('event-end-date').value || startDate;
+    const type = document.getElementById('event-type').value;
+    const title = document.getElementById('event-title').value.trim();
+    const notes = document.getElementById('event-notes').value.trim();
+
+    if (!startDate) {
+        alert('請選擇開始日期');
+        return;
+    }
+    if (endDate < startDate) {
+        alert('結束日期不能早於開始日期');
+        return;
+    }
+    if (!title) {
+        alert('請填寫行程標題');
+        return;
+    }
+
+    const memberBtns = document.querySelectorAll('#event-members button[data-selected="true"]');
+    const members = Array.from(memberBtns).map(b => b.dataset.member);
+
+    // [必填驗證] 至少要選一個人員
+    if (members.length === 0) {
+        alert('請至少選擇一位參與人員！');
+        // highlight 人員區域，讓使用者注意
+        const membersBox = document.getElementById('event-members');
+        if (membersBox) {
+            membersBox.style.transition = 'box-shadow 0.3s, border-color 0.3s';
+            membersBox.style.boxShadow = '0 0 0 2px rgba(212,160,160,0.5)';
+            membersBox.style.borderColor = 'rgba(212,160,160,0.6)';
+            membersBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+                membersBox.style.boxShadow = '';
+                membersBox.style.borderColor = '';
+            }, 2000);
+        }
+        return;
+    }
+
+    const payload = {
+        action: window.calendarState.editingEventId ? 'updateCalendarEvent' : 'addCalendarEvent',
+        id: window.calendarState.editingEventId || undefined,
+        startDate, endDate, type, title, notes,
+        members,
+        user: user
+    };
+
+    const saveBtn = document.querySelector('.btn-save-event');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = '儲存中...';
+    }
+
+    try {
+        const res = await fetch(ADMIN_API_URL, {
+            method: 'POST',
+            mode: 'cors',
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.ok) {
+            closeEventModal();
+            await fetchCalendarEvents();
+        } else {
+            alert('儲存失敗：' + (data.error || '未知錯誤'));
+        }
+    } catch (e) {
+        console.error('Save event error:', e);
+        alert('儲存失敗（網路或伺服器錯誤）');
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = '儲存行程';
+        }
+    }
+};
+
+
+// ===== 刪除事件（從 modal 內按刪除）=====
+window.deleteCurrentEvent = async function () {
+    const id = window.calendarState.editingEventId;
+    if (!id) return;
+    if (!confirm('確定要刪除這筆行程？此操作無法復原。')) return;
+
+    const user = window.getCurrentUser() || '未知';
+
+    try {
+        const res = await fetch(ADMIN_API_URL, {
+            method: 'POST',
+            mode: 'cors',
+            body: JSON.stringify({ action: 'deleteCalendarEvent', id, user })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            closeEventModal();
+            await fetchCalendarEvents();
+        } else {
+            alert('刪除失敗：' + (data.error || '未知錯誤'));
+        }
+    } catch (e) {
+        console.error('Delete event error:', e);
+        alert('刪除失敗（網路或伺服器錯誤）');
+    }
+};
+
+
+// ===== 更新 Hub 行事曆預覽（首頁底部那條）=====
+window.updateHubCalendarPreview = function () {
+    const el = document.getElementById('hub-cal-preview');
+    if (!el) return;
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayEvents = getEventsForDate(todayStr);
+
+    if (todayEvents.length === 0) {
+        el.textContent = '今日無排程';
+    } else if (todayEvents.length === 1) {
+        const ev = todayEvents[0];
+        el.textContent = `今日：${ev.type} · ${ev.title}`;
+    } else {
+        el.textContent = `今日 ${todayEvents.length} 筆排程`;
+    }
+};
+
+
+// ===== 初始化（進入 Calendar 頁時呼叫）=====
+window.initCalendarModule = async function () {
+    // 顯示「你是誰？」對話框（如果未設定）
+    if (!window.getCurrentUser()) {
+        await window.fetchCalendarMembers();
+        window.showWhoModal();
+    } else if (!window.calendarState.members || window.calendarState.members.length === 0) {
+        await window.fetchCalendarMembers();
+    }
+
+    // 載入事件並渲染
+    await window.fetchCalendarEvents();
+
+    // 預設選中今日
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    window.calendarState.selectedDate = todayStr;
+    
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+        // 手機週曆：currentDate 是今天，用來計算本週
+        window.calendarState.currentDate = new Date(today);
+    } else {
+        // 桌面月曆：currentDate 是本月 1 號
+        window.calendarState.currentDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+    renderCalendar();
+    renderEventList();
+};
+
+
+// ===== Hub 預覽用：背景自動載入事件（不開行事曆頁也載入）=====
+window.preloadCalendarForHub = async function () {
+    try {
+        if (!window.calendarState.members || window.calendarState.members.length === 0) {
+            await window.fetchCalendarMembers();
+        }
+        await window.fetchCalendarEvents();
+    } catch (e) {
+        console.warn('[Calendar] Hub preload failed:', e);
+    }
 };

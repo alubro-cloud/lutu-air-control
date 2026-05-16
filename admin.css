@@ -1,43 +1,49 @@
 :root {
-    /* Main Theme Colors - Morandi Evolution */
-    --primary: #545454;
-    --accent: #94a3b8;
-    /* Morandi Ash Gray fallback */
-    --bg: #fafafa;
+    /* Main Theme Colors - Morandi Dark Evolution */
+    --primary: rgba(255,255,255,0.85);
+    --accent: #6e7d8e;
+    --bg: #2C3742;
     --white: #ffffff;
-    --text: #545454;
-    --border: #e5e5e5;
-    --hover: #f5f5f5;
+    --text: rgba(255,255,255,0.85);
+    --border: rgba(255,255,255,0.1);
+    --hover: rgba(255,255,255,0.08);
 
-    /* Series Colors (Synced with style.css) */
-    --accent-20: #b3c7d9;
-    /* Lighter Slate Blue */
-    --accent-30: #c6a682;
-    /* Heavier Morandi Gold - Customer Service */
-    --accent-40: #b8ccb8;
-    /* Lighter Morandi Green */
+    /* === 深莫蘭迪 背景色 (用作 background) === */
+    --accent-20: rgba(179,199,217,0.32);
+    /* Deep Slate Blue */
+    --accent-30: rgba(198,166,130,0.32);
+    /* Deep Morandi Gold */
+    --accent-40: rgba(184,204,184,0.32);
+    /* Deep Morandi Green */
 
-    /* Low-Saturation Morandi Palette for UI */
-    --muted-lavender: #a3a3c2;
-    --dusty-rose: #c2a3a3;
-    --muted-teal: #8ca3a3;
-    --ash-gray: #94a3b8;
-    --accent-delivery: #ba8181;
-    /* Darker Rose for Price & Tags */
-    --accent-warehouse: #bcaaa4;
-    /* Milk Tea Brown */
-    --accent-mail: #dab2b2;
-    /* Lighter Muted Rose */
+    /* === 深莫蘭迪 文字色 (用作 color) === */
+    --accent-20-text: #c8d8e8;
+    --accent-30-text: #f2dcb6;
+    --accent-40-text: #ccdccc;
+
+    /* Low-Saturation Morandi Palette - Deep version */
+    --muted-lavender: rgba(163,163,194,0.32);
+    --dusty-rose: rgba(194,163,163,0.35);
+    --muted-teal: rgba(140,163,163,0.35);
+    --ash-gray: rgba(148,163,184,0.35);
+    --accent-delivery: rgba(186,129,129,0.35);
+    /* Deep Rose for Background */
+    --accent-delivery-text: #f0c4c4;
+    /* Light Rose for Text */
+    --accent-warehouse: rgba(188,170,164,0.35);
+    /* Deep Milk Tea */
+    --accent-warehouse-text: #e2cdbd;
+    --accent-mail: rgba(218,178,178,0.35);
+    /* Deep Rose */
+    --accent-mail-text: #f5d6d6;
 
     /* Legacy Map for Kanban Stability */
     --status-unquoted: var(--accent-30);
     --status-quoted: var(--accent-20);
     --status-paid: var(--muted-teal);
     --status-shipping: var(--accent-40);
-    --status-dispatched: #4a6b6b;
-    /* Darker Sage */
-    --status-completed: #2c3e50;
-    /* Navy Gray */
+    --status-dispatched: rgba(74,107,107,0.4);
+    --status-completed: rgba(74,90,107,0.45);
 }
 
 .hidden {
@@ -161,7 +167,7 @@
 /* SKU Tags styling */
 .d-sku {
     display: inline-block;
-    background: #f1f5f9;
+    background: rgba(255,255,255,0.06);
     color: #475569;
     font-size: 0.7rem;
     font-weight: 600;
@@ -325,7 +331,7 @@ body {
 }
 
 .module-topbar {
-    background: white;
+    background: #2C3742;
     padding: 20px 40px;
     border-bottom: 1px solid var(--border);
     display: flex;
@@ -346,7 +352,7 @@ body {
 /* Top Bar */
 .top-bar {
     padding: 20px 30px;
-    background: white;
+    background: #2C3742;
     border-bottom: 1px solid var(--border);
     display: flex;
     justify-content: space-between;
@@ -368,33 +374,33 @@ body {
 }
 
 .btn-refresh {
-    background: white;
-    border: 1px solid #ddd;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
     padding: 8px 15px;
     border-radius: 5px;
     cursor: pointer;
     font-size: 0.9rem;
-    color: #555;
+    color: rgba(255,255,255,0.7);
     transition: 0.2s;
     border: 1px solid var(--border);
 }
 
 .btn-refresh:hover {
-    background: #f9f9f9;
+    background: rgba(255,255,255,0.15);
     color: var(--accent);
     border-color: var(--accent);
 }
 
 #last-update {
     font-size: 0.85rem;
-    color: #888;
+    color: rgba(255,255,255,0.4);
 }
 
 /* Kanban Board */
 /* Kanban Board - Wider and Full Screen */
 .kanban-board {
     flex: 1;
-    background: #eef2f5;
+    background: #3D4D5C;
     padding: 20px 30px;
     overflow-x: auto;
     overflow-y: hidden;
@@ -414,7 +420,7 @@ body {
 }
 
 .column-header {
-    background: white;
+    background: rgba(44, 55, 66, 0.9);
     padding: 12px 15px;
     border-radius: 8px 8px 0 0;
     font-weight: 400;
@@ -458,8 +464,8 @@ body {
 }
 
 .count-badge {
-    background: #eee;
-    color: #666;
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.7);
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 0.8rem;
@@ -479,7 +485,7 @@ body {
 }
 
 .column-body::-webkit-scrollbar-thumb {
-    background: #ccc;
+    background: rgba(255,255,255,0.2);
     border-radius: 3px;
 }
 
@@ -492,7 +498,7 @@ body {
     margin-bottom: 10px;
     /* Reduced from 12px */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
-    border: 1px solid transparent;
+    border: 1px solid rgba(0,0,0,0.06);
     cursor: pointer;
     transition: 0.2s;
     position: relative;
@@ -614,7 +620,7 @@ body {
 .card-title {
     font-weight: 400;
     font-size: 1rem;
-    color: #1e293b;
+    color: #2C3742;
     margin-bottom: 4px;
 }
 
@@ -757,6 +763,7 @@ body {
     padding: 8px 20px;
     border: 1px solid #ddd;
     background: white;
+    color: #555;
     border-radius: 5px;
     cursor: pointer;
 }
@@ -829,7 +836,7 @@ body {
 
 .d-price {
     font-weight: 400;
-    color: #555;
+    color: rgba(255,255,255,0.7);
 }
 
 /* Modal tweaks */
@@ -923,19 +930,18 @@ body {
 .nav-btn-tab {
     /* Renamed from nav-btn to avoid conflict with sidebar */
     padding: 8px 16px;
-    border: 1px solid #bbdefb;
-    background: #e3f2fd;
-    /* Light blue for inactive as requested */
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.08);
     cursor: pointer;
     border-radius: 6px;
     font-size: 0.95rem;
-    color: #1976d2;
+    color: rgba(255,255,255,0.6);
     transition: all 0.2s;
     font-weight: 500;
 }
 
 .nav-btn-tab:hover {
-    background: #bbdefb;
+    background: rgba(255,255,255,0.15);
 }
 
 .nav-btn-tab.active {
@@ -954,12 +960,13 @@ body {
 }
 
 .category-card {
-    background: #fff;
+    background: rgba(44, 55, 66, 0.75);
     border-radius: 12px;
     padding: 20px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    border: 1px solid #f1f5f9;
+    border: 1px solid rgba(0,0,0,0.06);
     cursor: pointer;
+    color: rgba(255,255,255,0.85);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
@@ -984,7 +991,7 @@ body {
 
 .category-icon {
     font-size: 3rem;
-    color: #94a3b8;
+    color: rgba(255,255,255,0.4);
     transition: 0.3s;
     width: 60px;
     text-align: center;
@@ -1034,7 +1041,7 @@ body {
 
 /* Inventory Type Badges */
 .badge-heavy {
-    background: #34495e;
+    background: #B8864B;
     color: white;
     font-size: 0.75rem;
     padding: 2px 8px;
@@ -1045,7 +1052,7 @@ body {
 
 .badge-light {
     background: #bdc3c7;
-    color: #2c3e50;
+    color: #4A5A6B;
     font-size: 0.75rem;
     padding: 2px 8px;
     border-radius: 4px;
@@ -1149,11 +1156,12 @@ body {
 }
 
 .inventory-card {
-    background: #fff;
+    background: rgba(44, 55, 66, 0.75);
     border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    box-shadow: none;
     padding: 20px;
-    border: 1px solid #eee;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.85);
     transition: transform 0.2s;
 }
 
@@ -1161,7 +1169,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 2px solid #f0f2f5;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
     padding-bottom: 12px;
     margin-bottom: 15px;
 }
@@ -1172,7 +1180,7 @@ body {
 }
 
 .inventory-stock-count {
-    background: #2c3e50;
+    background: #4A5A6B;
     color: white;
     padding: 4px 12px;
     border-radius: 6px;
@@ -1195,8 +1203,8 @@ body {
 .offcut-vbar-container {
     flex: 1;
     height: 32px;
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
     border-radius: 4px;
     position: relative;
     overflow: hidden;
@@ -1253,7 +1261,7 @@ body {
     margin: 30px 0;
     width: 100%;
     padding: 15px;
-    background: #2c3e50;
+    background: #4A5A6B;
     color: white;
     border: none;
     border-radius: 8px;
@@ -1661,7 +1669,7 @@ body {
         font-size: 1.05rem !important;
         /* Reduced from 1.15rem */
         font-weight: 500 !important;
-        color: #1e293b !important;
+        color: #2C3742 !important;
         margin-bottom: 6px !important;
         /* Slightly more space for the horizontal row below */
     }
@@ -1924,7 +1932,7 @@ body {
     align-items: center;
     font-size: 0.85rem;
     font-weight: 400;
-    color: #1e293b;
+    color: #2C3742;
     z-index: 2;
     pointer-events: none;
 }
@@ -2020,11 +2028,11 @@ body {
     .kanban-group {
         display: flex;
         flex-direction: column;
-        border: 1px solid #ddd;
+        border: 1px solid rgba(255,255,255,0.08);
         border-radius: 12px;
-        background: #fdfdfd;
+        background: rgba(44, 55, 66, 0.5);
         height: min-content;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        box-shadow: none;
         margin-right: 20px;
         padding: 0 5px;
         flex-shrink: 0;
@@ -2066,7 +2074,7 @@ body {
         flex-shrink: 0;
         display: flex;
         flex-direction: column;
-        background: #f4f7f6;
+        background: rgba(36, 48, 57, 0.5);
         border-radius: 8px;
         padding: 8px;
     }
@@ -2106,12 +2114,13 @@ body {
     }
 
     .header-tag {
-        background: rgba(255, 255, 255, 0.9);
-        color: #333;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.75);
         font-size: 0.8rem;
         padding: 4px 10px;
         border-radius: 20px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: none;
         font-weight: normal;
         white-space: nowrap;
         margin-left: 10px;
@@ -2847,8 +2856,8 @@ body {
 }
 
 .kpi-card {
-    background: #fff;
-    border: 1px solid var(--border);
+    background: rgba(44, 55, 66, 0.75);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 14px;
     padding: 24px;
     text-align: center;
@@ -2877,8 +2886,8 @@ body {
 .kpi-icon {
     font-size: 1.5rem;
     margin-bottom: 10px;
-    opacity: 0.3;
-    color: var(--primary);
+    opacity: 0.5;
+    color: rgba(255,255,255,0.4);
 }
 
 .kpi-value {
@@ -2905,8 +2914,8 @@ body {
 }
 
 .chart-box {
-    background: #fff;
-    border: 1px solid var(--border);
+    background: rgba(44, 55, 66, 0.75);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 14px;
     padding: 24px;
 }
@@ -3373,7 +3382,7 @@ body {
         margin: 0 !important;
         font-size: 0.95rem !important;
         font-weight: 500 !important;
-        color: #1e293b !important;
+        color: #2C3742 !important;
     }
 
     #inventory-details .module-topbar-left {
@@ -3571,7 +3580,7 @@ body {
         width: 100% !important; /* 確保文字容器置中 */
         padding: 0 !important;
         margin: 0 !important;
-        color: var(--text-dark, #1e293b) !important;
+        color: var(--text-dark, #2C3742) !important;
         letter-spacing: 0 !important; /* 移除 letter-spacing 避免視覺重心右移 */
     }
 
@@ -3947,4 +3956,1772 @@ body {
 }
 .tag-out { background: #fdf2f2; color: #e74c3c; border: 1px solid #fadcdc; }
 .tag-in { background: #f0fdf4; color: #27ae60; border: 1px solid #bbf7d0; }
-.tag-meet { background: #eff6ff; color: #3498db; border: 1px solid #bfdbfe; }
+.tag-meet { background: #eff6ff; color: #3498db; border: 1px solid #bfdbfe; }
+
+
+/* =====================================================================
+   ALUMIBRO 後台深色主題 — 完整版（重新整理）
+   
+   設計邏輯：
+   - body / topbar / kanban-board / 圖表卡片 / 庫存卡片 = 深色
+   - kanban-group(權責區大框) / kanban-column(狀態欄) = 深色透明
+   - kanban-card(訂單小卡) = 白色（內容多需要清晰）
+   - modal = 白色（表單需要清晰）
+   - group-header(莫蘭迪頂條) = 不動（保持莫蘭迪色）
+   ===================================================================== */
+
+/* === 1. 基礎背景 === */
+body {
+    background: #2C3742 !important;
+}
+
+/* === 2. Topbar 深色 === */
+.module-topbar,
+.top-bar {
+    background: #2C3742 !important;
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+}
+.module-topbar h2,
+.module-topbar h2 i,
+.top-bar h1,
+#page-title,
+#page-title i {
+    color: rgba(255,255,255,0.85) !important;
+}
+.module-topbar-left h2,
+.module-topbar-left h2 i {
+    color: rgba(255,255,255,0.85) !important;
+}
+#last-update {
+    color: rgba(255,255,255,0.4) !important;
+}
+
+/* === 3. 主選單按鈕（左上角白方塊修正） === */
+.btn-back-hub-top {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.7) !important;
+}
+.btn-back-hub-top:hover {
+    background: rgba(255,255,255,0.15) !important;
+    border-color: rgba(255,255,255,0.25) !important;
+    color: white !important;
+}
+
+/* topbar 搜尋框 / 下拉 */
+.module-topbar-right input[type="text"],
+.module-topbar-right select,
+.module-topbar select,
+.module-topbar input {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+.module-topbar-right input::placeholder {
+    color: rgba(255,255,255,0.35) !important;
+}
+
+/* === 4. Kanban 看板背景 === */
+.kanban-board {
+    background: #3D4D5C !important;
+}
+
+/* === 5. kanban-group 權責區大卡片（深色） === */
+.kanban-group {
+    background: rgba(44, 55, 66, 0.5) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+}
+/* group-header 莫蘭迪色頂條 — 不覆蓋 background（保持 inline style 的莫蘭迪色） */
+
+/* === 6. kanban-column 狀態欄（深色透明） === */
+.kanban-column {
+    background: rgba(36, 48, 57, 0.5) !important;
+}
+
+/* column-header 狀態 header（保持莫蘭迪色，但加深透明背景） */
+.column-header {
+    background: rgba(44, 55, 66, 0.7) !important;
+    color: rgba(255,255,255,0.9) !important;
+    box-shadow: none !important;
+}
+/* count badge */
+.count-badge {
+    background: rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.7) !important;
+}
+
+/* === 7. kanban-card 訂單小卡（深色） === */
+.kanban-card {
+    background: rgba(36, 48, 57, 0.9) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: rgba(255,255,255,0.85) !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15) !important;
+}
+.kanban-card:hover {
+    background: rgba(36, 48, 57, 1) !important;
+    border-color: rgba(255,255,255,0.2) !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3) !important;
+}
+.card-header { border-bottom-color: rgba(255,255,255,0.1) !important; }
+.card-title { color: rgba(255,255,255,0.9) !important; }
+.card-info { color: rgba(255,255,255,0.55) !important; }
+.card-price { color: #e8c0a0 !important; }
+.shipping-fee-hint { color: rgba(255,255,255,0.4) !important; }
+
+/* === 8. KPI 卡片（深色） === */
+.kpi-card {
+    background: rgba(44, 55, 66, 0.75) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+}
+.kpi-icon { color: rgba(255,255,255,0.35) !important; opacity: 0.6 !important; }
+.kpi-value { color: rgba(255,255,255,0.9) !important; }
+.kpi-label { color: rgba(255,255,255,0.4) !important; }
+
+/* === 9. 圖表卡片（深色） === */
+.chart-box {
+    background: rgba(44, 55, 66, 0.75) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+}
+.chart-box h4 { color: rgba(255,255,255,0.7) !important; }
+/* 圖表內的篩選按鈕（按週/按日/全部/鋁材/配件） */
+.chart-box button {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: rgba(255,255,255,0.5) !important;
+}
+.chart-box button.active {
+    background: rgba(220,196,160,0.2) !important;
+    border-color: rgba(220,196,160,0.4) !important;
+    color: #dcc4a0 !important;
+}
+
+/* === 10. 庫存卡片（深色） === */
+.inventory-card {
+    background: rgba(44, 55, 66, 0.75) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+.inventory-card-header { border-bottom-color: rgba(255,255,255,0.1) !important; }
+.inventory-title { color: rgba(255,255,255,0.85) !important; }
+.offcut-vbar-container {
+    background: rgba(255,255,255,0.06) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+}
+
+/* === 11. 分類卡片（庫存頁入口）深色 === */
+.category-card {
+    background: rgba(44, 55, 66, 0.75) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    color: rgba(255,255,255,0.85) !important;
+    box-shadow: none !important;
+}
+.category-card:hover {
+    border-color: rgba(255,255,255,0.2) !important;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3) !important;
+}
+.category-icon { color: rgba(255,255,255,0.35) !important; }
+.category-text h3 { color: rgba(255,255,255,0.85) !important; }
+.category-text p { color: rgba(255,255,255,0.45) !important; }
+
+/* === 12. 短缺警報卡片 === */
+.critical-items-container,
+#critical-items-box {
+    background: rgba(44, 55, 66, 0.75) !important;
+    border-color: rgba(212,160,160,0.3) !important;
+    box-shadow: none !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+
+/* === 13. Modal（白色，保持原樣） === */
+/* modal 不改，保持白底黑字方便閱讀 */
+
+/* === 14. Table（歷史訂單）白色 === */
+table thead th {
+    background: #2C3742 !important;
+    color: rgba(255,255,255,0.7) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+}
+table tbody tr { background: white !important; color: #333 !important; }
+table tbody tr:nth-child(even) { background: #f8f9fa !important; }
+
+/* =====================================================================
+   後台深色 — 第二批補完
+   1. 訂單詳情 Modal 深色
+   2. 圖表內的按鈕（按週/按日/全部/鋁材/配件）
+   3. 月份切換箭頭
+   4. 鋁材庫存健康度、短缺警報
+   ===================================================================== */
+
+/* === 1. Modal 深色 === */
+.modal-content {
+    background: #2C3742 !important;
+    color: rgba(255,255,255,0.85) !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important;
+}
+.modal-header {
+    border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+}
+.modal-header h3 {
+    color: rgba(255,255,255,0.9) !important;
+}
+.close-modal {
+    color: rgba(255,255,255,0.4) !important;
+}
+.close-modal:hover {
+    color: white !important;
+}
+.modal-footer {
+    border-top: 1px solid rgba(255,255,255,0.1) !important;
+}
+.modal-body {
+    color: rgba(255,255,255,0.85) !important;
+}
+/* Modal 內所有 label / 文字 */
+.modal-content .detail-label,
+.modal-body .detail-label {
+    color: rgba(255,255,255,0.5) !important;
+}
+.modal-content .detail-value,
+.modal-body .detail-value {
+    color: rgba(255,255,255,0.9) !important;
+}
+.modal-content .detail-pre,
+.modal-body .detail-pre {
+    color: rgba(255,255,255,0.7) !important;
+}
+.modal-content .detail-card,
+.modal-body .detail-card {
+    border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+.modal-content .d-info { color: rgba(255,255,255,0.45) !important; }
+.modal-content .d-price { color: rgba(255,255,255,0.75) !important; }
+/* 切割排版視覺 in modal */
+.modal-content .cut-row,
+.modal-body .cut-row {
+    background: rgba(36,48,57,0.7) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+}
+.modal-content .cut-label {
+    color: rgba(255,255,255,0.75) !important;
+}
+.modal-content .cut-bar-container {
+    background: rgba(255,255,255,0.1) !important;
+    border-color: rgba(255,255,255,0.15) !important;
+}
+.modal-content .cut-remain.leftover {
+    background: rgba(255,255,255,0.12) !important;
+    color: rgba(255,255,255,0.4) !important;
+}
+.modal-content .cut-remain.waste {
+    background: rgba(255,255,255,0.08) !important;
+    color: rgba(255,255,255,0.3) !important;
+}
+/* Modal 內 input / textarea */
+.modal-content input[type="text"],
+.modal-content input[type="number"],
+.modal-content textarea,
+.modal-content select {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.9) !important;
+}
+/* btn-secondary 在 modal */
+.modal-content .btn-secondary,
+.modal-footer .btn-secondary {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.75) !important;
+}
+.modal-content .btn-secondary:hover {
+    background: rgba(255,255,255,0.15) !important;
+}
+
+/* === 2. 圖表內按鈕（按週/按日/全部/鋁材/配件）=== */
+/* 外層容器（trend-toggle-group）原本是 #f1f5f9 淺底 */
+.trend-toggle-group {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+}
+/* 按鈕：未啟用狀態（inline style 是 transparent + #888） */
+.trend-toggle-btn,
+.btn-period-unit {
+    color: rgba(255,255,255,0.5) !important;
+}
+.trend-toggle-btn:hover,
+.btn-period-unit:hover {
+    color: rgba(255,255,255,0.85) !important;
+    background: rgba(255,255,255,0.05) !important;
+}
+/* 按鈕：啟用狀態（inline style 用 --accent-mail） */
+.trend-toggle-btn.active,
+.btn-period-unit.active {
+    background: rgba(220,196,160,0.25) !important;
+    color: #dcc4a0 !important;
+}
+
+/* === 3. 月份切換箭頭按鈕 === */
+.btn-period {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.7) !important;
+}
+.btn-period:hover {
+    background: rgba(255,255,255,0.15) !important;
+    color: white !important;
+    border-color: rgba(255,255,255,0.25) !important;
+}
+/* 月份文字 */
+#current-financial-period {
+    color: rgba(255,255,255,0.9) !important;
+}
+/* 月份視圖切換 select */
+#report-view-mode,
+#financial-controls select {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+/* 分隔線 */
+#financial-controls > div[style*="width:1px"] {
+    background: rgba(255,255,255,0.15) !important;
+}
+
+/* === 4. 鋁材庫存健康度 / 短缺警報（dashboard-panel）=== */
+.dashboard-panel {
+    background: rgba(44, 55, 66, 0.75) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+.dashboard-panel .panel-title {
+    color: rgba(255,255,255,0.85) !important;
+}
+.dashboard-panel .alert-title i {
+    color: #d4a0a0 !important;
+}
+.gauges-container,
+#low-stock-bars {
+    color: rgba(255,255,255,0.7) !important;
+}
+.gauges-container > div,
+#low-stock-bars > div {
+    color: rgba(255,255,255,0.7) !important;
+}
+
+/* =====================================================================
+   後台深色 — 第三批：強制覆蓋 inline style 文字色
+   ===================================================================== */
+
+/* === 1. Modal 內所有 inline color 強制覆蓋 === */
+/* 訂單詳情各個 row 的 value（color:#333） */
+.modal-content [style*="color:#333"],
+.modal-content [style*="color: #333"],
+.modal-body [style*="color:#333"],
+.modal-body [style*="color: #333"] {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+/* label 灰色（color:#aaa） */
+.modal-content [style*="color:#aaa"],
+.modal-content [style*="color: #aaa"],
+.modal-body [style*="color:#aaa"],
+.modal-body [style*="color: #aaa"] {
+    color: rgba(255,255,255,0.4) !important;
+}
+
+/* 次要文字（color:#666） */
+.modal-content [style*="color:#666"],
+.modal-content [style*="color: #666"],
+.modal-body [style*="color:#666"],
+.modal-body [style*="color: #666"] {
+    color: rgba(255,255,255,0.65) !important;
+}
+
+/* 提示文字（color:#999） */
+.modal-content [style*="color:#999"],
+.modal-content [style*="color: #999"],
+.modal-body [style*="color:#999"],
+.modal-body [style*="color: #999"] {
+    color: rgba(255,255,255,0.4) !important;
+}
+
+/* 暗紅折扣色（color:#888 / color: #888） */
+.modal-content [style*="color:#888"],
+.modal-content [style*="color: #888"],
+.modal-body [style*="color:#888"],
+.modal-body [style*="color: #888"] {
+    color: rgba(255,255,255,0.45) !important;
+}
+
+/* 報價明細拆解區塊（background:#fafafa） */
+.modal-content [style*="background:#fafafa"],
+.modal-content [style*="background: #fafafa"],
+.modal-body [style*="background:#fafafa"],
+.modal-body [style*="background: #fafafa"] {
+    background: rgba(36, 48, 57, 0.6) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+}
+
+/* 分隔線 */
+.modal-content [style*="border-bottom:1px solid #f2f2f2"],
+.modal-content [style*="border-bottom: 1px solid #f2f2f2"],
+.modal-body [style*="border-bottom:1px solid #f2f2f2"],
+.modal-body [style*="border-bottom: 1px solid #f2f2f2"] {
+    border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+.modal-content [style*="border-bottom:2px solid #ddd"],
+.modal-content [style*="border-bottom: 2px solid #ddd"],
+.modal-body [style*="border-bottom:2px solid #ddd"],
+.modal-body [style*="border-bottom: 2px solid #ddd"] {
+    border-bottom-color: rgba(255,255,255,0.15) !important;
+}
+.modal-content [style*="border-top: 1px dashed #ccc"],
+.modal-content [style*="border-top:1px dashed #ccc"],
+.modal-body [style*="border-top: 1px dashed #ccc"],
+.modal-body [style*="border-top:1px dashed #ccc"] {
+    border-top-color: rgba(255,255,255,0.15) !important;
+}
+
+/* 關閉按鈕 btn-close-inline */
+.btn-close-inline {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.7) !important;
+}
+.btn-close-inline:hover {
+    background: rgba(255,255,255,0.15) !important;
+    color: white !important;
+}
+
+/* === 2. 短缺警報下方 SKU 文字（reservoir-label / value）=== */
+.dashboard-panel .reservoir-label,
+.panel-alerts .reservoir-label {
+    color: rgba(255,255,255,0.85) !important;
+}
+.panel-gauges .reservoir-label {
+    color: rgba(255,255,255,0.6) !important;
+}
+
+/* reservoir-value（數量文字） */
+.panel-gauges .reservoir-value {
+    color: rgba(255,255,255,0.85) !important;
+}
+
+/* 系列文字 20 系列 / 30 系列 / 40 系列（panel-gauges 內的灰字） */
+.panel-gauges [style*="color: var(--primary)"],
+.panel-gauges [style*="color:var(--primary)"] {
+    color: rgba(255,255,255,0.6) !important;
+}
+
+/* reservoir-circle 背景圈圈中性色 */
+.dashboard-panel .reservoir-svg circle[fill="#f8fafc"] {
+    fill: rgba(255,255,255,0.05) !important;
+}
+
+/* =====================================================================
+   後台深色 — 第四批：訂單詳情核對明細區
+   ===================================================================== */
+
+/* 核對明細外層容器 background:#f9f9f9 */
+.modal-content [style*="background:#f9f9f9"],
+.modal-content [style*="background: #f9f9f9"],
+.modal-body [style*="background:#f9f9f9"],
+.modal-body [style*="background: #f9f9f9"] {
+    background: rgba(36, 48, 57, 0.5) !important;
+}
+
+/* detail-card 小卡（在核對明細裡） */
+.modal-content .detail-card,
+.modal-body .detail-card {
+    background: rgba(36, 48, 57, 0.7) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+
+/* detail-card 名稱顏色 */
+.modal-content .detail-card .d-name,
+.modal-body .detail-card .d-name {
+    color: rgba(255,255,255,0.85) !important;
+}
+
+/* check-box */
+.modal-content .check-box,
+.modal-body .check-box {
+    background: rgba(255,255,255,0.08) !important;
+    border-color: rgba(255,255,255,0.25) !important;
+}
+
+/* checklist-progress-bar sticky 背景 */
+.modal-content .checklist-progress-bar,
+.modal-body .checklist-progress-bar {
+    background: rgba(44, 55, 66, 0.95) !important;
+    border-bottom-color: rgba(255,255,255,0.1) !important;
+    color: rgba(255,255,255,0.85) !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
+
+/* detail-item 非可勾選的項目 */
+.modal-content .detail-item,
+.modal-body .detail-item {
+    background: rgba(36, 48, 57, 0.7) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+
+/* 庫存連動狀態區域 */
+.modal-content [style*="color:#777"],
+.modal-content [style*="color: #777"],
+.modal-body [style*="color:#777"],
+.modal-body [style*="color: #777"] {
+    color: rgba(255,255,255,0.55) !important;
+}
+
+/* 列印撿貨單按鈕 */
+.modal-content .btn-print,
+.modal-body .btn-print {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.75) !important;
+}
+.modal-content .btn-print:hover,
+.modal-body .btn-print:hover {
+    background: rgba(255,255,255,0.15) !important;
+    color: white !important;
+}
+
+/* hr 分隔線 */
+.modal-content hr,
+.modal-body hr {
+    border-top-color: rgba(255,255,255,0.1) !important;
+}
+
+/* progress-pill 一般狀態 */
+.modal-content .progress-pill,
+.modal-body .progress-pill {
+    background: rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.8) !important;
+}
+
+/* detail-pre 在 modal */
+.modal-content .detail-pre,
+.modal-body .detail-pre {
+    color: rgba(255,255,255,0.85) !important;
+}
+
+/* d-info 在 detail-card 內（規格小字） */
+.modal-content .detail-card .d-info,
+.modal-body .detail-card .d-info,
+.modal-content .detail-item .d-info,
+.modal-body .detail-item .d-info {
+    color: rgba(255,255,255,0.5) !important;
+}
+
+/* d-price 在 detail-card */
+.modal-content .detail-card .d-price,
+.modal-body .detail-card .d-price {
+    color: rgba(255,255,255,0.75) !important;
+}
+
+/* 系列名稱 d-name 各系列色提亮 */
+.modal-content .detail-card.series-20 .d-name,
+.modal-body .detail-card.series-20 .d-name,
+.modal-content .detail-item.series-20 .d-name,
+.modal-body .detail-item.series-20 .d-name {
+    color: #c8d8e8 !important;
+}
+.modal-content .detail-card.series-30 .d-name,
+.modal-body .detail-card.series-30 .d-name,
+.modal-content .detail-item.series-30 .d-name,
+.modal-body .detail-item.series-30 .d-name {
+    color: #dcc4a0 !important;
+}
+.modal-content .detail-card.series-40 .d-name,
+.modal-body .detail-card.series-40 .d-name,
+.modal-content .detail-item.series-40 .d-name,
+.modal-body .detail-item.series-40 .d-name {
+    color: #ccdccc !important;
+}
+
+/* 列印按鈕也可能是 inline，再強制覆蓋 */
+.modal-content button[onclick*="printOrder"],
+.modal-body button[onclick*="printOrder"] {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.75) !important;
+}
+
+/* =====================================================================
+   深莫蘭迪統一 — 文字色 / 圖表色 補正
+   ===================================================================== */
+
+/* === 1. group-header 權責區頂條：用深底，加亮文字 === */
+.group-header {
+    color: rgba(255, 255, 255, 0.92) !important;
+    box-shadow: none !important;
+}
+/* header-tag 副標籤 */
+.group-header .header-tag {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* === 2. column-header 狀態 header：文字加亮 === */
+.column-header.status-unquoted,
+.column-header.status-quoted,
+.column-header.status-paid {
+    border-top-color: var(--accent-30) !important;
+    color: var(--accent-30-text) !important;
+}
+.column-header.status-cutting {
+    border-top-color: var(--accent-20) !important;
+    color: var(--accent-20-text) !important;
+}
+.column-header.status-shipping,
+.column-header.status-dispatched {
+    border-top-color: var(--accent-40) !important;
+    color: var(--accent-40-text) !important;
+}
+.column-header.status-inspection,
+.column-header.status-picking,
+.column-header.status-packing {
+    border-top-color: var(--accent-warehouse) !important;
+    color: var(--accent-warehouse-text) !important;
+}
+.column-header.status-completed {
+    border-top-color: var(--status-completed) !important;
+    color: rgba(255,255,255,0.7) !important;
+}
+
+/* === 3. card-no / card-tag 訂單編號標籤：在深莫蘭迪底上用 light text === */
+.status-unquoted .card-no, .status-unquoted .card-tag,
+.status-quoted .card-no, .status-quoted .card-tag,
+.status-paid .card-no, .status-paid .card-tag {
+    color: var(--accent-30-text) !important;
+}
+.status-cutting .card-no, .status-cutting .card-tag {
+    color: var(--accent-20-text) !important;
+}
+.status-inspection .card-no, .status-inspection .card-tag,
+.status-picking .card-no, .status-picking .card-tag,
+.status-packing .card-no, .status-packing .card-tag {
+    color: var(--accent-warehouse-text) !important;
+}
+.status-shipping .card-no, .status-shipping .card-tag,
+.status-dispatched .card-no, .status-dispatched .card-tag {
+    color: var(--accent-40-text) !important;
+}
+.status-completed .card-no, .status-completed .card-tag {
+    color: rgba(255,255,255,0.85) !important;
+}
+
+/* btn-gmail（回覆）按鈕 也提亮文字 */
+.status-unquoted .btn-gmail,
+.status-quoted .btn-gmail,
+.status-paid .btn-gmail { color: var(--accent-30-text) !important; }
+.status-cutting .btn-gmail { color: var(--accent-20-text) !important; }
+.status-inspection .btn-gmail,
+.status-picking .btn-gmail,
+.status-packing .btn-gmail { color: var(--accent-warehouse-text) !important; }
+.status-shipping .btn-gmail,
+.status-dispatched .btn-gmail { color: var(--accent-40-text) !important; }
+
+/* === 4. card-price (訂單金額) 用提亮玫瑰色 === */
+.card-price {
+    color: var(--accent-delivery-text) !important;
+}
+
+/* === 5. 圖表內按鈕（按週/按日/全部/鋁材/配件）=== */
+/* 啟用態 active 的莫蘭迪底要配亮字 */
+.trend-toggle-btn.active,
+.btn-period-unit.active {
+    background: var(--accent-mail) !important;
+    color: var(--accent-mail-text) !important;
+}
+
+/* === 6. Modal 內 detail-card 各系列名稱色（提亮版） === */
+.modal-content .detail-card.series-20 .d-name,
+.modal-body .detail-card.series-20 .d-name,
+.modal-content .detail-item.series-20 .d-name,
+.modal-body .detail-item.series-20 .d-name {
+    color: var(--accent-20-text) !important;
+}
+.modal-content .detail-card.series-30 .d-name,
+.modal-body .detail-card.series-30 .d-name,
+.modal-content .detail-item.series-30 .d-name,
+.modal-body .detail-item.series-30 .d-name {
+    color: var(--accent-30-text) !important;
+}
+.modal-content .detail-card.series-40 .d-name,
+.modal-body .detail-card.series-40 .d-name,
+.modal-content .detail-item.series-40 .d-name,
+.modal-body .detail-item.series-40 .d-name {
+    color: var(--accent-40-text) !important;
+}
+
+/* === 7. 配送方式 文字 (color:var(--accent-delivery)) 改用提亮版 === */
+.modal-content [style*="color:var(--accent-delivery)"],
+.modal-body [style*="color:var(--accent-delivery)"] {
+    color: var(--accent-delivery-text) !important;
+}
+
+/* === 8. tag-out / tag-in / tag-meet 行事曆標籤 === */
+.tag-out { background: rgba(122,74,74,0.25) !important; color: #f0c4c4 !important; border-color: rgba(122,74,74,0.4) !important; }
+.tag-in { background: rgba(79,107,79,0.25) !important; color: #ccdccc !important; border-color: rgba(79,107,79,0.4) !important; }
+.tag-meet { background: rgba(74,99,121,0.25) !important; color: #c8d8e8 !important; border-color: rgba(74,99,121,0.4) !important; }
+
+/* === 9. 系列詳細 d-name (歷史訂單明細) === */
+.series-20 .d-name { color: var(--accent-20-text) !important; }
+.series-30 .d-name { color: var(--accent-30-text) !important; }
+.series-40 .d-name { color: var(--accent-40-text) !important; }
+
+/* === 10. cut-block 切割視覺色 === */
+.cut-block {
+    background: var(--accent-20) !important;
+    color: var(--accent-20-text) !important;
+}
+
+/* === 11. 庫存圓圈 SVG 內 (reservoir-fill activeColor) === */
+/* admin.js 寫死 #94a3b8 / #b5926c / #9db39d，這些是 inline SVG fill 屬性，無法用 CSS 覆蓋 */
+/* 但 reservoir-label 文字可以用 CSS 改 */
+
+/* === 12. nav-btn-tab 已勾選 active 用深莫蘭迪 === */
+.nav-btn-tab.active {
+    background: var(--accent) !important;
+    color: rgba(255,255,255,0.95) !important;
+    border-color: var(--accent) !important;
+    box-shadow: none !important;
+}
+
+/* =====================================================================
+   半透明深莫蘭迪 — 細節調整
+   ===================================================================== */
+
+/* 權責區頂條：半透明色 + 細邊框（避免完全沒形狀） */
+.group-header {
+    border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+/* column-header 狀態 header：加細邊框 */
+.column-header.status-unquoted,
+.column-header.status-quoted,
+.column-header.status-paid,
+.column-header.status-cutting,
+.column-header.status-shipping,
+.column-header.status-dispatched,
+.column-header.status-inspection,
+.column-header.status-picking,
+.column-header.status-packing,
+.column-header.status-completed {
+    border: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* card-no / card-tag 訂單編號標籤：加細邊框，半透明色更有形狀 */
+.card-no, .card-tag {
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    box-shadow: none !important;
+}
+
+/* btn-gmail (回覆按鈕) 加細邊框 */
+.btn-gmail {
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    box-shadow: none !important;
+}
+
+/* btn-card-action 也加邊框 */
+.btn-card-action {
+    border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+/* tag-out / tag-in / tag-meet 重設邊框 */
+.tag-out, .tag-in, .tag-meet {
+    border-width: 1px !important;
+}
+
+/* cut-block 切割視覺加細邊框 */
+.cut-block {
+    border-right: 1px solid rgba(255,255,255,0.15) !important;
+    text-shadow: none !important;
+}
+
+/* nav-btn-tab active 加邊框 */
+.nav-btn-tab.active {
+    border: 1px solid rgba(255,255,255,0.15) !important;
+}
+
+/* 圖表內按鈕 active 也加細邊框 */
+.trend-toggle-btn.active,
+.btn-period-unit.active {
+    border: 1px solid rgba(255,255,255,0.12) !important;
+}
+
+
+/* === header-tag 時間標籤（權責區右邊）全域透明覆蓋 === */
+.header-tag {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: rgba(255, 255, 255, 0.75) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: none !important;
+}
+
+/* =====================================================================
+   庫存頁面 — 卡片改深色玻璃（aluminum-tube-card / reservoir-card）
+   ===================================================================== */
+
+/* 鋁材庫存卡片 */
+.aluminum-tube-card {
+    background: rgba(44, 55, 66, 0.6) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+.aluminum-tube-card:hover {
+    background: rgba(44, 55, 66, 0.75) !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+}
+
+/* 配件庫存卡片 */
+.reservoir-card {
+    background: rgba(44, 55, 66, 0.6) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+.reservoir-card:hover {
+    background: rgba(44, 55, 66, 0.75) !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+    border-color: rgba(255,255,255,0.15) !important;
+}
+
+/* sku-badge 預設樣式（莫蘭迪變數已半透明，這裡確保文字色 + border） */
+.sku-badge {
+    background: rgba(255,255,255,0.06) !important;
+    color: rgba(255,255,255,0.85) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    box-shadow: none !important;
+}
+
+/* === 鋁材卡片 — inline style 顏色強制覆蓋 === */
+
+/* 卡片內所有 #2C3742 文字（型號名稱） */
+.aluminum-tube-card [style*="color:#2C3742"],
+.aluminum-tube-card [style*="color: #2C3742"] {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+/* 卡片內所有 #475569 文字（次要） */
+.aluminum-tube-card [style*="color:#475569"],
+.aluminum-tube-card [style*="color: #475569"] {
+    color: rgba(255,255,255,0.8) !important;
+}
+.reservoir-card [style*="color:#475569"],
+.reservoir-card [style*="color: #475569"] {
+    color: rgba(255,255,255,0.8) !important;
+}
+
+/* 卡片內所有 #94a3b8 文字（提示） */
+.aluminum-tube-card [style*="color:#94a3b8"],
+.aluminum-tube-card [style*="color: #94a3b8"] {
+    color: rgba(255,255,255,0.4) !important;
+}
+.reservoir-card [style*="color:#94a3b8"],
+.reservoir-card [style*="color: #94a3b8"] {
+    color: rgba(255,255,255,0.4) !important;
+}
+
+/* 卡片內 #64748b 文字（kg/m 標籤） */
+.aluminum-tube-card [style*="color:#64748b"],
+.aluminum-tube-card [style*="color: #64748b"] {
+    color: rgba(255,255,255,0.7) !important;
+}
+
+/* 卡片內 #b45309 金棕色標籤 */
+.aluminum-tube-card [style*="color:#b45309"],
+.aluminum-tube-card [style*="color: #b45309"] {
+    color: #f2dcb6 !important;
+}
+
+/* 卡片內所有 background:#f1f5f9 (kg/m 標籤底) */
+.aluminum-tube-card [style*="background:#f1f5f9"],
+.aluminum-tube-card [style*="background: #f1f5f9"] {
+    background: rgba(255,255,255,0.06) !important;
+    border-color: rgba(255,255,255,0.12) !important;
+}
+
+/* 卡片內 background:#fef3c7 ($/kg 標籤底) */
+.aluminum-tube-card [style*="background:#fef3c7"],
+.aluminum-tube-card [style*="background: #fef3c7"] {
+    background: rgba(242,220,182,0.15) !important;
+    border-color: rgba(242,220,182,0.3) !important;
+}
+
+/* === tube-container 進度條 === */
+.tube-container {
+    background: rgba(255,255,255,0.06) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2) !important;
+}
+.tube-text {
+    color: rgba(255,255,255,0.9) !important;
+    text-shadow: none !important;
+}
+
+/* === 分隔線 #f1f5f9 / #e2e8f0 === */
+.aluminum-tube-card [style*="border-bottom:1px solid #f1f5f9"],
+.aluminum-tube-card [style*="border-bottom: 1px solid #f1f5f9"] {
+    border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+.aluminum-tube-card [style*="border:1px solid #e2e8f0"],
+.aluminum-tube-card [style*="border: 1px solid #e2e8f0"] {
+    border-color: rgba(255,255,255,0.1) !important;
+}
+
+/* === 配件圓圈下方系列文字（20 系列 / 30 系列 / 40 系列） === */
+.reservoir-card [style*="color: var(--primary)"],
+.reservoir-card [style*="color:var(--primary)"] {
+    color: rgba(255,255,255,0.6) !important;
+}
+
+/* 配件卡片標題 h3 */
+.reservoir-card h3 {
+    color: rgba(255,255,255,0.9) !important;
+}
+.reservoir-card h3 i {
+    color: rgba(255,255,255,0.4) !important;
+}
+.reservoir-card [style*="color:#2C3742"],
+.reservoir-card [style*="color: #2C3742"] {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+/* === 短缺警報卡片內容 === */
+#critical-items-box,
+.critical-items-container {
+    background: rgba(44, 55, 66, 0.6) !important;
+    border-color: rgba(212,160,160,0.3) !important;
+    box-shadow: none !important;
+}
+#critical-items-box h3 {
+    color: #f0c4c4 !important;
+}
+.critical-item svg circle[fill="#fef2f2"] {
+    fill: rgba(255,255,255,0.05) !important;
+    stroke: rgba(255,255,255,0.1) !important;
+}
+
+/* === 返回類別按鈕（左上角）=== */
+.inv-detail-header .btn-back-hub-top,
+[onclick*="backToInventoryHub"] {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.7) !important;
+}
+
+/* =====================================================================
+   手機版庫存頁修正 — panel 深色 + 短缺警報細長條
+   ===================================================================== */
+@media (max-width: 768px) {
+
+  /* panel 改深色（覆蓋手機版的白底） */
+  .dashboard-panel,
+  .category-card {
+    background: rgba(44, 55, 66, 0.6) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+  }
+
+  /* panel-title 深色 */
+  .dashboard-panel .panel-title {
+    background: rgba(36, 48, 57, 0.7) !important;
+    color: rgba(255,255,255,0.85) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+    font-weight: 500 !important;
+  }
+  .dashboard-panel .alert-title {
+    color: rgba(255,255,255,0.85) !important;
+  }
+  .dashboard-panel .alert-title i {
+    color: #f0c4c4 !important;
+  }
+
+  /* category-card 標題與描述 */
+  .category-card .category-name {
+    color: rgba(255,255,255,0.9) !important;
+  }
+  .category-card .category-desc {
+    color: rgba(255,255,255,0.5) !important;
+  }
+  .category-icon {
+    color: rgba(255,255,255,0.35) !important;
+  }
+
+  /* gauges-container / low-stock-bars 改 column flex */
+  .gauges-container,
+  #low-stock-bars {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+    padding: 10px !important;
+  }
+
+  /* reservoir-circle 容器在手機版改成水平排版（細長條） */
+  .dashboard-reservoir {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+/* =====================================================================
+   短缺警報 / 庫存健康度 — 強制直排（覆蓋原本的 row !important）
+   ===================================================================== */
+#low-stock-bars,
+.gauges-container {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    padding: 10px !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+}
+
+/* reservoir-circle-container 在短缺警報內，改成水平 row 排版（細長條樣式） */
+#low-stock-bars .reservoir-circle-container,
+.gauges-container .reservoir-circle-container {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* 鋁材健康度的 panel 高度自適應 */
+.dashboard-panel.panel-gauges,
+.dashboard-panel.panel-alerts {
+    min-height: 0 !important;
+    height: auto !important;
+}
+
+/* =====================================================================
+   手機版庫存頁：四區塊改直排（資訊在上、入口在下）
+   ===================================================================== */
+@media (max-width: 768px) {
+
+  /* dashboard-grid-4 改 1 欄直排 */
+  .dashboard-grid-4 {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* 四個區塊全部歸位（覆蓋之前的 2x2 grid） */
+  .panel-gauges {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+  }
+  .panel-alerts {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+  .dashboard-grid-4 > .category-card:nth-of-type(1) {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+  }
+  .dashboard-grid-4 > .category-card:nth-of-type(2) {
+    grid-column: 1 !important;
+    grid-row: 4 !important;
+  }
+
+  /* 上面兩個資訊面板：自適應高度 */
+  .panel-gauges,
+  .panel-alerts {
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  /* 下面兩個入口卡：矮扁版 */
+  .dashboard-grid-4 > .category-card {
+    min-height: 0 !important;
+    padding: 14px 18px !important;
+  }
+  .dashboard-grid-4 > .category-card .category-card-inner {
+    gap: 14px !important;
+    align-items: center !important;
+  }
+  .dashboard-grid-4 > .category-card .category-icon {
+    font-size: 1.6rem !important;
+    width: auto !important;
+  }
+  .dashboard-grid-4 > .category-card .category-name {
+    font-size: 1rem !important;
+    margin-bottom: 2px !important;
+  }
+  .dashboard-grid-4 > .category-card .category-desc {
+    font-size: 0.7rem !important;
+    line-height: 1.4 !important;
+  }
+}
+
+/* =====================================================================
+   手機版庫存頁 — 修正高度（讓每個區塊自然伸縮）
+   ===================================================================== */
+@media (max-width: 768px) {
+
+  /* dashboard-grid-4 改為純直排，不限定 row 高度 */
+  .dashboard-grid-4 {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+    gap: 12px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 10px !important;
+  }
+
+  /* 移除前面強制的 grid-row，改用 source order */
+  .panel-gauges,
+  .panel-alerts,
+  .dashboard-grid-4 > .category-card {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+  }
+
+  /* 兩個資訊面板：內容決定高度，不互相影響 */
+  .panel-gauges,
+  .panel-alerts {
+    min-height: 0 !important;
+    height: auto !important;
+    align-self: start !important;
+  }
+
+  /* 短缺警報內容區也不限高度，讓所有項目都顯示 */
+  #low-stock-bars {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+/* =====================================================================
+   庫存詳細頁修正：返回類別 header 改深色 + 隱藏主選單按鈕
+   ===================================================================== */
+
+/* inv-detail-header 改深色（覆蓋手機版的白底） */
+.inv-detail-header {
+    background: rgba(255,255,255,0.06) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+    padding: 10px 16px !important;
+    margin-bottom: 14px !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+
+.inv-detail-header h3,
+.inv-detail-header h3 i,
+#inventory-view-title,
+#inventory-view-title i {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+/* 返回類別按鈕（在 inv-detail-header 內） */
+.inv-detail-header .btn-back-hub-top {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.75) !important;
+}
+.inv-detail-header .btn-back-hub-top:hover {
+    background: rgba(255,255,255,0.15) !important;
+    color: white !important;
+}
+
+
+
+/* =====================================================================
+   庫存詳細頁 — 「返回類別」按鈕移到 topbar，下方橫條只保留標題
+   ===================================================================== */
+
+/* inv-detail-header 留下標題即可，調得更輕薄 */
+.inv-detail-header {
+    padding: 8px 14px !important;
+    margin-bottom: 14px !important;
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 0 !important;
+}
+.inv-detail-header h3 {
+    color: rgba(255,255,255,0.85) !important;
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+    margin: 0 !important;
+}
+.inv-detail-header h3 i {
+    color: rgba(255,255,255,0.4) !important;
+    margin-right: 6px !important;
+}
+
+/* =====================================================================
+   行事曆模組 — 深色版
+   ===================================================================== */
+
+/* 左右兩個大卡片 */
+.calendar-left,
+.calendar-right {
+    background: rgba(44, 55, 66, 0.6) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    box-shadow: none !important;
+    color: rgba(255,255,255,0.85) !important;
+}
+
+/* 月份切換 header */
+.calendar-header h3,
+#cal-month-title {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+/* 月份左右箭頭 */
+.cal-nav-btn {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.7) !important;
+}
+.cal-nav-btn:hover {
+    background: rgba(198,166,130,0.2) !important;
+    color: #dcc4a0 !important;
+    border-color: rgba(198,166,130,0.4) !important;
+}
+
+/* 星期標題（日一二三四五六） */
+.cal-weekdays {
+    color: rgba(255,255,255,0.45) !important;
+}
+
+/* 日期格子 */
+.cal-day {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+}
+.cal-day:hover {
+    background: rgba(255,255,255,0.07) !important;
+    border-color: rgba(198,166,130,0.4) !important;
+    box-shadow: none !important;
+}
+.cal-day.active {
+    border: 2px solid rgba(198,166,130,0.5) !important;
+    background: rgba(198,166,130,0.08) !important;
+}
+.cal-day.empty {
+    background: transparent !important;
+    border-color: transparent !important;
+}
+.cal-day .date-num {
+    color: rgba(255,255,255,0.7) !important;
+}
+.cal-day.today .date-num {
+    background: rgba(198,166,130,0.35) !important;
+    color: #f2dcb6 !important;
+    border: 1px solid rgba(198,166,130,0.5) !important;
+}
+
+/* 行程列表 header（日期標題） */
+.event-list-header {
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+}
+.event-list-header h3,
+#cal-selected-date-title {
+    color: rgba(255,255,255,0.9) !important;
+}
+
+/* 行程列表空狀態文字 */
+.event-list-body [style*="color:#999"],
+.event-list-body [style*="color: #999"] {
+    color: rgba(255,255,255,0.4) !important;
+}
+
+/* 行程卡片 */
+.event-card {
+    background: rgba(36, 48, 57, 0.7) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+}
+.event-card.outbound { border-left-color: #d4a0a0 !important; }
+.event-card.inbound { border-left-color: #a8c4a8 !important; }
+.event-card.meeting { border-left-color: #a0bcd4 !important; }
+
+.event-card-title {
+    color: rgba(255,255,255,0.9) !important;
+}
+.event-card-notes {
+    color: rgba(255,255,255,0.6) !important;
+}
+.btn-del-event {
+    color: rgba(255,255,255,0.25) !important;
+}
+.btn-del-event:hover {
+    color: #f0c4c4 !important;
+}
+
+/* 新增行程按鈕 */
+.btn-add-event {
+    background: rgba(198,166,130,0.25) !important;
+    color: #dcc4a0 !important;
+    border: 1px solid rgba(198,166,130,0.4) !important;
+}
+.btn-add-event:hover {
+    background: rgba(198,166,130,0.35) !important;
+    box-shadow: 0 4px 10px rgba(198,166,130,0.2) !important;
+}
+
+/* 儲存行程按鈕 (modal 內) */
+.btn-save-event {
+    background: rgba(198,166,130,0.3) !important;
+    color: #f2dcb6 !important;
+    border: 1px solid rgba(198,166,130,0.4) !important;
+    padding: 10px 24px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    margin-left: 8px !important;
+}
+.btn-save-event:hover {
+    background: rgba(198,166,130,0.4) !important;
+}
+
+/* form-input (modal 內所有輸入) */
+.form-input {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    color: rgba(255,255,255,0.9) !important;
+}
+.form-input:focus {
+    border-color: rgba(198,166,130,0.5) !important;
+    box-shadow: 0 0 0 2px rgba(198,166,130,0.15) !important;
+}
+.form-input::placeholder {
+    color: rgba(255,255,255,0.35) !important;
+}
+
+/* date input 在深色下的 icon */
+input[type="date"].form-input::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+}
+
+/* 行事曆事件圓點（在日期格子上） — 提亮版 */
+.cal-event-dot.outbound { background: #d4a0a0 !important; }
+.cal-event-dot.inbound { background: #a8c4a8 !important; }
+.cal-event-dot.meeting { background: #a0bcd4 !important; }
+
+/* === Hub 上的「行程與外派排程」按鈕（首頁固定底部那條）=== */
+.hub-calendar-fixed {
+    background: rgba(44, 55, 66, 0.9) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important;
+}
+.hub-calendar-fixed:hover {
+    border-color: rgba(220,196,160,0.4) !important;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.4) !important;
+}
+.hub-calendar-fixed .cal-icon {
+    background: rgba(220,196,160,0.18) !important;
+    color: #dcc4a0 !important;
+}
+.hub-calendar-fixed .cal-text h3 {
+    color: rgba(255,255,255,0.9) !important;
+}
+.hub-calendar-fixed .cal-text p,
+#hub-cal-preview {
+    color: rgba(255,255,255,0.5) !important;
+}
+.hub-calendar-fixed .cal-arrow {
+    color: rgba(255,255,255,0.5) !important;
+}
+
+/* =====================================================================
+   行事曆 — 跨日事件條 + 月曆格子改進
+   ===================================================================== */
+
+/* 月曆格子加大，讓事件條看得見 */
+.cal-day {
+    min-height: 95px !important;
+    overflow: hidden;
+}
+
+.cal-day .cal-events-wrap {
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* 跨日事件色條 — 每天一條 */
+.cal-event-bar {
+    font-size: 0.65rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+.cal-event-bar:hover {
+    filter: brightness(1.2);
+}
+
+/* date input 在 dark mode 下文字白 */
+input[type="date"].form-input {
+    color-scheme: dark;
+}
+
+/* select 在 dark mode 下背景與選項 */
+select.form-input option {
+    background: #2C3742;
+    color: rgba(255,255,255,0.9);
+}
+
+/* 行事曆模組 modal 內 detail-group spacing */
+#event-modal .detail-group {
+    margin-bottom: 14px;
+}
+#event-modal .detail-label {
+    color: rgba(255,255,255,0.65) !important;
+    font-size: 0.78rem;
+    margin-bottom: 4px;
+    display: block;
+}
+
+/* event-card hover */
+.event-card:hover {
+    background: rgba(36,48,57,0.9) !important;
+    border-color: rgba(255,255,255,0.15) !important;
+}
+
+/* 手機版 calendar — 月曆和事件列表上下排 */
+@media (max-width: 768px) {
+    .calendar-layout {
+        flex-direction: column !important;
+        gap: 12px !important;
+        height: auto !important;
+        padding: 10px !important;
+    }
+    .calendar-left, .calendar-right {
+        flex: none !important;
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+    .cal-day {
+        min-height: 60px !important;
+        padding: 4px !important;
+    }
+    .cal-day .date-num {
+        font-size: 0.75rem !important;
+    }
+    .cal-event-bar {
+        font-size: 0.55rem !important;
+        padding: 1px 3px !important;
+    }
+    /* 手機板月曆事件最多顯示一條 */
+    .cal-day .cal-events-wrap .cal-event-bar:nth-child(n+2) {
+        display: none;
+    }
+}
+
+/* =====================================================================
+   行事曆事件條 — 縮緊版（避免撐破日期格）
+   ===================================================================== */
+.cal-day {
+    overflow: hidden !important;
+    position: relative;
+}
+
+.cal-day .cal-events-wrap {
+    margin-top: 3px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    overflow: hidden;
+    max-height: calc(100% - 22px);
+}
+
+.cal-event-bar {
+    font-size: 0.62rem !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
+    line-height: 1.35 !important;
+    height: 16px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* =====================================================================
+   行事曆月曆 — 自動配合視窗高度（不超出）
+   ===================================================================== */
+
+/* 桌面：整個月曆裝在一個視窗內 */
+@media (min-width: 769px) {
+    .calendar-layout {
+        height: calc(100vh - 100px) !important;
+        max-height: calc(100vh - 100px) !important;
+        padding: 14px 20px !important;
+        gap: 14px !important;
+    }
+    
+    .calendar-left {
+        padding: 16px !important;
+        height: 100%;
+        overflow: hidden;
+    }
+    .calendar-right {
+        padding: 16px !important;
+        height: 100%;
+        overflow: hidden;
+    }
+    
+    .calendar-header {
+        margin-bottom: 10px !important;
+    }
+    
+    /* 月曆網格 自動分配 */
+    .calendar-grid {
+        flex: 1;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0;
+    }
+    .cal-weekdays {
+        margin-bottom: 6px !important;
+        flex-shrink: 0;
+    }
+    .cal-days {
+        flex: 1;
+        gap: 4px !important;
+        grid-auto-rows: 1fr;   /* 平均分配 */
+        min-height: 0;
+    }
+    
+    /* 格子：移除固定 min-height，改成自動撐滿 */
+    .cal-day {
+        min-height: 0 !important;
+        padding: 5px 6px !important;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .cal-day .date-num {
+        font-size: 0.78rem !important;
+        margin-bottom: 2px !important;
+        flex-shrink: 0;
+    }
+    
+    /* 事件條再縮一點 */
+    .cal-event-bar {
+        font-size: 0.6rem !important;
+        height: 15px !important;
+        padding: 0 4px !important;
+        line-height: 15px !important;
+    }
+    
+    /* 右側列表也填滿 */
+    .event-list-body {
+        flex: 1;
+        overflow-y: auto;
+    }
+}
+
+/* =====================================================================
+   行事曆月曆 — 再縮一點（v2）
+   ===================================================================== */
+@media (min-width: 769px) {
+    .calendar-layout {
+        height: calc(100vh - 75px) !important;
+        max-height: calc(100vh - 75px) !important;
+        padding: 10px 16px !important;
+        gap: 12px !important;
+    }
+    
+    .calendar-left, .calendar-right {
+        padding: 12px !important;
+        border-radius: 10px !important;
+    }
+    
+    .calendar-header {
+        margin-bottom: 6px !important;
+    }
+    .calendar-header h3 {
+        font-size: 0.95rem !important;
+    }
+    .cal-nav-btn {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 0.85rem !important;
+    }
+    
+    .cal-weekdays {
+        margin-bottom: 4px !important;
+        font-size: 0.7rem !important;
+    }
+    .cal-days {
+        gap: 3px !important;
+    }
+    
+    .cal-day {
+        padding: 3px 5px !important;
+    }
+    .cal-day .date-num {
+        font-size: 0.72rem !important;
+        margin-bottom: 1px !important;
+    }
+    
+    /* 今日標記縮小 */
+    .cal-day.today .date-num {
+        width: 18px !important;
+        height: 18px !important;
+        font-size: 0.7rem !important;
+        line-height: 18px !important;
+    }
+    
+    .cal-event-bar {
+        font-size: 0.56rem !important;
+        height: 13px !important;
+        padding: 0 3px !important;
+        line-height: 13px !important;
+    }
+    .cal-day .cal-events-wrap {
+        gap: 1px !important;
+        margin-top: 1px !important;
+    }
+}
+
+/* =====================================================================
+   行事曆 — 整頁鎖死不捲動（最終版）
+   ===================================================================== */
+@media (min-width: 769px) {
+    /* 進到 calendar 模組時，整個 body 都不捲動 */
+    body:has(#calendar-module:not(.hidden)) {
+        overflow: hidden !important;
+        height: 100vh !important;
+    }
+    body:has(#calendar-module:not(.hidden)) #calendar-module {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    body:has(#calendar-module:not(.hidden)) #calendar-module .module-topbar {
+        flex-shrink: 0 !important;
+    }
+    body:has(#calendar-module:not(.hidden)) .calendar-layout {
+        flex: 1 !important;
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+}
+
+/* =====================================================================
+   行事曆手機版 — 週曆 + agenda 列表（簡潔模式）
+   ===================================================================== */
+@media (max-width: 768px) {
+
+    /* 解除桌面版的鎖死 */
+    body:has(#calendar-module:not(.hidden)) {
+        overflow: auto !important;
+        height: auto !important;
+    }
+    body:has(#calendar-module:not(.hidden)) #calendar-module {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+    }
+
+    /* topbar 縮小 */
+    #calendar-module .module-topbar {
+        padding: 8px 12px !important;
+    }
+    #calendar-module .module-topbar h2 {
+        font-size: 0.92rem !important;
+    }
+    #calendar-module .btn-add-event {
+        padding: 5px 10px !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* layout 直排 */
+    .calendar-layout {
+        flex-direction: column !important;
+        gap: 0 !important;
+        padding: 10px 12px !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    /* 隱藏右側欄（手機版用左欄裡的 agenda 取代）*/
+    .calendar-right {
+        display: none !important;
+    }
+
+    /* 左欄調整 */
+    .calendar-left {
+        width: 100% !important;
+        flex: none !important;
+        padding: 12px !important;
+        height: auto !important;
+        overflow: visible !important;
+        max-height: none !important;
+    }
+
+    /* 月份切換 header */
+    .calendar-header {
+        margin-bottom: 8px !important;
+    }
+    .calendar-header h3 {
+        font-size: 0.85rem !important;
+        text-align: center !important;
+        line-height: 1.2;
+    }
+    .cal-nav-btn {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 0.8rem !important;
+    }
+
+    /* 隱藏 cal-weekdays（週日標已內建在每個格子）*/
+    .cal-weekdays {
+        display: none !important;
+    }
+
+    /* cal-days 改成 7 欄並排（一週）*/
+    .cal-days {
+        display: grid !important;
+        grid-template-columns: repeat(7, 1fr) !important;
+        grid-template-rows: auto !important;
+        gap: 4px !important;
+        flex: none !important;
+        min-height: 0 !important;
+    }
+
+    /* 移除舊的 cal-day 樣式干擾 */
+    #cal-days .cal-day {
+        background: transparent !important;
+        border: 1px solid transparent !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+    }
+}
