@@ -1729,7 +1729,7 @@ async function generateConsolidatedCuttingList() {
 
             // Extract Length
             let length = 0;
-            let lenMatch = line.match(/\(L=([0-9]+)cm\)/);
+            let lenMatch = line.match(/\(L=([\d.]+)cm\)/);
             if (lenMatch) length = parseInt(lenMatch[1]);
 
             // If no length (e.g. fixed length or not specified), maybe not a cut item or standard
@@ -1744,7 +1744,7 @@ async function generateConsolidatedCuttingList() {
             // Clean Name (Remove Qty and Length for grouping key)
             let baseName = line.replace(/ -- \$[0-9]+/, '')
                 .replace(/\( x [0-9]+ \)/, '')
-                .replace(/\(L=[0-9]+cm\)/, '')
+                .replace(/\(L=[\d.]+cm\)/, '')
                 .trim();
 
             let key = `${series} -${baseName} -${length} `;
@@ -4478,10 +4478,10 @@ function renderDetailCards(detailsStr, status) {
             const cleanBaseNoSKU = window.removeSKU(info.cleanBase);
 
             let formatted = `【鋁材】 <span style="font-weight:bold;">${cleanBaseNoSKU}</span>${skuHtml}`;
-            const lenMatch = line.match(/\((?:L=|長度)(\d+)cm\)/);
+            const lenMatch = line.match(/\((?:L=|長度)(\d+(?:\.\d+)?)cm\)/);
             // Replace the hardcoded (L=xx) in cleanBase to prevent duplicates
-            formatted = formatted.replace(/\(L=\d+cm\)/g, '').replace(/\(長度\d+cm\)/g, '').trim();
-            if (lenMatch) formatted += ` <span style="color:#c0392b; font-weight:bold;">(長度${Number(lenMatch[1]) * 10}mm)</span>`;
+            formatted = formatted.replace(/\(L=[\d.]+cm\)/g, '').replace(/\(長度[\d.]+cm\)/g, '').trim();
+            if (lenMatch) formatted += ` <span style="color:#c0392b; font-weight:bold;">(長度${Math.round(Number(lenMatch[1]) * 10)}mm)</span>`;
             if (qtyMatch) formatted += ` <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`;
 
             normalItems.push({

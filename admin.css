@@ -5725,3 +5725,67 @@ select.form-input option {
         padding: 0 !important;
     }
 }
+
+/* =====================================================================
+   報價精算面板 — 修復深色主題下文字看不到
+   ===================================================================== */
+
+/* 成本/收費面板兩個淺色區塊裡，強制黑色文字（這兩個是刻意淺色的面板） */
+.modal-content [style*="background:#fff1f2"] label,
+.modal-content [style*="background:#fff1f2"] span,
+.modal-content [style*="background:#fff1f2"] div,
+.modal-content [style*="background:#f0fdf4"] label,
+.modal-content [style*="background:#f0fdf4"] span,
+.modal-content [style*="background:#f0fdf4"] div {
+    color: #334155 !important;
+}
+
+/* 個別 label 的灰色文字強制深色 */
+.modal-content [style*="background:#fff1f2"] [style*="color:#888"],
+.modal-content [style*="background:#f0fdf4"] [style*="color:#888"] {
+    color: #64748b !important;
+}
+
+/* 成本區標題保留紅色 */
+.modal-content [style*="background:#fff1f2"] h4 {
+    color: #e11d48 !important;
+}
+
+/* 收費區標題保留綠色 */
+.modal-content [style*="background:#f0fdf4"] h4 {
+    color: #16a34a !important;
+}
+
+/* 折扣優惠 label 保留紅字 */
+.modal-content [style*="color:#e11d48"] {
+    color: #e11d48 !important;
+}
+
+/* 稅金白底那塊也修 */
+.modal-content [style*="background:#fff"] label,
+.modal-content [style*="background:#fff"] div,
+.modal-content [style*="background:#f8fafc"] span {
+    color: #334155 !important;
+}
+
+/* 系統料件小計灰字 */
+.modal-content [style*="color:#64748b"] {
+    color: #64748b !important;
+}
+
+/* input 在淺色面板內恢復深色文字 */
+.modal-content [style*="background:#fff1f2"] input,
+.modal-content [style*="background:#f0fdf4"] input {
+    color: #1e293b !important;
+    background: rgba(255,255,255,0.9) !important;
+}
+
+/* 平轉按鈕 */
+.modal-content [style*="background:#e2e8f0"] {
+    color: #334155 !important;
+}
+
+/* 稅金 radio label */
+.modal-content [style*="display:flex"] label {
+    color: rgba(255,255,255,0.85) !important;
+}
