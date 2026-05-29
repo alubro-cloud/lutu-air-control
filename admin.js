@@ -1307,17 +1307,32 @@ function logout() {
 window.assignProjectIds = function() {
     if (!ordersData || ordersData.length === 0) return;
     const allSorted = [...ordersData].sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
-    const dateCounts = {};
+
+    const newAssigned = [];
     allSorted.forEach(order => {
-        const d = window.safeParseDate(order.timestamp);
-        const dateKey = d.getFullYear().toString() + (d.getMonth() + 1).toString().padStart(2, '0') + d.getDate().toString().padStart(2, '0');
-        dateCounts[dateKey] = (dateCounts[dateKey] || 0) + 1;
-        
-        // 如果原本已經有編號（從後端載入或已生成過），則保留，否則生成新編號
         if (!order.projectId) {
-            order.projectId = `B${dateKey}${dateCounts[dateKey].toString().padStart(3, '0')}`;
+            const d = window.safeParseDate(order.timestamp);
+            const dateKey = d.getFullYear().toString()
+                + (d.getMonth() + 1).toString().padStart(2, '0')
+                + d.getDate().toString().padStart(2, '0');
+            // 用 timestamp 後 4 碼當唯一識別，刪單後重打也不重號
+            const ts = String(order.timestamp || Date.now());
+            const suffix = ts.slice(-4);
+            order.projectId = `B${dateKey}-${suffix}`;
+            newAssigned.push({ orderId: order.timestamp, projectId: order.projectId });
         }
     });
+
+    // 把新產生的 projectId 存回 Sheets S 欄（靜默背景寫入）
+    if (newAssigned.length > 0) {
+        newAssigned.forEach(({ orderId, projectId }) => {
+            fetch(ADMIN_API_URL, {
+                method: 'POST',
+                mode: 'cors',
+                body: JSON.stringify({ action: 'updateOrderPrice', orderId, projectId })
+            }).catch(e => console.warn('[assignProjectIds] save failed:', e));
+        });
+    }
 };
 
 async function fetchOrders() {
