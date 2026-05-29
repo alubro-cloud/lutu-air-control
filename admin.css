@@ -5785,7 +5785,25 @@ select.form-input option {
     color: #334155 !important;
 }
 
-/* 稅金 radio label */
-.modal-content [style*="display:flex"] label {
-    color: rgba(255,255,255,0.85) !important;
+/* 稅金 radio label — 白底區塊內強制深色 */
+.modal-content [style*="background:#fff"] label {
+    color: #334155 !important;
+}
+.modal-content [style*="background:#fff"] div[style*="display:flex"] label {
+    color: #334155 !important;
+}
+
+/* =====================================================================
+   報價面板 — 稅金白底區塊強制深色文字
+   ===================================================================== */
+.modal-content [style*="background:#fff"] label,
+.modal-content [style*="background:#fff"] label *,
+.modal-content [style*="background: #fff"] label,
+.modal-content [style*="background:#f8fafc"] label,
+.modal-content [style*="background:#f8fafc"] span {
+    color: #334155 !important;
+}
+/* 確保 radio 旁邊的文字也被蓋到 */
+.modal-content [style*="background:#fff"] div[style*="display:flex"] label {
+    color: #334155 !important;
 }
