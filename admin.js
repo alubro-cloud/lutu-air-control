@@ -174,11 +174,11 @@ window.showPriceModal = function (order, nextStatus) {
 
             <!-- 稅金選項 -->
             <div style="margin-bottom:15px; padding:10px 15px; border:1px solid #eee; border-radius:8px; background:#fff;">
-                 <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:8px; color:var(--text);">營業稅金計算：</label>
-                 <div style="display:flex; gap:20px; font-size:0.9rem;">
-                     <label style="cursor:pointer;"><input type="radio" name="tax_type" value="none" ${(!prevTaxType || prevTaxType === 'none') ? 'checked' : ''} onchange="updateQuotePreview()"> 未稅 (不開發票)</label>
-                     <label style="cursor:pointer;"><input type="radio" name="tax_type" value="inclusive" ${prevTaxType === 'inclusive' ? 'checked' : ''} onchange="updateQuotePreview()"> 含稅 (開發票，自行吸收5%)</label>
-                     <label style="cursor:pointer;"><input type="radio" name="tax_type" value="exclusive" ${prevTaxType === 'exclusive' ? 'checked' : ''} onchange="updateQuotePreview()"> 含稅 (開發票，外加5%)</label>
+                 <label style="display:block; font-size:0.85rem; font-weight:bold; margin-bottom:8px; color:#334155;">營業稅金計算：</label>
+                 <div style="display:flex; gap:20px; font-size:0.9rem; color:#334155;">
+                     <label style="cursor:pointer; color:#334155;"><input type="radio" name="tax_type" value="none" ${(!prevTaxType || prevTaxType === 'none') ? 'checked' : ''} onchange="updateQuotePreview()"> 未稅 (不開發票)</label>
+                     <label style="cursor:pointer; color:#334155;"><input type="radio" name="tax_type" value="inclusive" ${prevTaxType === 'inclusive' ? 'checked' : ''} onchange="updateQuotePreview()"> 含稅 (開發票，自行吸收5%)</label>
+                     <label style="cursor:pointer; color:#334155;"><input type="radio" name="tax_type" value="exclusive" ${prevTaxType === 'exclusive' ? 'checked' : ''} onchange="updateQuotePreview()"> 含稅 (開發票，外加5%)</label>
                  </div>
                  <div id="tax-amount-display" style="font-size:0.85rem; color:#e11d48; margin-top:8px; display:none; font-weight:bold;">+ 稅金 NT$ 0</div>
             </div>
