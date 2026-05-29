@@ -1306,33 +1306,21 @@ function logout() {
 
 window.assignProjectIds = function() {
     if (!ordersData || ordersData.length === 0) return;
-    const allSorted = [...ordersData].sort((a, b) => parseInt(a.timestamp) - parseInt(b.timestamp));
-
-    const newAssigned = [];
-    allSorted.forEach(order => {
+    // 只做顯示備援：S欄有值就用；沒有才用 timestamp 後4碼暫時顯示
+    // 後端 v17 起，新訂單下單時就會寫入 S欄，這裡只是保護舊訂單顯示不爆掉
+    ordersData.forEach(order => {
         if (!order.projectId) {
             const d = window.safeParseDate(order.timestamp);
             const dateKey = d.getFullYear().toString()
                 + (d.getMonth() + 1).toString().padStart(2, '0')
                 + d.getDate().toString().padStart(2, '0');
-            // 用 timestamp 後 4 碼當唯一識別，刪單後重打也不重號
             const ts = String(order.timestamp || Date.now());
             const suffix = ts.slice(-4);
             order.projectId = `B${dateKey}-${suffix}`;
-            newAssigned.push({ orderId: order.timestamp, projectId: order.projectId });
+            // 注意：這裡不寫回 Sheets，避免競爭條件
+            // 如果想永久固定，請直接在 Sheets S欄手動填入
         }
     });
-
-    // 把新產生的 projectId 存回 Sheets S 欄（靜默背景寫入）
-    if (newAssigned.length > 0) {
-        newAssigned.forEach(({ orderId, projectId }) => {
-            fetch(ADMIN_API_URL, {
-                method: 'POST',
-                mode: 'cors',
-                body: JSON.stringify({ action: 'updateOrderPrice', orderId, projectId })
-            }).catch(e => console.warn('[assignProjectIds] save failed:', e));
-        });
-    }
 };
 
 async function fetchOrders() {
