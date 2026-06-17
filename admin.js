@@ -17,6 +17,28 @@ window.setProfileDeducted = function (orderId) {
     localStorage.setItem(`deducted_${orderId}`, "true");
 };
 
+// [持久化修正] 把狀態同時存 localStorage + POST 後端，避免「改了卻沒存」→ 重整跳回 / 別台沒同步
+window.persistOrderStatus = function (orderId, status, target) {
+    try {
+        let saved = JSON.parse(localStorage.getItem('order_statuses') || '{}');
+        saved[orderId] = status;
+        localStorage.setItem('order_statuses', JSON.stringify(saved));
+    } catch (e) { }
+    try {
+        fetch(ADMIN_API_URL, {
+            method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'updateOrderPrice',
+                orderId: orderId,
+                newTotal: (target && target.total) || 0,
+                shippingFee: (target && target.shippingFee) || 0,
+                status: status,
+                projectId: target && target.projectId
+            })
+        }).catch(() => { });
+    } catch (e) { }
+};
+
 // [New] Safe Price Parser to handle currency symbols like $ and commas
 window.safeParsePrice = function (val) {
     if (typeof val === 'number') return val;
@@ -2616,11 +2638,7 @@ window.advanceStatus = function (orderId, nextStatus) {
             const confirmSkip = confirm("⚠️ 注意：系統紀錄顯示此訂單「已扣除」過配件庫存。\n是否直接移至待出貨 (不再重複扣庫存)？");
             if (confirmSkip) {
                 target.status = nextStatus;
-
-                // Save Status
-                let saved = JSON.parse(localStorage.getItem('order_statuses') || '{}');
-                saved[orderId] = nextStatus;
-                localStorage.setItem('order_statuses', JSON.stringify(saved));
+                window.persistOrderStatus(orderId, nextStatus, target); // [修正] 存狀態+POST後端
 
                 applyFilter();
                 window.lastActiveOrderId = orderId;
@@ -2760,6 +2778,7 @@ window.advanceStatus = function (orderId, nextStatus) {
                         localStorage.setItem(`deducted_acc_${orderId}`, 'true');
 
                         target.status = nextStatus;
+                        window.persistOrderStatus(orderId, nextStatus, target); // [修正] 存狀態+POST，避免重整跳回
                         applyFilter();
                         window.lastActiveOrderId = orderId;
                         alert("✅ 配件庫存已扣除，訂單移至待出貨。");
@@ -2768,6 +2787,7 @@ window.advanceStatus = function (orderId, nextStatus) {
                         // Allow force proceed?
                         if (confirm("⚠️ 配件扣除失敗 (可能庫存不足或名稱不符)。\n是否強制移至待出貨？")) {
                             target.status = nextStatus;
+                            window.persistOrderStatus(orderId, nextStatus, target); // [修正] 存狀態+POST
                             applyFilter();
                             window.lastActiveOrderId = orderId;
                             window.closeModal();
