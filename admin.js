@@ -5842,10 +5842,17 @@ window.runCuttingOptimization = async function () {
                 // Split by common delimiters
                 let candidates = offStr.split(/[,，、 ]+/).map(s => parseFloat(s.trim())).filter(n => !isNaN(n) && n > 0);
 
-                candidates.forEach(len => {
-                    if (len > 1000) {
+                candidates.forEach(raw => {
+                    let len = raw;
+                    // [自我修復] 一支整料=600cm，餘料不可能 >600。
+                    // 若 >600 但 ÷10 後 ≤600，是舊版誤存的 mm 值 → 還原成 cm。
+                    if (len > 600 && (len / 10) <= 600) {
+                        len = len / 10;
+                    }
+                    if (len > 600) {
+                        // ÷10 後仍 >600 → 真正異常（例如多段被串接）
                         dataWarning = `<div style="color:red; font-size:0.8rem; background:#fee; padding:5px; margin-bottom:5px; border-radius:4px;">
-        <i class="fas fa-exclamation-triangle"></i> 警告：餘料數據異常(${len})。<br>請檢查 Google Sheet 儲存格格式是否誤設為「數字」。請改為「純文字」。
+        <i class="fas fa-exclamation-triangle"></i> 警告：餘料數據異常(${raw})。<br>請檢查 Google Sheet 儲存格格式是否誤設為「數字」。請改為「純文字」。
         </div>`;
                     } else {
                         availableOffcuts.push(len);
@@ -6198,24 +6205,23 @@ window.recordCuttingPlanToInventory = async function () {
                 // The remainder is tracked as offcut/waste.
                 cuttingPlans[modelName].deductStandardCM += 600;
             }
-            // Case B: Offcut (餘料)
+            // Case B: Offcut (餘料) — header 是「餘料 XXXmm」，數字是 mm，要 ÷10 還原 cm
             else if (headerText.includes('餘料')) {
-                // Extract 123cm or 123.5cm
-                const match = headerText.match(/(\d+(\.\d+)?)cm/);
+                const match = headerText.match(/(\d+(\.\d+)?)\s*mm/);
                 if (match) {
-                    cuttingPlans[modelName].removeOffcuts.push(parseFloat(match[1]));
+                    cuttingPlans[modelName].removeOffcuts.push(parseFloat(match[1]) / 10); // [修正] mm → cm
                 }
             }
 
             // Check Remainder (for all rows)
             const remainDiv = row.querySelector('.cut-remain');
             if (remainDiv) {
-                // Title format: "剩餘 123.5cm (餘料)"
+                // 注意：title 內數字是 mm（render 時 ×10 顯示），必須 ÷10 還原成 cm
                 const title = remainDiv.getAttribute('title') || "";
                 const remainMatch = title.match(/[\d.]+/);
 
                 if (remainMatch) {
-                    const remainLen = parseFloat(remainMatch[0]);
+                    const remainLen = parseFloat(remainMatch[0]) / 10; // [修正] mm → cm
                     // Logic: >= 10cm is useful Offcut, else Waste
                     if (remainLen >= 10) {
                         cuttingPlans[modelName].addOffcuts.push(remainLen);
@@ -6337,6 +6343,9 @@ window.recordCuttingPlanToInventory = async function () {
 
                 // 3. PERSIST to LocalStorage (Use explicit String key)
                 savedStatuses[String(o.timestamp)] = 'inspection';
+
+                // 4. [修正] POST 後端，讓手機/別台同步（切料→品檢 之前漏了這步）
+                window.persistOrderStatus(o.timestamp, 'inspection', o);
 
                 advancedCount++;
             });
