@@ -2,7 +2,7 @@
 const ADMIN_API_URL = "https://script.google.com/macros/s/AKfycbx2mqPe1ilOWDQ45JYDGJ2KaAUZ9dyH0fT-NwIDOdqUNmz1Dn3-tsL70urJT2cYYI5Q/exec";
 
 // === 版本印記（部署後按 F12 看 Console 確認是否生效）===
-console.log("%c[ADMIN] build 20260617f", "background:#222B34;color:#BEBEBE;padding:2px 8px;border-radius:3px;font-weight:bold;");
+console.log("%c[ADMIN] build 20260617h", "background:#222B34;color:#BEBEBE;padding:2px 8px;border-radius:3px;font-weight:bold;");
 
 // Global Error Handler for debugging
 // Global Error Handler removed to prevent generic script errors from alerting
@@ -2288,8 +2288,10 @@ window.triggerGmailReply = function (orderId) {
     window.openGmail(target.email, mailSubject, mailBody);
 
     // [New] Auto-Advance Logic: For S2S orders, jump directly to picking (skip confirmation per user request)
-    let isStoreOrder = (target.address || "").includes("店到店") || parseInt(target.shippingFee) === 60;
-    if (target.status === 'unquoted' && isStoreOrder) {
+    let isStoreOrder = (target.address || "").includes("店到店");
+    // [修正] 有鋁材的單不可自動跳撿料（仍需切料）
+    let _hasAlu = (target.details || "").match(/鋁材|銘材|鋁擠型/);
+    if (target.status === 'unquoted' && isStoreOrder && !_hasAlu) {
         // Auto-advance without confirm() to make it "Directly jump"
         window.advanceStatus(orderId, 'picking');
     }
@@ -2345,7 +2347,7 @@ function createCard(order, index, currentStatus) {
     let hasS2SKeyword = s2sKeywords.some(k => addrStr.includes(k));
     let parsedShipFee = window.safeParsePrice(order.shippingFee);
 
-    if (hasS2SKeyword || parsedShipFee === 60) {
+    if (hasS2SKeyword) {
         tag = `<span class="card-tag" ${tagStyle}>店到店</span>`;
         isStore = true;
         isSelfPickup = false;
@@ -2358,12 +2360,18 @@ function createCard(order, index, currentStatus) {
         tag = `<span class="card-tag" ${tagStyle}>公司配送${vtLabel}</span>`;
     }
 
+    // [修正] 是否含鋁材 → 決定要不要走切料（與配送方式無關）。
+    // 有鋁材一定要切料；只有配件才可跳過切料直接撿料。
+    let _d = order.details || "";
+    let hasProfiles = _d.includes('鋁材') || _d.includes('銘材') || _d.includes('鋁擠型');
+
     // Determine Next Step Logic
     let nextStatus = null;
     let prevStatus = null;
 
     // [Crucial Fix] For Store-to-Store orders at 'unquoted' or 'quoted', next step IS ALWAYS 'picking'
-    if (isStore && (currentStatus === 'unquoted' || currentStatus === 'quoted')) {
+    // [修正] 但只有「沒有鋁材」的單才走這條捷徑；有鋁材一定要先切料。
+    if (isStore && !hasProfiles && (currentStatus === 'unquoted' || currentStatus === 'quoted')) {
         nextStatus = 'picking';
     } else {
         let flow = STANDARD_FLOW;
@@ -2376,7 +2384,8 @@ function createCard(order, index, currentStatus) {
     }
 
     if (currentStatus === 'paid') {
-        if (isStore) nextStatus = 'picking';
+        // [修正] 有鋁材 → 切料；只有配件 → 才跳過切料直接撿料（不再看配送方式）
+        if (!hasProfiles) nextStatus = 'picking';
         else nextStatus = 'cutting';
     }
 
@@ -2390,7 +2399,7 @@ function createCard(order, index, currentStatus) {
         let btnText = nextLabel;
 
         // [Final Logic Enforcement] Ensure text and status are correct for S2S
-        if (isStore && (currentStatus === 'unquoted' || currentStatus === 'quoted')) {
+        if (isStore && !hasProfiles && (currentStatus === 'unquoted' || currentStatus === 'quoted')) {
             nextStatus = 'picking';
             btnText = "開始撿貨 (店到店)";
         } else if (currentStatus === 'unquoted') {
@@ -2557,12 +2566,14 @@ window.advanceStatus = function (orderId, nextStatus) {
     // [Fix] If nextStatus is already 'picking' (from S2S logic), skip this block
     if (target.status === 'unquoted' && nextStatus === 'quoted') {
         const addr = (target.address || "").toLowerCase();
-        let isS2S = addr.includes("店到店") || parseInt(target.shippingFee) === 60 || addr.includes("[店到店]");
+        let isS2S = addr.includes("店到店") || addr.includes("[店到店]");
+        // [修正] 有鋁材的單不可走店到店捷徑跳撿料（仍需切料）
+        let _hasAlu = (target.details || "").match(/鋁材|銘材|鋁擠型/);
 
         // Smart Skip: Self-Pickup implies 0 shipping. 
         // Note: For S2S, we usually want to jump to 'picking', not 'quoted'. 
         // If we somehow get here for S2S and nextStatus is 'quoted', redirect to 'picking' logic.
-        if (isS2S) {
+        if (isS2S && !_hasAlu) {
             nextStatus = 'picking';
             target.status = 'picking'; // Update locally for S2S jump
         } else if (addr.includes("自取") || addr.includes("[自取]")) {
@@ -6467,7 +6478,7 @@ window.renderHistoryOrders = function () {
             let tag = "";
             let addrStr = o.address || "";
             let isSelfPickup = addrStr.includes("自取") || addrStr.includes("[自取]");
-            let isStore = addrStr.includes("店到店") || addrStr.includes("超商") || addrStr.includes("7-11") || addrStr.includes("全家") || addrStr.includes("[店到店]") || window.safeParsePrice(o.shippingFee) === 60;
+            let isStore = addrStr.includes("店到店") || addrStr.includes("超商") || addrStr.includes("7-11") || addrStr.includes("全家") || addrStr.includes("[店到店]");
 
             const tagStyle = `style="background:var(--status-completed, #94a3b8);color:#fff;"`;
             if (isStore) tag = `<span class="card-tag" ${tagStyle}>店到店</span>`;
