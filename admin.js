@@ -2506,6 +2506,19 @@ window.regressStatus = function (orderId, prevStatus) {
         saved[orderId] = prevStatus;
         localStorage.setItem('order_statuses', JSON.stringify(saved));
 
+        // [跨機同步修正] 退回也要存回後端，否則新合併規則會讓退回失效、別台也看不到
+        fetch(ADMIN_API_URL, {
+            method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'updateOrderPrice',
+                orderId: orderId,
+                newTotal: target.total || 0,
+                shippingFee: target.shippingFee || 0,
+                status: prevStatus,
+                projectId: target.projectId
+            })
+        }).then(() => console.log(`Regress ${prevStatus} saved to backend`)).catch(() => { });
+
         applyFilter();
     }
 };
