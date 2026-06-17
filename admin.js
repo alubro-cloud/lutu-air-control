@@ -1,6 +1,9 @@
 // Link to the same API
 const ADMIN_API_URL = "https://script.google.com/macros/s/AKfycbx2mqPe1ilOWDQ45JYDGJ2KaAUZ9dyH0fT-NwIDOdqUNmz1Dn3-tsL70urJT2cYYI5Q/exec";
 
+// === 版本印記（部署後按 F12 看 Console 確認是否生效）===
+console.log("%c[ADMIN] build 20260617f", "background:#222B34;color:#BEBEBE;padding:2px 8px;border-radius:3px;font-weight:bold;");
+
 // Global Error Handler for debugging
 // Global Error Handler removed to prevent generic script errors from alerting
 // window.onerror = ...
