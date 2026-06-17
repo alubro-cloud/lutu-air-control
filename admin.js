@@ -2037,20 +2037,11 @@ window.switchCutTab = function (tab) {
                     let chunks = str.split(/[,，]/).filter(s => s.trim().length > 0);
                     chunks.forEach(s => {
                         let num = parseFloat(s);
-                        if (num > 650) {
-                            // Try to split logic
-                            let s2 = s.trim();
-                            while (s2.length > 0) {
-                                let chunk = s2.substring(0, s2.indexOf('.') + 2);
-                                if (!chunk || chunk.length < 3) chunk = s2.substring(0, 3);
-                                let val = parseFloat(chunk);
-                                if (!isNaN(val)) parsedArr.push(val);
-                                s2 = s2.substring(chunk.length);
-                                if (parsedArr.length > 20) break;
-                            }
-                        } else if (num > 0) {
-                            parsedArr.push(num);
-                        }
+                        if (isNaN(num) || num <= 0) return;
+                        // [自我修復] >600(cm 不可能) 但 ÷10 ≤600 → 舊版誤存的 mm，還原成 cm（與主解析器一致）
+                        if (num > 600 && (num / 10) <= 600) num = num / 10;
+                        if (num > 600) return; // ÷10 後仍 >600，視為異常略過
+                        parsedArr.push(num);
                     });
                     if (parsedArr.length > 0) autoOffcuts = parsedArr.join(', ');
                 }
