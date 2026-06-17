@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>配送排車 · ALUMIBRO</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root{
+    --bg:#2C3742; --ink:#222B34;
+    --glass:rgba(255,255,255,0.10); --glass-hi:rgba(255,255,255,0.16);
+    --line:rgba(255,255,255,0.12); --line-hi:rgba(255,255,255,0.30);
+    --w90:rgba(255,255,255,0.90); --w70:rgba(255,255,255,0.70); --w50:rgba(255,255,255,0.50); --w35:rgba(255,255,255,0.35);
+    --accent:#c8d8e8; --big:#a9c6e3; --mid:#b6d6b6; --ok:#bfe3c6; --warn:#e7a3a3;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Noto Sans TC',sans-serif;color:var(--w90);font-size:15px;line-height:1.55;-webkit-text-size-adjust:100%;
+    background:radial-gradient(1200px 700px at 50% -15%, #3a4753 0%, #2C3742 55%, #232b33 100%) fixed;}
+  .wrap{max-width:1280px;margin:0 auto;padding:14px 16px 70px}
+  .hidden{display:none!important}
+
+  /* Login */
+  .gate{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+  .gate-box{background:var(--glass);border:1px solid var(--line-hi);border-radius:20px;padding:46px 36px;width:100%;max-width:380px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+  .gate-box i.lk{font-size:1.6rem;color:var(--accent);margin-bottom:14px}
+  .gate-box h2{font-weight:300;letter-spacing:1px;font-size:1.3rem;margin-bottom:6px}
+  .gate-box p{color:var(--w50);font-size:.86rem;margin-bottom:22px}
+  .gate-box input{width:100%;padding:13px;background:rgba(255,255,255,.16);border:1px solid var(--line-hi);border-radius:10px;color:#fff;text-align:center;font-family:inherit;margin-bottom:16px}
+  .gate-box input::placeholder{color:var(--w50)}
+
+  /* Header */
+  header{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 16px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .cube{font-size:1.3rem;color:var(--accent)}
+  .brand h1{font-size:1.2rem;font-weight:300;letter-spacing:1px}
+  .brand .sub{font-size:.7rem;color:var(--w35);letter-spacing:.5px}
+  .hd-right{display:flex;align-items:center;gap:12px}
+  /* 你是誰 + 角色 */
+  .who-list{display:flex;flex-direction:column;gap:9px;margin-top:4px;max-height:48vh;overflow-y:auto;padding-right:4px}
+  .who-list::-webkit-scrollbar{width:6px}
+  .who-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:3px}
+  .who-btn{display:flex;align-items:center;justify-content:space-between;width:100%;padding:13px 16px;background:rgba(255,255,255,.10);border:1px solid var(--line-hi);border-radius:11px;color:#fff;font-family:inherit;font-size:.98rem;cursor:pointer;transition:.2s}
+  .who-btn:hover{background:rgba(255,255,255,.20)}
+  .who-role{font-size:.72rem;padding:2px 10px;border-radius:12px;background:rgba(255,255,255,.14);color:var(--w70)}
+  .who-role.ed{background:#3f6fb0;color:#fff}
+  .role-tag{font-size:.66rem;padding:1px 8px;border-radius:12px;background:rgba(255,255,255,.16);color:var(--w70);margin-left:5px}
+  .role-tag.ed{background:#3f6fb0;color:#fff}
+  .me-badge{font-size:.8rem;color:var(--w70);white-space:nowrap}
+  body.viewer #addPointBtn{display:none}
+  body.viewer .pt-act{display:none}
+  /* 檢視者唯讀樣式 */
+  .ro{padding:10px 12px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:9px;color:var(--w90);font-size:.92rem}
+  .ro-note{font-size:.8rem;color:var(--accent);margin-top:4px}
+  .card.truck-white .ro{background:#f1f4f7;border-color:#e0e5ea;color:var(--ink)}
+  .card.truck-white .ro-note{color:#3f6fb0}
+  .dt{font-size:.78rem;color:var(--w35)}
+  .glassbtn{background:var(--glass);border:1px solid var(--line);color:var(--w70);padding:7px 13px;border-radius:9px;cursor:pointer;font-size:.82rem;font-family:inherit;transition:.2s}
+  .glassbtn:hover{background:var(--glass-hi);border-color:var(--line-hi);color:#fff}
+
+  .tabs{display:flex;gap:8px;margin-bottom:16px}
+  .tab{flex:1;padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--glass);color:var(--w70);font-weight:500;font-size:.92rem;cursor:pointer;font-family:inherit;transition:.25s}
+  .tab.on{background:#fff;color:var(--ink);border-color:#fff;font-weight:700}
+
+  /* Week bar */
+  .weekbar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .wk-toggle{display:flex;background:var(--glass);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .wk-toggle button{padding:9px 16px;border:none;background:none;color:var(--w50);font-family:inherit;font-weight:700;font-size:.86rem;cursor:pointer}
+  .wk-toggle button.on{background:#fff;color:var(--ink)}
+  .wk-range{color:var(--w35);font-size:.78rem;margin-left:auto}
+
+  .daytabs{display:flex;gap:7px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px;-webkit-overflow-scrolling:touch}
+  .day{flex:1;min-width:60px;padding:9px 4px;border:1px solid var(--line);border-radius:12px;background:var(--glass);text-align:center;cursor:pointer;transition:.2s;position:relative}
+  .day .dow{font-weight:700;font-size:.92rem}
+  .day .md{font-size:.68rem;color:var(--w50);margin-top:1px}
+  .day.on{background:#fff;border-color:#fff}
+  .day.on .dow{color:var(--ink)} .day.on .md{color:var(--ink-soft,#5b6670)}
+  .day.today::after{content:'';position:absolute;top:6px;right:7px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .day .hasplan{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);width:16px;height:3px;border-radius:3px;background:var(--mid)}
+
+  /* Card (glass) */
+  .card{background:var(--glass);border:1px solid var(--line);border-radius:20px;padding:18px 18px;margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,.14);position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--bar,rgba(255,255,255,.5));border-radius:20px 0 0 20px}
+  /* 大車 = 白卡（深字） */
+  .card.truck-white{background:#eef1f4;border-color:rgba(0,0,0,.08);--bar:#9fb2c6;color:var(--ink);box-shadow:0 12px 30px rgba(0,0,0,.22)}
+  .card.truck-white h2{color:var(--ink)} .card.truck-white h2 i{color:#5b6b7d}
+  .card.truck-white .pill{background:var(--ink);color:#fff}
+  .card.truck-white label{color:#6b7682}
+  .card.truck-white select,.card.truck-white input{background:#fff;border-color:#d4dae0;color:var(--ink)}
+  .card.truck-white select option{background:#fff;color:var(--ink)}
+  .card.truck-white .stop-item{background:#fff;border-color:#e1e6ea}
+  .card.truck-white .si-top .nm{color:var(--ink)}
+  .card.truck-white .si-note{background:#fff;border-color:#d4dae0;color:var(--ink)}
+  .card.truck-white .empty{color:#98a2ac}
+  .card.truck-white .chk{color:#3a4754}
+  .card.truck-white .btn-ghost{background:#fff;border-color:#d4dae0;color:#3a4754}
+  .card.truck-white .res{border-top-color:#dde3e8}
+  .card.truck-white .res-row{border-bottom-color:#e6eaee}
+  .card.truck-white .seq{background:var(--ink);color:#fff}
+  .card.truck-white .seq.edge{background:#c2cad2;color:var(--ink)}
+  .card.truck-white .res-nm{color:var(--ink)} .card.truck-white .res-note{color:#3f6fb0}
+  .card.truck-white .res-eta b{color:var(--ink)} .card.truck-white .res-eta span{color:#8a929b}
+  .card.truck-white .summ{background:#fff;color:#5b6670} .card.truck-white .summ b{color:var(--ink)}
+  /* 中車 = 藍卡（白字） */
+  .card.truck-blue{background:linear-gradient(140deg,#3c6196,#2f4f76);border-color:rgba(255,255,255,.20);--bar:#cfe0f2;box-shadow:0 12px 30px rgba(0,0,0,.22)}
+  .card.truck-blue .res-note{color:#dbe8f7}
+  /* 每站任務備註 */
+  .si-top{display:flex;align-items:center;gap:9px}
+  .si-top .nm{flex:1}
+  .si-top .x{color:var(--warn);cursor:pointer;font-weight:700;font-size:1.05rem;padding:0 4px}
+  .si-note{width:100%;margin-top:8px;padding:7px 10px;font-size:.85rem;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-family:inherit}
+  .res-note{font-size:.78rem;color:var(--accent);margin-top:3px;font-weight:400}
+  /* 每站指定時間 */
+  .si-time{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .si-time .lbl{font-size:.7rem;color:var(--w35)}
+  .si-time .si-t{width:auto;flex:0 0 auto;padding:5px 7px;font-size:.82rem}
+  .si-time .dash{color:var(--w35)}
+  .card.truck-white .si-time .lbl,.card.truck-white .si-time .dash{color:#8a929b}
+  .card.truck-white .si-t{background:#fff;border-color:#d4dae0;color:var(--ink)}
+  /* 結果：時間窗 / 等候 / 趕不到 */
+  .res-win{font-size:.74rem;color:#7fb0e0;margin-top:2px}
+  .res-win.bad{color:#e7a3a3;font-weight:700}
+  .res-eta b.bad{color:#e7a3a3}
+  .seq.bad{background:#b8534f;color:#fff}
+  .card.truck-white .res-win{color:#3f6fb0} .card.truck-white .res-win.bad{color:#c0392b}
+  .card.truck-white .res-eta b.bad{color:#c0392b}
+  .card.truck-white .seq.bad{background:#c0392b;color:#fff}
+
+  /* 兩車左右排（電腦版），手機堆疊 */
+  .trucks{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+  @media(min-width:860px){ .trucks{grid-template-columns:1fr 1fr;gap:18px} }
+
+  /* 當日公告 / 外車提醒 */
+  .announce{margin-bottom:16px}
+  .ann-box{background:linear-gradient(135deg,rgba(231,178,116,.20),rgba(231,178,116,.08));border:1px solid rgba(231,178,116,.38);border-radius:14px;padding:11px 14px;display:flex;gap:11px;align-items:flex-start}
+  .ann-box .meg{color:#e7b274;font-size:1.05rem;margin-top:3px;flex-shrink:0}
+  .ann-lbl{font-size:.66rem;color:#e7b274;font-weight:700;letter-spacing:.5px;display:block;margin-bottom:2px}
+  .ann-box textarea{width:100%;background:transparent;border:none;color:#fff;font-family:inherit;font-size:.9rem;resize:vertical;min-height:22px;outline:none;line-height:1.5}
+  .ann-box textarea::placeholder{color:var(--w35)}
+  .day .hasann{position:absolute;top:6px;left:7px;width:5px;height:5px;border-radius:50%;background:#e7b274}
+  /* 近期公告 strip */
+  #upcoming{margin-bottom:12px}
+  .upc-box{background:rgba(231,178,116,.12);border:1px solid rgba(231,178,116,.30);border-radius:12px;padding:9px 12px}
+  .upc-box .ttl{font-size:.7rem;color:#e7b274;font-weight:700;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .upc-item{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;padding:5px 10px;margin:3px 5px 3px 0;font-size:.82rem;cursor:pointer;color:var(--w90)}
+  .upc-item b{color:#e7b274;font-weight:700}
+  .upc-item:hover{background:rgba(255,255,255,.12)}
+  .card h2{font-size:1.05rem;font-weight:300;display:flex;align-items:center;gap:9px;margin-bottom:2px}
+  .card h2 i{color:var(--accent)}
+  .pill{font-size:.66rem;font-weight:700;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,.14);color:var(--w70)}
+  label{display:block;font-size:.74rem;color:var(--w50);font-weight:500;margin:12px 0 5px;letter-spacing:.3px}
+  select,input[type=text],input[type=time],input[type=number]{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:.95rem;background:rgba(255,255,255,.07);color:#fff}
+  select option{background:#2C3742;color:#fff}
+  input::placeholder{color:var(--w35)}
+  .row{display:flex;gap:9px}.row>*{flex:1}
+  .stop-list{margin:8px 0 2px;display:flex;flex-direction:column;gap:6px}
+  .stop-item{display:flex;flex-direction:column;align-items:stretch;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:.92rem}
+  .empty{font-size:.8rem;color:var(--w35);padding:5px 2px}
+  .addbar{display:flex;gap:7px;margin-top:7px}.addbar select{flex:1}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:13px;font-size:.86rem;color:var(--w70);cursor:pointer}
+  .chk input{width:17px;height:17px;accent-color:var(--accent)}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border:none;border-radius:11px;font-family:inherit;font-weight:700;font-size:.95rem;cursor:pointer;margin-top:14px;transition:.2s}
+  .btn-primary{background:#fff;color:var(--ink)} .btn-primary:hover{background:#e9eef3}
+  .btn-nav{background:linear-gradient(135deg,#3f7d52,#2f6b45);color:#fff;text-decoration:none}
+  .btn-ghost{background:var(--glass);border:1px solid var(--line);color:var(--w70)}
+  .btn-sm{width:auto;padding:8px 14px;font-size:.84rem;margin:0}
+
+  .res{margin-top:14px;border-top:1px dashed var(--line);padding-top:13px;display:none}
+  .res.show{display:block}
+  .res-row{display:flex;align-items:flex-start;gap:11px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .res-row:last-child{border-bottom:none}
+  .seq{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#fff;color:var(--ink);font-size:.78rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .seq.edge{background:rgba(255,255,255,.2);color:#fff}
+  .res-nm{flex:1;font-weight:500;font-size:.93rem;word-break:break-all}
+  .res-eta{flex-shrink:0;text-align:right}
+  .res-eta b{font-size:1rem} .res-eta span{display:block;font-size:.68rem;color:var(--w35)}
+  .summ{background:rgba(255,255,255,.06);border-radius:11px;padding:10px 13px;font-size:.82rem;color:var(--w70);margin-top:12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+  .summ b{color:#fff}
+  .stale{font-size:.76rem;color:var(--warn);margin-top:8px}
+
+  /* Address book */
+  .pt-row{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+  .pt-row:last-child{border-bottom:none}
+  .pt-info{flex:1;min-width:0}
+  .pt-info .pn{font-weight:500;font-size:.95rem}
+  .pt-info .pa{font-size:.78rem;color:var(--w35);word-break:break-all}
+  .pt-tag{font-size:.64rem;font-weight:700;padding:1px 8px;border-radius:12px;background:rgba(255,255,255,.14);color:var(--w70);flex-shrink:0}
+  .pt-act{display:flex;gap:2px;flex-shrink:0}
+  .pt-act button{border:none;background:none;cursor:pointer;font-size:.82rem;color:var(--accent);font-weight:600;padding:5px}
+  .pt-act .del{color:var(--warn)}
+  .muted{color:var(--w35);font-size:.84rem;text-align:center;padding:18px}
+
+  dialog{border:none;border-radius:18px;padding:20px;max-width:420px;width:92%;background:#323e4a;color:var(--w90);box-shadow:0 16px 50px rgba(0,0,0,.5)}
+  dialog::backdrop{background:rgba(20,26,32,.6)}
+  .dlg-title{font-weight:300;font-size:1.1rem;letter-spacing:.5px;margin-bottom:8px}
+  .dlg-act{display:flex;gap:9px;margin-top:18px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#fff;color:var(--ink);padding:10px 20px;border-radius:24px;font-size:.86rem;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:300;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  .toast.show{opacity:1}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.25);border-top-color:var(--ink);border-radius:50%;animation:sp .7s linear infinite}
+  .btn-nav .spin,.btn-ghost .spin{border-color:rgba(255,255,255,.3);border-top-color:#fff}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* === 登入：兩台貨車動畫 === */
+  .truck-scene{position:relative;height:96px;margin:-14px -10px 16px;overflow:hidden;border-radius:14px;
+    background:linear-gradient(180deg,rgba(120,160,210,.10),rgba(255,255,255,.02))}
+  .truck-scene .road{position:absolute;left:0;right:0;bottom:18px;height:3px;background:rgba(255,255,255,.16);overflow:hidden}
+  .truck-scene .road::after{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(90deg,rgba(255,255,255,.55) 0 14px,transparent 14px 32px);
+    animation:roadmove .7s linear infinite}
+  @keyframes roadmove{to{transform:translateX(-32px)}}
+  .t17{position:absolute;bottom:14px;width:120px;animation:drive17 7s linear infinite}
+  .t5{position:absolute;bottom:13px;width:88px;animation:drive5 5.4s linear infinite;animation-delay:-2s}
+  .t17 svg,.t5 svg{display:block;width:100%;height:auto;filter:drop-shadow(0 3px 5px rgba(0,0,0,.32))}
+  @keyframes drive17{from{transform:translateX(-140px)}to{transform:translateX(400px)}}
+  @keyframes drive5{from{transform:translateX(-110px)}to{transform:translateX(400px)}}
+  .wheel-spin{transform-box:fill-box;transform-origin:center;animation:wspin .55s linear infinite}
+  @keyframes wspin{to{transform:rotate(360deg)}}
+  .cabbody{transform-box:fill-box;transform-origin:center;animation:idle .4s ease-in-out infinite alternate}
+  @keyframes idle{from{transform:translateY(0)}to{transform:translateY(-.8px)}}
+  @media(prefers-reduced-motion:reduce){
+    .t17,.t5,.wheel-spin,.cabbody,.road::after{animation:none}
+    .t17{transform:translateX(40px)} .t5{transform:translateX(190px)}
+  }
+
+  @media(max-width:560px){
+    .wrap{padding:12px 10px 70px}
+    .brand h1{font-size:1.05rem}.dt{display:none}
+    .card{padding:15px 14px}
+    .day{min-width:54px}
+  }
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <div class="truck-scene" aria-hidden="true">
+      <div class="road"></div>
+      <div class="t17">
+        <svg viewBox="0 0 122 60" xmlns="http://www.w3.org/2000/svg">
+          <g class="cabbody">
+            <rect x="4" y="6" width="74" height="36" rx="2" fill="#ffffff" stroke="#cdd2d8" stroke-width="1.5"/>
+            <rect x="9" y="11" width="58" height="26" rx="1" fill="#f3f5f7"/>
+            <text x="38" y="29" text-anchor="middle" font-size="13" font-weight="800" fill="#838b94" font-family="sans-serif">17T</text>
+            <rect x="78" y="16" width="34" height="26" rx="3" fill="#fbfcfd" stroke="#cdd2d8" stroke-width="1.5"/>
+            <polygon points="96,18 110,18 112,30 96,30" fill="#a9cdee"/>
+            <rect x="113" y="33" width="3" height="5" rx="1" fill="#ffd76a"/>
+            <rect x="6" y="42" width="106" height="3" fill="#c7ccd2"/>
+          </g>
+          <g transform="translate(22,46)"><g class="wheel-spin"><circle r="9" fill="#2b2e33"/><circle r="3.4" fill="#cfd4d9"/><rect x="-1" y="-8" width="2" height="16" fill="#cfd4d9"/><rect x="-8" y="-1" width="16" height="2" fill="#cfd4d9"/></g></g>
+          <g transform="translate(42,46)"><g class="wheel-spin"><circle r="9" fill="#2b2e33"/><circle r="3.4" fill="#cfd4d9"/><rect x="-1" y="-8" width="2" height="16" fill="#cfd4d9"/><rect x="-8" y="-1" width="16" height="2" fill="#cfd4d9"/></g></g>
+          <g transform="translate(100,46)"><g class="wheel-spin"><circle r="9" fill="#2b2e33"/><circle r="3.4" fill="#cfd4d9"/><rect x="-1" y="-8" width="2" height="16" fill="#cfd4d9"/><rect x="-8" y="-1" width="16" height="2" fill="#cfd4d9"/></g></g>
+        </svg>
+      </div>
+      <div class="t5">
+        <svg viewBox="0 0 94 56" xmlns="http://www.w3.org/2000/svg">
+          <g class="cabbody">
+            <rect x="3" y="6" width="54" height="30" rx="2" fill="#3f6fb0" stroke="#2f5790" stroke-width="1.5"/>
+            <text x="30" y="25" text-anchor="middle" font-size="12" font-weight="800" fill="#dce8f5" font-family="sans-serif">5T</text>
+            <rect x="57" y="14" width="28" height="22" rx="3" fill="#34619f" stroke="#264b7d" stroke-width="1.5"/>
+            <polygon points="71,16 83,16 85,26 71,26" fill="#bcd6f0"/>
+            <rect x="86" y="29" width="3" height="4" rx="1" fill="#ffd76a"/>
+            <rect x="5" y="36" width="82" height="3" fill="#264b7d"/>
+          </g>
+          <g transform="translate(20,40)"><g class="wheel-spin"><circle r="7.5" fill="#2b2e33"/><circle r="2.8" fill="#cfd4d9"/><rect x="-1" y="-6.5" width="2" height="13" fill="#cfd4d9"/><rect x="-6.5" y="-1" width="13" height="2" fill="#cfd4d9"/></g></g>
+          <g transform="translate(74,40)"><g class="wheel-spin"><circle r="7.5" fill="#2b2e33"/><circle r="2.8" fill="#cfd4d9"/><rect x="-1" y="-6.5" width="2" height="13" fill="#cfd4d9"/><rect x="-6.5" y="-1" width="13" height="2" fill="#cfd4d9"/></g></g>
+        </svg>
+      </div>
+    </div>
+    <h2>配送排車</h2>
+    <p>請輸入管理密碼</p>
+    <input type="password" id="gatePass" placeholder="密碼" inputmode="numeric" onkeydown="if(event.key==='Enter')checkGate()">
+    <button class="btn btn-primary" onclick="checkGate()" style="margin-top:0">進入</button>
+  </div>
+</div>
+
+<div class="gate hidden" id="who">
+  <div class="gate-box">
+    <i class="fas fa-user-group lk"></i>
+    <h2>你是誰?</h2>
+    <p>選擇你的身分（決定能不能編輯）</p>
+    <div id="whoList" class="who-list"></div>
+  </div>
+</div>
+
+<div class="wrap hidden" id="app">
+  <header>
+    <div class="brand">
+      <i class="fas fa-truck-fast cube"></i>
+      <div><h1>配送排車</h1><div class="sub">ALUMIBRO · 路線最佳化 + 到站時間</div></div>
+    </div>
+    <div class="hd-right">
+      <span class="me-badge" id="meBadge"></span>
+      <span class="dt" id="dt"></span>
+      <button class="glassbtn" onclick="refreshAll(this)" title="重新整理"><i class="fas fa-rotate"></i></button>
+      <button class="glassbtn" onclick="logout()" title="登出/換人"><i class="fas fa-sign-out-alt"></i></button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" id="tabPlan" onclick="switchTab('plan')">排車</button>
+    <button class="tab" id="tabBook" onclick="switchTab('book')">地址簿</button>
+  </div>
+
+  <div id="viewPlan">
+    <div id="upcoming"></div>
+    <div class="weekbar">
+      <div class="wk-toggle">
+        <button id="wk0" class="on" onclick="setWeek(0)">本週</button>
+        <button id="wk1" onclick="setWeek(1)">下週</button>
+        <button id="wk2" onclick="setWeek(2)">下下週</button>
+      </div>
+      <span class="wk-range" id="wkRange"></span>
+    </div>
+    <div class="daytabs" id="dayTabs"></div>
+    <div class="announce" id="announce"></div>
+    <div class="trucks">
+      <div id="card-大車" class="card truck-white"></div>
+      <div id="card-中車" class="card truck-blue"></div>
+    </div>
+  </div>
+
+  <div id="viewBook" class="hidden">
+    <div class="card" style="--bar:var(--accent)">
+      <h2><i class="fas fa-location-dot"></i> 配送地點清單</h2>
+      <p style="font-size:.78rem;color:var(--w35);margin-top:2px">把常跑的公司、還有一廠/二廠都加進來。排車時直接挑、不用重打。</p>
+      <button class="btn btn-primary" id="addPointBtn" onclick="openPointDlg()">＋ 新增地點</button>
+      <div id="pointList" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<dialog id="pointDlg">
+  <div class="dlg-title" id="dlgTitle">新增地點</div>
+  <input type="hidden" id="pId">
+  <label>名稱</label><input type="text" id="pName" placeholder="例：二廠 / 大里○○公司">
+  <label>地址</label><input type="text" id="pAddr" placeholder="完整地址（Google 找得到的）">
+  <label>類型</label>
+  <select id="pType"><option value="客戶">客戶</option><option value="廠">廠（可當出發地）</option></select>
+  <label>備註（選填）</label><input type="text" id="pNote" placeholder="聯絡人 / 卸貨注意…">
+  <div class="dlg-act">
+    <button class="btn btn-ghost" onclick="document.getElementById('pointDlg').close()">取消</button>
+    <button class="btn btn-primary" id="pSaveBtn" onclick="savePoint()">儲存</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const GAS = "https://script.google.com/macros/s/AKfycbx2mqPe1ilOWDQ45JYDGJ2KaAUZ9dyH0fT-NwIDOdqUNmz1Dn3-tsL70urJT2cYYI5Q/exec";
+const PASS = "82830476";
+const TRUCKS = [{key:'大車',cap:'17 噸',cls:'truck-white',icon:'fa-truck-moving'},{key:'中車',cap:'5 噸',cls:'truck-blue',icon:'fa-truck'}];
+let POINTS = [];
+let PLANS = {};          // key `${date}__${truck}` -> {originId,stops[],start,service,ret,result}
+let ANNOUNCE = {};       // date -> 當日公告文字
+let weekOffset = 0;      // 0=本週 1=下週
+let selDate = "";
+const saveTimers = {};
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200);}
+function esc(s){return String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));}
+
+/* ---- gate + who am i ---- */
+let ME='', ROLE='檢視', STAFF=[];
+function canEdit(){return ROLE==='編輯';}
+function checkGate(){
+  if(document.getElementById('gatePass').value.trim()===PASS){ sessionStorage.setItem('disp_ok','1'); showWho(); }
+  else toast('密碼錯誤');
+}
+function logout(){ sessionStorage.removeItem('disp_ok'); sessionStorage.removeItem('disp_me'); location.reload(); }
+async function showWho(){
+  document.getElementById('gate').classList.add('hidden');
+  const who=document.getElementById('who'); who.classList.remove('hidden');
+  const box=document.getElementById('whoList'); box.innerHTML='<div style="color:var(--w50);text-align:center;padding:10px">載入中…</div>';
+  try{ const r=await fetch(GAS+'?action=getDispatchStaff&t='+Date.now()); const j=await r.json(); STAFF=(j&&j.staff)?j.staff:[]; }
+  catch(e){ STAFF=[]; }
+  if(STAFF.length===0)STAFF=[{name:'管理員',role:'編輯'}];
+  STAFF.sort((a,b)=>(a.role==='編輯'?0:1)-(b.role==='編輯'?0:1)); // 編輯排上面
+  box.innerHTML=STAFF.map(s=>`<button class="who-btn" onclick="pickMe('${esc(s.name).replace(/'/g,'')}','${s.role}')">${esc(s.name)} <span class="who-role ${s.role==='編輯'?'ed':''}">${s.role}</span></button>`).join('');
+}
+function pickMe(name,role){ ME=name; ROLE=role; sessionStorage.setItem('disp_me',JSON.stringify({name:name,role:role})); document.getElementById('who').classList.add('hidden'); enter(); }
+function enter(){
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('who').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('meBadge').innerHTML=`<i class="fas fa-user"></i> ${esc(ME||'—')} <span class="role-tag ${canEdit()?'ed':''}">${ROLE}</span>`;
+  document.body.classList.toggle('viewer',!canEdit());
+  tickClock();setInterval(tickClock,30000);
+  init();
+}
+(function(){
+  if(sessionStorage.getItem('disp_ok')==='1'){
+    const m=sessionStorage.getItem('disp_me');
+    if(m){ try{const o=JSON.parse(m);ME=o.name;ROLE=o.role;}catch(e){} window.addEventListener('DOMContentLoaded',enter); }
+    else { window.addEventListener('DOMContentLoaded',showWho); }
+  }
+})();
+function tickClock(){const d=new Date();const wd='日一二三四五六'[d.getDay()];
+  document.getElementById('dt').textContent=`${d.getMonth()+1}/${d.getDate()}（${wd}）${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+
+function switchTab(t){
+  document.getElementById('tabPlan').classList.toggle('on',t==='plan');
+  document.getElementById('tabBook').classList.toggle('on',t==='book');
+  document.getElementById('viewPlan').classList.toggle('hidden',t!=='plan');
+  document.getElementById('viewBook').classList.toggle('hidden',t!=='book');
+}
+
+/* ---- dates ---- */
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function mondayOf(offset){const d=new Date();d.setHours(0,0,0,0);const dow=(d.getDay()+6)%7;/*Mon=0*/ d.setDate(d.getDate()-dow+offset*7);return d;}
+function weekDates(offset){const mon=mondayOf(offset);const out=[];const dows=['一','二','三','四','五'];const today=ymd(new Date());
+  for(let i=0;i<5;i++){const d=new Date(mon);d.setDate(mon.getDate()+i);const s=ymd(d);out.push({date:s,dow:dows[i],md:(d.getMonth()+1)+'/'+d.getDate(),isToday:s===today});}return out;}
+
+/* ---- init / load ---- */
+async function init(){await loadPoints();await loadWeek();await loadUpcoming();}
+async function refreshAll(btn){
+  if(btn){btn.innerHTML='<span class="spin"></span>';}
+  await loadPoints();await loadWeek();await loadUpcoming();
+  if(btn){btn.innerHTML='<i class="fas fa-rotate"></i>';}
+  toast('已更新');
+}
+// 近期公告（今天起 21 天內）
+async function loadUpcoming(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const to=new Date(today);to.setDate(today.getDate()+21);
+  let items=[];
+  try{
+    const r=await fetch(`${GAS}?action=getDispatchPlans&from=${ymd(today)}&to=${ymd(to)}&t=${Date.now()}`);
+    const j=await r.json();
+    (j&&j.plans?j.plans:[]).forEach(p=>{
+      if(p.truck==='公告'){try{const tx=(JSON.parse(p.data||'{}').text||'').trim();if(tx&&p.date>=ymd(today))items.push({date:p.date,text:tx});}catch(e){}}
+    });
+  }catch(e){}
+  items.sort((a,b)=>a.date<b.date?-1:1);
+  const box=document.getElementById('upcoming');
+  if(items.length===0){box.innerHTML='';return;}
+  box.innerHTML=`<div class="upc-box"><div class="ttl"><i class="fas fa-bullhorn"></i> 近期公告 / 外車</div>
+    ${items.map(it=>{const d=it.date.slice(5).replace('-','/');const short=it.text.length>22?it.text.slice(0,22)+'…':it.text;
+      return `<span class="upc-item" onclick="goToDate('${it.date}')"><b>${d}</b> ${esc(short)}</span>`;}).join('')}</div>`;
+}
+async function goToDate(date){
+  const mon=mondayOf(0);const target=new Date(date+'T00:00:00');
+  const tmon=new Date(target);tmon.setDate(target.getDate()-((target.getDay()+6)%7));
+  const offset=Math.round((tmon-mon)/(7*86400000));
+  weekOffset=Math.max(0,Math.min(2,offset));
+  await loadWeek();selDate=date;renderDayTabs();renderDay();switchTab('plan');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function loadPoints(){
+  try{const r=await fetch(GAS+"?action=getDispatchPoints&t="+Date.now());const j=await r.json();POINTS=(j&&j.points)?j.points:[];}
+  catch(e){POINTS=[];toast('讀取地點失敗');}
+  renderBook();
+}
+async function loadWeek(){
+  const days=weekDates(weekOffset);
+  document.getElementById('wkRange').textContent=days[0].md+' – '+days[4].md;
+  [0,1,2].forEach(o=>document.getElementById('wk'+o).classList.toggle('on',weekOffset===o));
+  // 清掉本週 keys 重新載
+  try{
+    const r=await fetch(`${GAS}?action=getDispatchPlans&from=${days[0].date}&to=${days[4].date}&t=${Date.now()}`);
+    const j=await r.json();
+    (j&&j.plans?j.plans:[]).forEach(p=>{
+      if(p.truck==='公告'){ try{ANNOUNCE[p.date]=(JSON.parse(p.data||'{}').text)||'';}catch(e){} }
+      else { try{PLANS[p.date+'__'+p.truck]=normalizePlan(JSON.parse(p.data||'{}'));}catch(e){} }
+    });
+  }catch(e){toast('讀取排程失敗');}
+  // 預設選今天（若在本週）否則選週一
+  const today=ymd(new Date());
+  selDate=days.find(d=>d.date===today)?today:days[0].date;
+  renderDayTabs();renderDay();
+}
+function setWeek(o){weekOffset=o;loadWeek();}
+
+function planKey(date,truck){return date+'__'+truck;}
+function normalizePlan(p){
+  if(!p)p={};
+  if(!Array.isArray(p.stops)){ p.stops=(p.stopIds||[]).map(id=>({id:id,note:''})); }
+  delete p.stopIds;
+  p.stops=p.stops.map(s=> (s&&typeof s==='object')?{id:s.id,note:s.note||'',early:s.early||'',late:s.late||''}:{id:s,note:'',early:'',late:''});
+  if(p.originId===undefined)p.originId='';
+  if(p.start===undefined)p.start='09:00';
+  if(p.service===undefined)p.service=15;
+  if(p.ret===undefined)p.ret=false;
+  if(p.result===undefined)p.result=null;
+  return p;
+}
+function getPlan(date,truck){const k=planKey(date,truck);if(!PLANS[k])PLANS[k]=normalizePlan({});return PLANS[k];}
+function dayHasPlan(date){return TRUCKS.some(t=>{const p=PLANS[planKey(date,t.key)];return p&&p.stops&&p.stops.length>0;});}
+function dayHasAnnounce(date){return !!(ANNOUNCE[date]&&ANNOUNCE[date].trim());}
+
+function renderDayTabs(){
+  const days=weekDates(weekOffset);
+  document.getElementById('dayTabs').innerHTML=days.map(d=>`
+    <div class="day ${d.date===selDate?'on':''} ${d.isToday?'today':''}" onclick="selDate='${d.date}';renderDayTabs();renderDay()">
+      <div class="dow">${d.dow}</div><div class="md">${d.md}</div>
+      ${dayHasPlan(d.date)?'<span class="hasplan"></span>':''}
+      ${dayHasAnnounce(d.date)?'<span class="hasann"></span>':''}
+    </div>`).join('');
+}
+
+/* ---- save (debounced) ---- */
+function scheduleSave(date,truck){
+  const k=planKey(date,truck);
+  clearTimeout(saveTimers[k]);
+  saveTimers[k]=setTimeout(()=>{
+    const p=PLANS[k]||{};
+    fetch(GAS,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveDispatchPlan',date,truck,data:JSON.stringify(p)})}).catch(()=>{});
+  },700);
+}
+
+/* ---- render a day's two trucks ---- */
+function ptName(id){const p=POINTS.find(x=>x.id===id);return p?p.name:'(已刪除)';}
+function ptAddr(id){const p=POINTS.find(x=>x.id===id);return p?p.address:'';}
+
+function renderDay(){renderAnnounce();TRUCKS.forEach(renderTruck);}
+function renderAnnounce(){
+  const txt=ANNOUNCE[selDate]||'';const ED=canEdit();
+  document.getElementById('announce').innerHTML=`
+    <div class="ann-box">
+      <i class="fas fa-bullhorn meg"></i>
+      <div style="flex:1;min-width:0">
+        <span class="ann-lbl">當日公告 / 外車提醒</span>
+        ${ED?`<textarea placeholder="例：大榮貨運 14:00 來載鋁料 3 件 / 外車送螺絲約上午到，請留位…" onchange="saveAnnounce(this.value)">${esc(txt)}</textarea>`
+            :(txt?`<div class="ro" style="white-space:pre-wrap">${esc(txt)}</div>`:`<div class="ro" style="color:var(--w35)">（無公告）</div>`)}
+      </div>
+    </div>`;
+}
+function saveAnnounce(val){
+  if(!canEdit())return;
+  ANNOUNCE[selDate]=val;const date=selDate;
+  clearTimeout(saveTimers['ann__'+date]);
+  saveTimers['ann__'+date]=setTimeout(()=>{
+    fetch(GAS,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'saveDispatchPlan',date,truck:'公告',data:JSON.stringify({text:val})})}).catch(()=>{});
+    setTimeout(loadUpcoming,1300);
+  },700);
+  renderDayTabs();
+}
+function renderTruck(t){
+  const P=getPlan(selDate,t.key);
+  const card=document.getElementById('card-'+t.key);
+  const ED=canEdit();
+  if(!ED){
+    // 檢視者：唯讀
+    card.innerHTML=`
+      <h2><i class="fas ${t.icon}"></i> ${t.key}路線 <span class="pill">${t.cap}</span></h2>
+      <label>出發地</label><div class="ro">${P.originId?esc(ptName(P.originId)):'—'}</div>
+      <label>停靠點（${P.stops.length}）</label>
+      <div class="stop-list">${P.stops.map((st,i)=>`<div class="stop-item">
+        <div class="si-top"><span class="seq">${i+1}</span><span class="nm">${esc(ptName(st.id))}</span></div>
+        ${st.note?`<div class="ro-note"><i class="fas fa-circle-info"></i> ${esc(st.note)}</div>`:''}
+        ${(st.early||st.late)?`<div class="ro-note"><i class="fas fa-clock"></i> 指定 ${st.early||'？'}~${st.late||'？'}</div>`:''}
+      </div>`).join('')||'<div class="empty">尚未加入停靠點</div>'}</div>
+      <div class="ro" style="margin-top:8px">出發 ${P.start} · 每站 ${P.service} 分 · ${P.ret?'繞回出發地':'不繞回'}</div>
+      <div class="res ${P.result?'show':''}">${P.result?resultHtml(t.key,P.result):'<div class="empty" style="margin-top:8px">（編輯者尚未規劃路線）</div>'}</div>`;
+    return;
+  }
+  const opts=POINTS.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  card.innerHTML=`
+    <h2><i class="fas ${t.icon}"></i> ${t.key}路線 <span class="pill">${t.cap}</span></h2>
+    <label>出發地</label>
+    <select onchange="upd('${t.key}','origin',this.value)">
+      <option value="">— 選出發地 —</option>
+      ${POINTS.map(p=>`<option value="${p.id}" ${P.originId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}
+    </select>
+    <label>停靠點（${P.stops.length}）· 可填每站要做什麼</label>
+    <div class="stop-list">${P.stops.map((st,i)=>`<div class="stop-item">
+      <div class="si-top"><span class="seq">${i+1}</span><span class="nm">${esc(ptName(st.id))}</span><span class="x" onclick="rmStop('${t.key}',${i})">×</span></div>
+      <input class="si-note" placeholder="這站要做什麼…（裝/卸什麼、找誰、注意事項）" value="${esc(st.note||'')}" onchange="updStop('${t.key}',${i},'note',this.value)">
+      <div class="si-time"><span class="lbl"><i class="fas fa-clock"></i> 指定到達(可空)</span>
+        <input type="time" class="si-t" value="${st.early||''}" onchange="updStop('${t.key}',${i},'early',this.value)" title="最早到">
+        <span class="dash">~</span>
+        <input type="time" class="si-t" value="${st.late||''}" onchange="updStop('${t.key}',${i},'late',this.value)" title="最晚到">
+      </div>
+    </div>`).join('')||'<div class="empty">尚未加入停靠點</div>'}</div>
+    <div class="addbar">
+      <select id="add-${t.key}"><option value="">＋ 加入停靠點…</option>${opts}</select>
+      <button class="btn btn-ghost btn-sm" onclick="addStop('${t.key}')">加入</button>
+    </div>
+    <div class="row">
+      <div><label>出發時間</label><input type="time" value="${P.start}" onchange="upd('${t.key}','start',this.value)"></div>
+      <div><label>每站停留(分)</label><input type="number" min="0" value="${P.service}" onchange="upd('${t.key}','service',parseInt(this.value)||0)"></div>
+    </div>
+    <label class="chk"><input type="checkbox" ${P.ret?'checked':''} onchange="upd('${t.key}','ret',this.checked)"> 跑完繞回出發地</label>
+    <button class="btn btn-primary" id="plan-${t.key}" onclick="planRoute('${t.key}')">${P.result?'重新規劃路線':'規劃路線'}</button>
+    <div class="res ${P.result?'show':''}" id="res-${t.key}">${P.result?resultHtml(t.key,P.result):''}</div>
+    ${P.result&&P._stale?'<div class="stale">⚠️ 停靠點有變動，建議重新規劃</div>':''}`;
+}
+function upd(truck,field,val){
+  if(!canEdit())return;
+  const P=getPlan(selDate,truck);
+  if(field==='origin')P.originId=val; else P[field]=val;
+  if(field!=='ret'||true){} // mark stale if affects route
+  if(['origin'].includes(field)){P._stale=!!P.result;}
+  scheduleSave(selDate,truck);
+  if(field==='origin')renderTruck(TRUCKS.find(t=>t.key===truck));
+}
+function addStop(truck){if(!canEdit())return;const sel=document.getElementById('add-'+truck);const v=sel.value;if(!v)return;
+  const P=getPlan(selDate,truck);P.stops.push({id:v,note:'',early:'',late:''});P._stale=!!P.result;scheduleSave(selDate,truck);renderTruck(TRUCKS.find(t=>t.key===truck));renderDayTabs();}
+function rmStop(truck,i){if(!canEdit())return;const P=getPlan(selDate,truck);P.stops.splice(i,1);P._stale=!!P.result;scheduleSave(selDate,truck);renderTruck(TRUCKS.find(t=>t.key===truck));renderDayTabs();}
+function updStop(truck,i,field,val){if(!canEdit())return;const P=getPlan(selDate,truck);if(!P.stops[i])return;
+  P.stops[i][field]=val;
+  if(field==='early'||field==='late')P._stale=!!P.result; // 時間改了要重算
+  scheduleSave(selDate,truck);
+  renderTruck(TRUCKS.find(t=>t.key===truck));}
+
+async function planRoute(truck){
+  if(!canEdit())return;
+  const P=getPlan(selDate,truck);
+  if(!P.originId){toast('先選出發地');return;}
+  if(P.stops.length===0){toast('先加停靠點');return;}
+  const btn=document.getElementById('plan-'+truck);btn.innerHTML='<span class="spin"></span> 計算中…';
+  const origin=ptAddr(P.originId);
+  const stops=P.stops.map(st=>ptAddr(st.id)).join('|');
+  const early=P.stops.map(st=>(st.early||'').replace(':','')).join('|');
+  const late=P.stops.map(st=>(st.late||'').replace(':','')).join('|');
+  const q=`?action=planDispatchRoute&origin=${encodeURIComponent(origin)}&stops=${encodeURIComponent(stops)}&early=${encodeURIComponent(early)}&late=${encodeURIComponent(late)}&start=${P.start.replace(':','')}&service=${P.service}&ret=${P.ret?1:0}&t=${Date.now()}`;
+  try{
+    const r=await fetch(GAS+q);const j=await r.json();
+    if(j&&j.status==='success'){
+      P.result=j;P._stale=false;scheduleSave(selDate,truck);
+    }else{ P.result={error:(j&&j.message)||'規劃失敗'};}
+  }catch(e){P.result={error:'連線失敗'};}
+  renderTruck(TRUCKS.find(t=>t.key===truck));
+}
+
+function resultHtml(truck,j){
+  const P=getPlan(selDate,truck);
+  if(j.error){return `<p style="color:var(--warn);font-size:.86rem">⚠️ ${esc(j.error)}</p>`;}
+  let html=`<div class="res-row"><span class="seq edge">出</span><span class="res-nm">${esc(ptName(P.originId))}</span><div class="res-eta"><b>${P.start}</b><span>出發</span></div></div>`;
+  j.stops.forEach((s,i)=>{
+    const st=(typeof s.idx==='number'&&P.stops[s.idx])?P.stops[s.idx]:P.stops.find(x=>ptAddr(x.id)===s.name);
+    const nm=st?ptName(st.id):s.name;
+    const note=st&&st.note?`<div class="res-note"><i class="fas fa-circle-info"></i> ${esc(st.note)}</div>`:'';
+    const win=s.want?`<div class="res-win ${s.violation?'bad':''}">${s.violation?'⚠️ 趕不到，指定 ':'<i class=\"fas fa-clock\"></i> 指定 '}${esc(s.want)}${s.waited?'（早到，等候）':''}</div>`:'';
+    html+=`<div class="res-row"><span class="seq ${s.violation?'bad':''}">${i+1}</span><span class="res-nm">${esc(nm)}${win}${note}</span><div class="res-eta"><b class="${s.violation?'bad':''}">${s.arrive}</b><span>車程 ${s.legMin}分 · ${s.legKm}km</span></div></div>`;
+  });
+  if(j.returnToBase){html+=`<div class="res-row"><span class="seq edge">回</span><span class="res-nm">${esc(ptName(P.originId))}</span><div class="res-eta"><b>${j.finishTime}</b><span>回程 ${j.backMin}分</span></div></div>`;}
+  if(j.anyViolation)html+=`<div class="stale">⚠️ 有「指定時間」的點趕不到（上面紅色那站），建議調整順序、改出發時間、或換別台車</div>`;
+  html+=`<div class="summ"><span>完成 <b>${j.finishTime}</b></span><span>總車程 <b>${j.totalMin}分</b></span><span>里程 <b>${j.totalKm}km</b></span></div>`;
+  html+=`<a class="btn btn-nav" href="${j.mapsUrl}" target="_blank" rel="noopener"><i class="fas fa-diamond-turn-right"></i> 用 Google Maps 導航（已排序）</a>`;
+  return html;
+}
+
+/* ---- address book ---- */
+function renderBook(){
+  const box=document.getElementById('pointList');
+  if(POINTS.length===0){box.innerHTML='<p class="muted">還沒有任何地點，點上面「新增地點」開始。</p>';return;}
+  box.innerHTML=POINTS.map(p=>`
+    <div class="pt-row">
+      <div class="pt-info"><div class="pn">${esc(p.name)} ${p.type==='廠'?'<span class="pt-tag">廠</span>':''}</div>
+      <div class="pa">${esc(p.address)}${p.note?' · '+esc(p.note):''}</div></div>
+      <div class="pt-act"><button onclick='editPoint("${p.id}")'><i class="fas fa-pen"></i></button>
+      <button class="del" onclick='delPoint("${p.id}","${esc(p.name).replace(/'/g,"")}")'><i class="fas fa-trash"></i></button></div>
+    </div>`).join('');
+}
+const dlg=document.getElementById('pointDlg');
+function openPointDlg(){if(!canEdit())return;document.getElementById('dlgTitle').textContent='新增地點';['pId','pName','pAddr','pNote'].forEach(i=>document.getElementById(i).value='');document.getElementById('pType').value='客戶';dlg.showModal();}
+function editPoint(id){if(!canEdit())return;const p=POINTS.find(x=>x.id===id);if(!p)return;document.getElementById('dlgTitle').textContent='編輯地點';document.getElementById('pId').value=p.id;document.getElementById('pName').value=p.name;document.getElementById('pAddr').value=p.address;document.getElementById('pType').value=p.type==='廠'?'廠':'客戶';document.getElementById('pNote').value=p.note;dlg.showModal();}
+async function savePoint(){
+  if(!canEdit())return;
+  const name=document.getElementById('pName').value.trim();const address=document.getElementById('pAddr').value.trim();
+  if(!name||!address){toast('名稱跟地址要填');return;}
+  const btn=document.getElementById('pSaveBtn');btn.innerHTML='<span class="spin"></span>';
+  await fetch(GAS,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({
+    action:'saveDispatchPoint',id:document.getElementById('pId').value||undefined,name,address,
+    type:document.getElementById('pType').value,note:document.getElementById('pNote').value.trim()})}).catch(()=>{});
+  await new Promise(r=>setTimeout(r,900));await loadPoints();
+  btn.textContent='儲存';dlg.close();toast('已儲存');renderDay();
+}
+async function delPoint(id,name){
+  if(!canEdit())return;
+  if(!confirm('確定刪除「'+name+'」？'))return;
+  await fetch(GAS,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteDispatchPoint',id})}).catch(()=>{});
+  await new Promise(r=>setTimeout(r,800));await loadPoints();renderDay();toast('已刪除');
+}
+</script>
+</body>
+</html>
