@@ -2480,7 +2480,7 @@ window.regressStatus = function (orderId, prevStatus) {
     if (target) {
         // [Safety Guard] Prevent regression if accessories were deducted
         if (target.status === 'shipping' || target.status === 'dispatched') {
-            if (localStorage.getItem(`deducted_acc_${orderId} `)) {
+            if (localStorage.getItem(`deducted_acc_${orderId}`)) {
                 alert("⚠️ 無法退回上一步！\n\n此訂單的配件庫存已經扣除。\n若強制退回將導致庫存重複扣除或數據不一致。\n若必須退回，請聯繫管理員手動調整庫存。");
                 return;
             }
@@ -2613,7 +2613,7 @@ window.advanceStatus = function (orderId, nextStatus) {
         const deductionMap = new Map();
 
         // Safety Check: Already deducted?
-        if (localStorage.getItem(`deducted_acc_${orderId} `)) {
+        if (localStorage.getItem(`deducted_acc_${orderId}`)) {
             console.log("Accessories already deducted for this order. Skipping.");
             const confirmSkip = confirm("⚠️ 注意：系統紀錄顯示此訂單「已扣除」過配件庫存。\n是否直接移至待出貨 (不再重複扣庫存)？");
             if (confirmSkip) {
