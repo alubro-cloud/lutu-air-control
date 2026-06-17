@@ -826,9 +826,13 @@ function navigateTo(module, subView) {
                         const cached = localStorage.getItem('orders_cache');
                         if (cached) {
                             const savedStatuses = JSON.parse(localStorage.getItem('order_statuses') || '{}');
+                            const STATUS_ORDER = ['unquoted', 'quoted', 'paid', 'cutting', 'inspection', 'picking', 'packing', 'shipping', 'dispatched', 'completed'];
+                            const _rank = s => STATUS_ORDER.indexOf(s);
                             ordersData = JSON.parse(cached).map(order => {
                                 let key = String(order.timestamp);
-                                if (savedStatuses[key]) order.status = savedStatuses[key];
+                                const localStatus = savedStatuses[key];
+                                // 只在「本機進度較前面」時才用本機，否則用快取裡的後端值（與 fetchOrders 同規則）
+                                if (localStatus && _rank(localStatus) > _rank(order.status || '')) order.status = localStatus;
                                 return order;
                             });
                             window.assignProjectIds(); // 補上全域專案編號
@@ -1337,18 +1341,35 @@ async function fetchOrders() {
             // Load saved statuses
             const savedStatuses = JSON.parse(localStorage.getItem('order_statuses') || '{}');
 
-            ordersData = json.orders.map(order => {
-                // Backend now handles defaults via Column J.
-                // Priority: LocalStorage > API (Column J) > Fallback 'unquoted'
+            // [跨機同步修正] 狀態標準推進順序（index 越大＝進度越前面）
+            const STATUS_ORDER = ['unquoted', 'quoted', 'paid', 'cutting', 'inspection', 'picking', 'packing', 'shipping', 'dispatched', 'completed'];
+            const _rank = s => STATUS_ORDER.indexOf(s);
+            let _localDirty = false;
 
-                let key = String(order.timestamp);
-                if (savedStatuses[key]) {
-                    order.status = savedStatuses[key];
-                } else if (!order.status) {
-                    order.status = 'unquoted';
+            ordersData = json.orders.map(order => {
+                const key = String(order.timestamp);
+                const backendStatus = order.status || '';
+                const localStatus = savedStatuses[key];
+
+                // 規則：以「進度較前面者」為準
+                //  - 本機較前進（自己剛推、後端還沒同步）→ 保留本機，避免閃跳
+                //  - 否則一律以後端為準（別台已推進 or 本機落後）→ 跨機同步、不再卡死
+                if (localStatus && _rank(localStatus) > _rank(backendStatus)) {
+                    order.status = localStatus;
+                } else {
+                    order.status = backendStatus || 'unquoted';
+                    // 後端較新時，順手把過時的本機快取更新掉，避免它下次又蓋過後端
+                    if (localStatus && localStatus !== order.status) {
+                        savedStatuses[key] = order.status;
+                        _localDirty = true;
+                    }
                 }
                 return order;
             });
+
+            if (_localDirty) {
+                try { localStorage.setItem('order_statuses', JSON.stringify(savedStatuses)); } catch (e) { }
+            }
 
             // [快取] 將最新資料存入 localStorage，讓下次可立即顯示
             try {
