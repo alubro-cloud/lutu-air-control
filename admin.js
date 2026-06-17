@@ -2478,12 +2478,10 @@ function createCard(order, index, currentStatus) {
 window.regressStatus = function (orderId, prevStatus) {
     let target = ordersData.find(o => o.timestamp === orderId);
     if (target) {
-        // [Safety Guard] Prevent regression if accessories were deducted
+        // [Safety Guard] 待出貨/已出貨 = 配件扣帳點，一律不准退回（純看狀態，不靠 localStorage 記號）
         if (target.status === 'shipping' || target.status === 'dispatched') {
-            if (localStorage.getItem(`deducted_acc_${orderId}`)) {
-                alert("⚠️ 無法退回上一步！\n\n此訂單的配件庫存已經扣除。\n若強制退回將導致庫存重複扣除或數據不一致。\n若必須退回，請聯繫管理員手動調整庫存。");
-                return;
-            }
+            alert("⚠️ 無法退回上一步！\n\n訂單已進入「待出貨／已出貨」，配件庫存已扣除。\n強制退回會造成庫存重複扣除。\n若確實需要退回，請聯繫管理員手動調整庫存。");
+            return;
         }
 
         // [Safety Guard] Prevent regression to Cutting if Aluminum was deducted
