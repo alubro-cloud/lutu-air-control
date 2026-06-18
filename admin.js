@@ -8025,12 +8025,14 @@ window.preloadCalendarForHub = async function () {
 
 // ============================================================
 // 訂單板自動同步（給「掛著看」的人）— v2 新增
-// 每 20 秒在背景重抓訂單；資料真的變了才重畫（沒變不重畫＝不閃）
+// 每 10 秒在背景重抓訂單；資料真的變了才重畫（沒變不重畫＝不閃）
 // 只在「分頁在前景 + 正在看訂單板 + 沒在處理 + 沒開著視窗」時才動
+// 防疊：上一次請求還沒回來，就跳過這次（避免請求疊在一起）
 // 純新增、不依賴它做 correctness；要移除直接刪這整段即可
 // ============================================================
 (function setupOrderAutoSync() {
-    const POLL_MS = 20000; // 20 秒。要更即時可改 15000；別低於 10000，省 GAS 額度
+    const POLL_MS = 10000; // 10 秒。要更即時可改 8000；別低於 5000，省 GAS 額度
+    let inFlight = false;  // 防疊請求：上一次還沒回來就跳過這次
 
     // 用 (狀態/金額/筆數) 當指紋，判斷畫面該不該重畫
     function signature(list) {
@@ -8053,7 +8055,9 @@ window.preloadCalendarForHub = async function () {
     }
 
     async function syncTick() {
+        if (inFlight) return;            // 上一次請求還沒回 → 跳過，不疊請求
         if (!safeToRefresh()) return;
+        inFlight = true;
         try {
             const res = await fetch(ADMIN_API_URL + '?action=getOrders&t=' + Date.now());
             const json = await res.json();
@@ -8090,6 +8094,8 @@ window.preloadCalendarForHub = async function () {
             if (lu) lu.innerText = '最後更新: ' + new Date().toLocaleTimeString();
         } catch (e) {
             console.warn('[autoSync] 背景同步失敗:', e && e.message); // 失敗就靜默略過，不打擾
+        } finally {
+            inFlight = false; // 不管成功失敗都釋放，下一輪才能再抓
         }
     }
 
