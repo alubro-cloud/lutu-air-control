@@ -8021,3 +8021,82 @@ window.preloadCalendarForHub = async function () {
         console.warn('[Calendar] Hub preload failed:', e);
     }
 };
+
+
+// ============================================================
+// 訂單板自動同步（給「掛著看」的人）— v2 新增
+// 每 20 秒在背景重抓訂單；資料真的變了才重畫（沒變不重畫＝不閃）
+// 只在「分頁在前景 + 正在看訂單板 + 沒在處理 + 沒開著視窗」時才動
+// 純新增、不依賴它做 correctness；要移除直接刪這整段即可
+// ============================================================
+(function setupOrderAutoSync() {
+    const POLL_MS = 20000; // 20 秒。要更即時可改 15000；別低於 10000，省 GAS 額度
+
+    // 用 (狀態/金額/筆數) 當指紋，判斷畫面該不該重畫
+    function signature(list) {
+        if (!Array.isArray(list)) return '';
+        return list.length + '|' + list.map(o =>
+            String(o.timestamp) + ':' + (o.status || '') + ':' +
+            (o.total || 0) + ':' + (o.shippingFee || 0)
+        ).join(',');
+    }
+
+    function safeToRefresh() {
+        if (document.visibilityState !== 'visible') return false;       // 分頁切到背景 → 不抓
+        const dash = document.getElementById('dashboard');
+        if (!dash || dash.classList.contains('hidden')) return false;  // 不在訂單板 → 不抓
+        if (window.currentPrimaryView === 'inventory') return false;   // 在庫存子頁 → 看板沒顯示，不用抓
+        if (window.isProcessing) return false;                         // 正在扣帳/送出 → 不打斷
+        const modal = document.getElementById('modal');
+        if (modal && modal.style.display === 'flex') return false;     // 報價/核對/明細視窗開著 → 不在他臉上重畫
+        return true;
+    }
+
+    async function syncTick() {
+        if (!safeToRefresh()) return;
+        try {
+            const res = await fetch(ADMIN_API_URL + '?action=getOrders&t=' + Date.now());
+            const json = await res.json();
+            if (!json || !json.orders) return;
+
+            // 與 fetchOrders 同一套「進度較前者勝」合併規則
+            const STATUS_ORDER = ['unquoted', 'quoted', 'paid', 'cutting', 'inspection', 'picking', 'packing', 'shipping', 'dispatched', 'completed'];
+            const _rank = s => STATUS_ORDER.indexOf(s);
+            const savedStatuses = JSON.parse(localStorage.getItem('order_statuses') || '{}');
+            const merged = json.orders.map(order => {
+                const key = String(order.timestamp);
+                const backendStatus = order.status || '';
+                const localStatus = savedStatuses[key];
+                if (localStatus && _rank(localStatus) > _rank(backendStatus)) order.status = localStatus;
+                else order.status = backendStatus || 'unquoted';
+                return order;
+            });
+
+            // fetch 期間使用者可能開了視窗，再確認一次
+            if (!safeToRefresh()) return;
+
+            // 資料沒變 → 什麼都不做（不重畫、不閃、不跳捲動）
+            if (signature(merged) === signature(ordersData)) return;
+
+            // 有變 → 套用並走原本渲染路徑（徽章等照常顯示）
+            ordersData = merged;
+            try {
+                localStorage.setItem('orders_cache', JSON.stringify(merged));
+                localStorage.setItem('orders_cache_time', Date.now());
+            } catch (e) { }
+            if (window.assignProjectIds) window.assignProjectIds();
+            if (typeof applyFilter === 'function') applyFilter();
+            const lu = document.getElementById('last-update');
+            if (lu) lu.innerText = '最後更新: ' + new Date().toLocaleTimeString();
+        } catch (e) {
+            console.warn('[autoSync] 背景同步失敗:', e && e.message); // 失敗就靜默略過，不打擾
+        }
+    }
+
+    setInterval(syncTick, POLL_MS);
+
+    // 分頁從背景切回前景 → 立刻補抓一次，不用等下一輪
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') syncTick();
+    });
+})();
