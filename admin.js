@@ -905,6 +905,18 @@ function navigateTo(module, subView) {
 // INVENTORY DASHBOARD (戰情面板)
 // ==========================================
 window.renderInventoryDashboard = function () {
+    // [自家成品] 動態補上第三張分類卡（不需改 admin.html）
+    (function () {
+        var hub = document.getElementById('inventory-hub');
+        if (hub && !hub.querySelector('[data-cat="finished"]')) {
+            var card = document.createElement('div');
+            card.className = 'category-card';
+            card.setAttribute('data-cat', 'finished');
+            card.setAttribute('onclick', "switchInventoryCategory('finished')");
+            card.innerHTML = '<div class="category-card-inner"><i class="fas fa-box-open category-icon"></i><div class="category-text"><div class="category-name">自家成品總覽</div><div class="category-desc">手機架、餐車等自家成品庫存</div></div></div>';
+            hub.appendChild(card);
+        }
+    })();
     if (!window.allInventory || window.allInventory.length === 0) return;
 
     try {
@@ -5035,6 +5047,9 @@ window.switchInventoryCategory = function (category) {
     const titleEl = document.getElementById('inventory-view-title');
     if (category === 'aluminum') {
         if (titleEl) titleEl.innerHTML = `<i class="fas fa-layer-group"></i> 鋁材庫存概覽`;
+    } else if (category === 'finished') {
+        if (titleEl) titleEl.innerHTML = `<i class="fas fa-box-open"></i> 自家成品庫存概覽`;
+        window.currentInventorySeries = 'all';
     } else {
         if (titleEl) titleEl.innerHTML = `<i class="fas fa-tools"></i> 配件庫存概覽`;
         window.currentInventorySeries = 'all';
@@ -5088,8 +5103,13 @@ window.filterInventory = function () {
         })()).toString().trim();
 
         // Tier 1: Category Check (Strict)
+        const cat = (item.category || item['產品主分類'] || item['分類'] || item['主分類'] || '').toString().trim();
+        const isFinished = (cat === '自家成品' || cat === '成品');
         const isAluminum = ALUMINUM_ALLOW_LIST.some(model => name.includes(model));
-        const matchesCategory = (category === 'aluminum') ? isAluminum : !isAluminum;
+        let matchesCategory;
+        if (category === 'finished') matchesCategory = isFinished;
+        else if (category === 'aluminum') matchesCategory = isAluminum && !isFinished;
+        else matchesCategory = !isAluminum && !isFinished;
 
         return matchesCategory;
     });
@@ -5147,8 +5167,10 @@ function renderInventory(inventory, isPartial = false) {
         if (currentCat === 'aluminum' && !isAluminum) return false;
         if (currentCat === 'accessory' && isAluminum) return false;
 
-        // 配件額外過濾：名稱有前綴 OR 有系列欄
-        if (!isAluminum) {
+        // 配件額外過濾：名稱有前綴 OR 有系列欄（自家成品免此限制）
+        const _cat = (findValue(item, ['category', '產品主分類', '分類', '主分類']) || '').toString().trim();
+        const _isFinished = (_cat === '自家成品' || _cat === '成品');
+        if (!isAluminum && !_isFinished) {
             const hasPrefix = name.match(/^(20|30|40)-(uff|.+)/);
             const seriesCol = (findValue(item, ['series', '產品類型', '系列']) || '').toString().replace('系列', '').trim();
             const hasSeriesCol = ['20', '30', '40'].includes(seriesCol);
@@ -5190,8 +5212,10 @@ function renderInventory(inventory, isPartial = false) {
         const seriesCol = (findValue(item, ['series', '產品類型', '系列']) || '').toString().replace('系列', '').trim();
         const hasSeriesCol = ['20', '30', '40'].includes(seriesCol);
 
-        // 過濾：必須是錘材 OR 名稱有前綴 OR 有系列欄
-        if (!isAluminum && !name.match(/^(20|30|40)-/) && !hasSeriesCol) return;
+        // 過濾：必須是鋁材 OR 名稱有前綴 OR 有系列欄（自家成品免此限制）
+        const _catR = (findValue(item, ['category', '產品主分類', '分類', '主分類']) || '').toString().trim();
+        const _isFinishedR = (_catR === '自家成品' || _catR === '成品');
+        if (!isAluminum && !_isFinishedR && !name.match(/^(20|30|40)-/) && !hasSeriesCol) return;
 
         if (isAluminum) {
             aluminumItems.push(item);
@@ -5263,6 +5287,31 @@ function renderInventory(inventory, isPartial = false) {
 
             if (lastType !== 'accessory') {
                 lastType = 'accessory';
+            }
+
+            // [自家成品] 簡化卡：只顯示單一庫存數量，不分系列、不套短缺警報徽章
+            const _finItem0 = seriesItems[0];
+            const _finCat = _finItem0 ? (findValue(_finItem0, ['category', '產品主分類', '分類', '主分類']) || '').toString().trim() : '';
+            if (_finCat === '自家成品' || _finCat === '成品') {
+                const _q = parseNum(findValue(_finItem0, ['qty', 'stock', '庫存數量', '數量']));
+                const _finSku = _finItem0._sku || (findValue(_finItem0, ['sku', '內部編號', '編號', '內部編號(SKU)', 'SKU']) || '');
+                const _low = _q < 5;
+                html += `
+                <div class="reservoir-card" style="grid-column: span 1; margin-bottom: 14px;">
+                    <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.06);">
+                        <i class="fas fa-box-open" style="font-size:0.8rem; color:rgba(255,255,255,0.5);"></i>
+                        <span style="font-size:1rem; font-weight:500; color:rgba(255,255,255,0.92);">${baseName}</span>
+                        ${_finSku ? `<span style="font-family:'Consolas',monospace; font-size:0.6rem; color:rgba(255,255,255,0.45); margin-left:auto;">[${_finSku}]</span>` : ''}
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:2px;">
+                        <span style="font-size:0.8rem; color:rgba(255,255,255,0.55);">現有庫存</span>
+                        <div style="display:flex; align-items:baseline; gap:4px;">
+                            <span style="font-size:1.7rem; font-weight:700; color:${_low ? '#f0c4c4' : 'rgba(255,255,255,0.95)'}; font-variant-numeric:tabular-nums;">${_q}</span>
+                            <span style="font-size:0.7rem; color:rgba(255,255,255,0.4);">件</span>
+                        </div>
+                    </div>
+                </div>`;
+                return;
             }
 
             // [Shortage Alert Section]
@@ -6658,7 +6707,7 @@ window.setChartFilter = function (chartId, filterType, value) {
         window.chartConfigs[chartId][filterType] = value;
     }
 
-    const ids = filterType === 'time' ? ['month', 'week', 'day'] : ['all', 'profile', 'accessory'];
+    const ids = filterType === 'time' ? ['month', 'week', 'day'] : ['all', 'profile', 'accessory', 'finished'];
     ids.forEach(id => {
         const btn = document.getElementById(`toggle-${chartId}-${filterType}-${id}`);
         if (btn) {
@@ -6710,7 +6759,7 @@ function parseOrderItemsRobust(o) {
 
     let stats = {
         count20: 0, count30: 0, count40: 0, countOther: 0,
-        countProfile: 0, countAccessory: 0,
+        countProfile: 0, countAccessory: 0, countFinished: 0,
         itemsMapTotal: {},
         paramMap: {}
     };
@@ -6756,7 +6805,10 @@ function parseOrderItemsRobust(o) {
         else if (series === "20") stats.count20++;
         else stats.countOther++;
 
-        if (isProfile) stats.countProfile++;
+        // [自家成品分類] 先認自家成品（訂單標籤【自家成品】或成品SKU），避免被併進配件
+        let isFinished = /【自家成品】|【成品】/.test(itemStr) || /PHONE-STAND|CART-STD|FOOD-CAR/i.test(sku);
+        if (isFinished) stats.countFinished++;
+        else if (isProfile) stats.countProfile++;
         else stats.countAccessory++;
 
         const qtyMatch = itemStr.match(/\(\s*x\s*(\d+)\s*\)/i) || itemStr.match(/x\s*(\d+)(?!\S)/i) || itemStr.match(/\*\s*(\d+)/);
@@ -6941,6 +6993,7 @@ window.renderFinancialReports = function () {
     const monthlyDataTotal = {};
     const monthlyDataProfile = {};
     const monthlyDataAccessory = {};
+    const monthlyDataFinished = {};
     const trConf = window.chartConfigs.trend;
     const smConf = window.chartConfigs.seriesMix || { time: 'month' };
     const logConf = window.chartConfigs.logistics || { time: 'month' };
@@ -6966,6 +7019,7 @@ window.renderFinancialReports = function () {
             monthlyDataTotal[mKey] = 0;
             monthlyDataProfile[mKey] = 0;
             monthlyDataAccessory[mKey] = 0;
+            monthlyDataFinished[mKey] = 0;
         }
     } else if (trConf.time === 'week') {
         const daysInMonth = new Date(selYear, selMonth, 0).getDate();
@@ -6975,6 +7029,7 @@ window.renderFinancialReports = function () {
             monthlyDataTotal[wKey] = 0;
             monthlyDataProfile[wKey] = 0;
             monthlyDataAccessory[wKey] = 0;
+            monthlyDataFinished[wKey] = 0;
         }
     } else {
         // Trend / Year Mode: Init all 12 months
@@ -6983,6 +7038,7 @@ window.renderFinancialReports = function () {
             monthlyDataTotal[mKey] = 0;
             monthlyDataProfile[mKey] = 0;
             monthlyDataAccessory[mKey] = 0;
+            monthlyDataFinished[mKey] = 0;
         }
     }
 
@@ -7019,10 +7075,11 @@ window.renderFinancialReports = function () {
         const price = window.safeParsePrice(o.total);
         const itemsInfo = parseOrderItemsRobust(o);
 
-        let totalItemsCount = itemsInfo.countProfile + itemsInfo.countAccessory;
+        let totalItemsCount = itemsInfo.countProfile + itemsInfo.countAccessory + itemsInfo.countFinished;
         if (totalItemsCount === 0) totalItemsCount = 1;
         let pRatio = itemsInfo.countProfile / totalItemsCount;
         let aRatio = itemsInfo.countAccessory / totalItemsCount;
+        let fRatio = itemsInfo.countFinished / totalItemsCount;
 
         // Series Mix logic
         let totalSeriesCount = itemsInfo.count20 + itemsInfo.count30 + itemsInfo.count40 + itemsInfo.countOther;
@@ -7079,6 +7136,7 @@ window.renderFinancialReports = function () {
             monthlyDataTotal[timeKey] += price;
             monthlyDataProfile[timeKey] += price * pRatio;
             monthlyDataAccessory[timeKey] += price * aRatio;
+            monthlyDataFinished[timeKey] += price * fRatio;
         }
 
         // SeriesMix + CrossSell aggregation
@@ -7131,6 +7189,15 @@ window.renderFinancialReports = function () {
                         label: '配件營收',
                         data: Object.values(monthlyDataAccessory).map(v => Math.round(v)),
                         backgroundColor: '#ba8181', // Morandi Rose
+                        borderRadius: trConf.cat === 'all' ? { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } : 4,
+                        borderSkipped: false
+                    });
+                }
+                if (trConf.cat === 'all' || trConf.cat === 'finished') {
+                    trSets.push({
+                        label: '自家成品營收',
+                        data: Object.values(monthlyDataFinished).map(v => Math.round(v)),
+                        backgroundColor: 'rgba(142,68,173,0.55)', // 自家成品 紫（與訂單標籤同色系）
                         borderRadius: trConf.cat === 'all' ? { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } : 4,
                         borderSkipped: false
                     });
