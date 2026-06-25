@@ -4409,7 +4409,9 @@ function renderDetailCards(detailsStr, status) {
         }
 
         // 基本類型判斷
+        let isFinished = line.includes('【自家成品】') || line.includes('自家成品');
         if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型')) type = 'profile';
+        else if (isFinished) type = 'accessory';   // 自家成品：用配件式名稱扣帳，但標籤獨立顯示
         else if (line.includes('【配件】') || line.includes('配件')) type = 'accessory';
 
         // 1. [強化] 直接從「整行文字」偵測系列提示
@@ -4520,7 +4522,7 @@ function renderDetailCards(detailsStr, status) {
             } else {
                 // Remove trailing SKUs from the base name if they are already going to be appended
                 const simplifiedName = window.removeSKU(info.cleanBase).replace(/\(含[^)]+\)/g, '').replace(/（含[^）]+）/g, '').trim();
-                let formatted = `【配件】 <span style="font-weight:bold;">${simplifiedName}</span>${skuHtml}`;
+                let formatted = `${isFinished ? '【自家成品】' : '【配件】'} <span style="font-weight:bold;">${simplifiedName}</span>${skuHtml}`;
                 if (qtyMatch) formatted += ` <span style="color:#000; font-weight:bold;">( x ${qty} )</span>`;
 
                 const displaySeries = info.series !== 99 ? info.series : series;
@@ -4718,7 +4720,9 @@ window.printOrder = function () {
         const qtyMatch = line.match(/\( x (\d+) \)/);
         if (qtyMatch) qty = parseInt(qtyMatch[1]);
 
+        let isFinished = line.includes('【自家成品】') || line.includes('自家成品');
         if (line.includes('【鋁材】') || line.includes('鋁材') || line.includes('鋁擠型')) type = 'profile';
+        else if (isFinished) type = 'accessory';   // 自家成品：用配件式名稱扣帳，但標籤獨立顯示
         else if (line.includes('【配件】') || line.includes('配件')) type = 'accessory';
 
         let itemName = line.replace(/^【.*?】\s*/, '').trim();
@@ -4762,7 +4766,7 @@ window.printOrder = function () {
                 else if (series === 40) seriesColor = '#5e8a5e';
 
                 const skuText = info.sku ? ` <span style="color:${seriesColor}">[${info.sku}]</span>` : '';
-                items.push({ raw: `【配件】 <b>${simplifiedName}</b>${skuText} <b>(x${qty})</b>`, type, series });
+                items.push({ raw: `${isFinished ? '【自家成品】' : '【配件】'} <b>${simplifiedName}</b>${skuText} <b>(x${qty})</b>`, type, series });
             }
         } else {
             const info = window.resolveItemInfo(itemName, series);
