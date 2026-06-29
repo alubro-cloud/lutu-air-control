@@ -372,17 +372,10 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
         }).then(() => console.log('Advanced price update sent to backend'))
           .catch(e => console.error('Failed to update backend price', e));
 
-        // 開啟 Gmail
-        if (target.email) {
-            let mailSubject = encodeURIComponent(`ALUMIBRO訂購報價回覆 - ${target.name}`);
-            let rawBody = window.generateMailBody(target.name, sysTotal, outsource, assembly, shipping, discount, taxType, taxAmount, finalTotal, target.details);
-            let mailBody = encodeURIComponent(rawBody);
-
-            if (mailBody.length > 1800) {
-                rawBody = window.generateMailBody(target.name, sysTotal, outsource, assembly, shipping, discount, taxType, taxAmount, finalTotal, target.details, true);
-                mailBody = encodeURIComponent(rawBody);
-            }
-            window.openGmail(target.email, mailSubject, mailBody);
+        // [新流程] 確認報價後自動分流：公司→報價單PDF；個人→付款通知Email
+        //（取代舊的純文字報價信；分類依統編/公司自動猜，可在卡片上改後用按鈕重觸發）
+        if (window.triggerQuoteOrNotice) {
+            window.triggerQuoteOrNotice(orderId);
         }
     }
     closeModal();
@@ -2616,11 +2609,9 @@ window.advanceStatus = function (orderId, nextStatus) {
             target.status = nextStatus; // Update locally
 
             // ... rest of logic ...
-            if (target.email) {
-                let mailSubject = encodeURIComponent(`ALUMIBRO訂購報價回覆 - ${target.name} `);
-                let rawBody = window.generateMailBody(target.name, target.total, 0, target.details);
-                let mailBody = encodeURIComponent(rawBody);
-                window.openGmail(target.email, mailSubject, mailBody);
+            // [新流程] 自取單確認後改走新分流（公司→報價單 / 個人→付款通知），取代舊純文字報價信
+            if (window.triggerQuoteOrNotice && (target.email || window._guessCustomerType(target) === '公司')) {
+                window.triggerQuoteOrNotice(target.timestamp);
             }
 
             // Persist
