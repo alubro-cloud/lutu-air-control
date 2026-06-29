@@ -220,7 +220,7 @@ window.showPriceModal = function (order, nextStatus) {
                  <button class="btn-secondary" onclick="closeModal()" style="padding:10px 20px; border-radius:8px;">取消</button>
                  <button id="btn-confirm-price" onclick="confirmQuotePrice('${order.timestamp}', '${nextStatus}')" 
                     style="flex:1; padding:12px; background:var(--accent-30); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">
-                確認並發送報價信
+                確認報價 → 前往 Gmail 檢查送出
             </button>
             </div>
         </div>
@@ -8358,7 +8358,9 @@ window.triggerPaymentNotice = function (orderId) {
     if (!o.email || String(o.email).indexOf('@') < 0) { alert('此訂單沒有有效 Email，無法寄付款通知。'); return; }
     var subject = encodeURIComponent('ALUMIBRO 鋁材兄弟 — 訂單付款通知');
     var body = encodeURIComponent(window.buildPaymentNoticeBody(o));
-    window.openGmail(o.email, subject, body);
+    var url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + o.email + '&su=' + subject + '&body=' + body;
+    window.open(url, '_blank'); // 嘗試自動開（被擋也沒關係，下面有可點按鈕）
+    _omToastLink('付款通知已備好。沒自動跳轉就點這裡：', url, '開啟 Gmail 撰寫');
 };
 
 window.printQuote = function (orderId) {
@@ -8463,18 +8465,26 @@ window.buildQuotePayload = function (o) {
     };
 };
 
+function _omToastLink(msg, url, btnLabel) {
+    var t = document.createElement('div');
+    t.style.cssText = 'position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#333;color:#fff;padding:14px 20px;border-radius:10px;font-size:14px;z-index:99999;max-width:88%;text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.35);line-height:1.7';
+    t.innerHTML = msg + '<br><a href="' + url + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:9px;background:#fff;color:#222;padding:7px 16px;border-radius:7px;text-decoration:none;font-weight:bold;"><i class="fas fa-external-link-alt"></i> ' + (btnLabel || '開啟 Gmail') + '</a>';
+    document.body.appendChild(t);
+    setTimeout(function () { t.style.transition = 'opacity .5s'; t.style.opacity = '0'; setTimeout(function () { try { t.remove(); } catch (e) {} }, 500); }, 12000);
+}
+
 window.createQuoteDraft = function (orderId) {
     var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
     if (!o) return;
     var payload = window.buildQuotePayload(o);
+    var GMAIL_DRAFTS = 'https://mail.google.com/mail/u/0/#drafts';
     try {
+        window.open(GMAIL_DRAFTS, '_blank'); // 嘗試自動開（被擋也沒關係，下面有可點按鈕）
         fetch(ADMIN_API_URL, {
             method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'createQuoteDraft', orderId: orderId, data: payload })
         });
-        // 順手把人帶到 Gmail 草稿匣（草稿約幾秒後出現，必要時重新整理）
-        window.open('https://mail.google.com/mail/u/0/#drafts', '_blank');
-        _omToast('報價單 PDF 產生中… 已開啟 Gmail 草稿匣，約幾秒後（必要時重新整理）即可檢查送出');
+        _omToastLink('報價單草稿建立中（約幾秒）。沒自動跳轉就點這裡：', GMAIL_DRAFTS, '開啟 Gmail 草稿匣');
     } catch (e) {
         alert('產生報價單草稿失敗：' + e.message);
     }
