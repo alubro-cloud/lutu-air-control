@@ -8239,7 +8239,7 @@ function _omSaveLocal(id, patch) {
 }
 window._guessCustomerType = function (order) {
     var s = String((order.delivery || '') + (order.note || '') + (order.details || ''));
-    return /公司/.test(s) ? '公司' : '個人';
+    return /【統編】|【公司】|公司/.test(s) ? '公司' : '個人';
 };
 window.getMeta = function (order) {
     var c = _omCache();
@@ -8336,6 +8336,9 @@ function _omParseRows(details) {
     return out;
 }
 
+function _extractTaxId(note) { var m = String(note || '').match(/【統編】\s*([0-9]{6,})/); return m ? m[1] : ''; }
+function _extractCompany(note) { var m = String(note || '').match(/【公司】\s*([^<【]+)/); return m ? m[1].trim() : ''; }
+
 window.buildPaymentNoticeBody = function (order) {
     var rows = _omParseRows(order.details);
     var detailText = rows.map(function (r) {
@@ -8371,6 +8374,8 @@ window.printQuote = function (orderId) {
     var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
     if (!o) return;
     var m = window.getMeta(o);
+    var taxId = _extractTaxId(o.note);
+    var company = _extractCompany(o.note);
     var rows = _omParseRows(o.details);
     var sub = rows.reduce(function (a, r) { return a + r.amount; }, 0);
     var proc = (Number(o.outsourcePrice) || 0) + (Number(o.assemblyFee) || 0);
@@ -8403,7 +8408,7 @@ window.printQuote = function (orderId) {
         + '.sign{margin-top:16px;text-align:center;font-weight:bold;letter-spacing:4px;border:2px solid #333;padding:8px}'
         + '</style></head><body>'
         + '<h1>報　價　單</h1>'
-        + '<div class="head"><div><b>客戶：</b>' + (o.name || '') + '<br><b>電話：</b>' + (o.phone || '') + '<br><b>地址：</b>' + (o.address || '') + '<br><b>統一編號：</b>＿＿＿＿＿＿</div>'
+        + '<div class="head"><div>' + (company ? '<b>公司抬頭：</b>' + company + '<br>' : '') + '<b>客戶：</b>' + (o.name || '') + '<br><b>電話：</b>' + (o.phone || '') + '<br><b>地址：</b>' + (o.address || '') + '<br><b>統一編號：</b>' + (taxId || '＿＿＿＿＿＿') + '</div>'
         + '<div class="co"><b>' + ALUMIBRO_CO.name + '</b><br>' + ALUMIBRO_CO.addr + '<br>電話：' + ALUMIBRO_CO.tel + '　傳真：' + ALUMIBRO_CO.fax + '<br>統編：' + ALUMIBRO_CO.tax + '　聯絡人：' + ALUMIBRO_CO.contact + '<br>日期：' + fmtD(today) + '</div></div>'
         + '<table class="items"><thead><tr><th>項次</th><th>品名</th><th>規格</th><th>數量</th><th>單價</th><th>金額</th></tr></thead><tbody>'
         + rowsHtml + '</tbody></table>'
