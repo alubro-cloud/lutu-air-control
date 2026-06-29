@@ -2401,6 +2401,11 @@ function createCard(order, index, currentStatus) {
         else nextStatus = 'cutting';
     }
 
+    // [新流程] 報價後直接進生產；付款改由卡片「付款狀態+回簽」閘門控管，不再強制經過「已付款」步驟
+    if (currentStatus === 'quoted') {
+        nextStatus = hasProfiles ? 'cutting' : 'picking';
+    }
+
     if (currentStatus === 'packing') {
         nextStatus = 'shipping';
     }
@@ -2422,6 +2427,10 @@ function createCard(order, index, currentStatus) {
             }
         }
 
+        if (currentStatus === 'quoted') {
+            if (nextStatus === 'cutting') btnText = "可生產 → 切料";
+            if (nextStatus === 'picking') btnText = "可生產 → 撿貨";
+        }
         if (currentStatus === 'paid') {
             if (nextStatus === 'cutting') btnText = "開始工單流程";
             if (nextStatus === 'picking') btnText = "開始撿貨 (入庫)";
@@ -2468,6 +2477,8 @@ function createCard(order, index, currentStatus) {
     let mailSubject = encodeURIComponent(`ALUMIBRO訂購報價回覆 - ${order.name}`);
     let rawBody = window.generateMailBody(order.name, order.total, order.shippingFee || 0, order.details);
     let mailBody = encodeURIComponent(rawBody);
+    let _ctype = (window.getMeta ? window.getMeta(order).customerType : '個人');
+    let _quoteBtnLabel = (_ctype === '公司') ? '報價單' : '付款通知';
 
     el.innerHTML = `
     <div class="card-header">
@@ -2493,12 +2504,14 @@ function createCard(order, index, currentStatus) {
         </div>
     </div>
 
+    ${window.renderOrderMeta ? window.renderOrderMeta(order) : ''}
+
     <div class="card-actions">
         ${prevBtnHtml}
         <button class="btn-card-action btn-gmail"
             style="background:${tagColor}; color:#fff;"
-            onclick="event.stopPropagation(); window.triggerGmailReply('${order.timestamp}')">
-            <i class="fas fa-envelope"></i> 回覆
+            onclick="event.stopPropagation(); window.triggerQuoteOrNotice('${order.timestamp}')">
+            <i class="fas fa-envelope"></i> ${_quoteBtnLabel}
         </button>
         ${nextBtnHtml}
     </div>
@@ -2569,6 +2582,13 @@ window.advanceStatus = function (orderId, nextStatus) {
     if (!target) {
         console.error("Order not found:", orderId);
         return;
+    }
+
+    // [生產閘門] 開始生產(切料／或配件單由報價直接進撿貨)前必須：已付清，或（收訂金/月結 + 已回簽）
+    var _isProdStart = (nextStatus === 'cutting') || (nextStatus === 'picking' && (target.status === 'quoted' || target.status === 'paid'));
+    if (_isProdStart && typeof window.canEnterCutting === 'function') {
+        var _gate = window.canEnterCutting(target);
+        if (!_gate.ok) { alert(_gate.msg); return; }
     }
 
     // [Fix] Local status update should only happen after guards
@@ -8177,3 +8197,236 @@ window.preloadCalendarForHub = async function () {
         if (document.visibilityState === 'visible') syncTick();
     });
 })();
+
+// ============================================================
+// [業務 meta] 客戶類別 / 付款狀態 / 回簽 / 匯款末五碼  (附加模組)
+// 卡片上即時可改；本機快取先顯示、背景寫回 Sheet(updateOrderMeta)、10秒同步帶到別台。
+// 付款採「最新人為設定為準」，系統不自動倒退；生產閘門：已付清 或（收訂金/月結 + 已回簽）。
+// ============================================================
+(function () {
+    if (document.getElementById('order-meta-style')) return;
+    var s = document.createElement('style');
+    s.id = 'order-meta-style';
+    s.textContent =
+        '.order-meta{margin:6px 0 2px;padding:6px 8px;background:rgba(0,0,0,0.035);border-radius:8px;display:flex;flex-direction:column;gap:5px;font-size:11.5px}'
+      + '.order-meta .om-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap}'
+      + '.order-meta .om-lbl{color:#999;min-width:30px;flex-shrink:0}'
+      + '.order-meta .om-pill{border:1px solid #ccc;background:#fff;color:#555;border-radius:10px;padding:1px 9px;font-size:11px;cursor:pointer;line-height:1.6}'
+      + '.order-meta .om-pill.on{border-color:transparent;background:#666;color:#fff}'
+      + '.order-meta .om-pay.on.paid{background:#2e7d32}'
+      + '.order-meta .om-pay.on.part{background:#b8860b}'
+      + '.order-meta .om-pay.on.unpaid{background:#9e9e9e}'
+      + '.order-meta .om-sign{margin-left:auto;border:1px solid #ccc;background:#fff;color:#999;border-radius:10px;padding:1px 9px;font-size:11px;cursor:pointer}'
+      + '.order-meta .om-sign.on{border-color:transparent;background:#8e44ad;color:#fff}'
+      + '.order-meta .om-remit{flex:1;min-width:90px;border:1px solid #ccc;border-radius:6px;padding:2px 6px;font-size:11px}';
+    document.head.appendChild(s);
+})();
+
+function _omPick() {
+    for (var i = 0; i < arguments.length; i++) {
+        var v = arguments[i];
+        if (v !== undefined && v !== null && v !== '') return v;
+    }
+    return '';
+}
+function _omCache() {
+    try { return JSON.parse(localStorage.getItem('order_meta') || '{}'); } catch (e) { return {}; }
+}
+function _omSaveLocal(id, patch) {
+    var c = _omCache();
+    c[id] = Object.assign({}, c[id], patch);
+    try { localStorage.setItem('order_meta', JSON.stringify(c)); } catch (e) { }
+}
+window._guessCustomerType = function (order) {
+    var s = String((order.delivery || '') + (order.note || '') + (order.details || ''));
+    return /公司/.test(s) ? '公司' : '個人';
+};
+window.getMeta = function (order) {
+    var c = _omCache();
+    var l = c[order.timestamp] || {};
+    return {
+        customerType: _omPick(l.customerType, order.customerType, window._guessCustomerType(order)),
+        paymentStatus: _omPick(l.paymentStatus, order.paymentStatus),
+        signedBack: _omPick(l.signedBack, order.signedBack),
+        remitNote: _omPick(l.remitNote, order.remitNote)
+    };
+};
+function _omPush(id, patch) {
+    try {
+        fetch(ADMIN_API_URL, {
+            method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(Object.assign({ action: 'updateOrderMeta', orderId: id }, patch))
+        });
+    } catch (e) { }
+}
+function _omApply(id, patch) {
+    _omSaveLocal(id, patch);
+    var t = ordersData.find(function (o) { return String(o.timestamp) === String(id); });
+    if (t) Object.assign(t, patch);
+    _omPush(id, patch);
+    var el = document.getElementById('meta-' + id);
+    if (el && t) el.outerHTML = window.renderOrderMeta(t);
+}
+window.setMetaType = function (id, v) { _omApply(id, { customerType: v }); };
+window.setMetaPay = function (id, v) { _omApply(id, { paymentStatus: v }); };
+window.toggleMetaSign = function (id) {
+    var t = ordersData.find(function (o) { return String(o.timestamp) === String(id); });
+    var cur = t ? (window.getMeta(t).signedBack === '已回簽') : false;
+    _omApply(id, { signedBack: cur ? '' : '已回簽' });
+};
+window.setMetaRemit = function (id, v) { _omApply(id, { remitNote: v }); };
+
+window.renderOrderMeta = function (order) {
+    var m = window.getMeta(order);
+    var id = order.timestamp;
+    var typeBtn = function (v) {
+        return '<button class="om-pill' + (m.customerType === v ? ' on' : '') + '" onclick="event.stopPropagation();window.setMetaType(\'' + id + '\',\'' + v + '\')">' + v + '</button>';
+    };
+    var payBtn = function (v, label, cls) {
+        return '<button class="om-pill om-pay' + (m.paymentStatus === v ? ' on ' + cls : '') + '" onclick="event.stopPropagation();window.setMetaPay(\'' + id + '\',\'' + v + '\')">' + label + '</button>';
+    };
+    var signed = m.signedBack === '已回簽';
+    var remit = String(m.remitNote || '').replace(/"/g, '&quot;');
+    return '<div class="order-meta" id="meta-' + id + '" onclick="event.stopPropagation()">'
+      + '<div class="om-row"><span class="om-lbl">類別</span>' + typeBtn('個人') + typeBtn('公司')
+      + '<button class="om-sign' + (signed ? ' on' : '') + '" onclick="event.stopPropagation();window.toggleMetaSign(\'' + id + '\')"><i class="fas fa-' + (signed ? 'check-circle' : 'circle') + '"></i> 回簽</button></div>'
+      + '<div class="om-row"><span class="om-lbl">付款</span>' + payBtn('未付', '未付', 'unpaid') + payBtn('收訂金', '訂金', 'part') + payBtn('已付清', '已付清', 'paid') + payBtn('月結', '月結', 'part') + '</div>'
+      + '<div class="om-row"><span class="om-lbl">末五碼</span><input class="om-remit" value="' + remit + '" placeholder="匯款末五碼 / 日期" onclick="event.stopPropagation()" onchange="window.setMetaRemit(\'' + id + '\', this.value)"></div>'
+      + '</div>';
+};
+
+window.canEnterCutting = function (order) {
+    var m = window.getMeta(order);
+    var pay = m.paymentStatus;
+    var signed = m.signedBack === '已回簽';
+    if (pay === '已付清') return { ok: true };
+    if ((pay === '收訂金' || pay === '月結') && signed) return { ok: true };
+    var why;
+    if (!pay || pay === '未付') why = '此單尚未收款。請先收款並把付款標成「已付清」；若是收訂金或月結，需先完成「回簽」才能放行。';
+    else why = '付款為「' + pay + '」但客戶尚未回簽。請先取得蓋章報價單、勾選卡片上的「回簽」，才能放行生產。';
+    return { ok: false, msg: '⛔ 無法開始生產\n\n' + why + '\n\n（在訂單卡片上設定付款狀態與回簽即可）' };
+};
+
+// ============================================================
+// [報價/付款輸出] 公司→報價單(列印 PDF)；個人→付款通知(Email，免費，不用簡訊)
+// ============================================================
+var ALUMIBRO_BANK_LINES = '玉山銀行（808）烏日分行\n帳號：1399-940-164898\n戶名：鋅峰鋁業股份有限公司';
+var ALUMIBRO_CO = { name: '鋅峰鋁業股份有限公司', addr: '台中市大里區仁美路159巷11號', tel: '04-24962319', fax: '04-24962029', tax: '82830476', contact: '謝松霖' };
+
+function _omParseRows(details) {
+    var out = [];
+    String(details || '').split(/\n/).forEach(function (line) {
+        line = line.trim();
+        if (!line) return;
+        var qty = 1, amount = 0, spec = '';
+        var mq = line.match(/\(\s*x\s*([0-9]+)\s*\)/);
+        if (mq) qty = parseInt(mq[1]);
+        var ma = line.match(/--\s*\$([0-9.]+)/);
+        if (ma) amount = Math.round(parseFloat(ma[1]));
+        var ms = line.match(/\(L=([\d.]+)cm\)/);
+        if (ms) spec = 'L=' + ms[1] + 'cm';
+        var name = line
+            .replace(/\s*\[[^\]]*\]\s*/g, ' ')
+            .replace(/--\s*\$[0-9.]+/, '')
+            .replace(/\(\s*x\s*[0-9]+\s*\)/, '')
+            .replace(/\(L=[\d.]+cm\)/, '')
+            .replace(/\s+/g, ' ').trim();
+        out.push({ name: name, spec: spec, qty: qty, amount: amount });
+    });
+    return out;
+}
+
+window.buildPaymentNoticeBody = function (order) {
+    var rows = _omParseRows(order.details);
+    var detailText = rows.map(function (r) {
+        return '・' + r.name + (r.spec ? ' ' + r.spec : '') + ' ×' + r.qty + '　$' + r.amount;
+    }).join('\n');
+    var proc = (Number(order.outsourcePrice) || 0) + (Number(order.assemblyFee) || 0);
+    var ship = Number(order.shippingFee) || 0;
+    var sub = rows.reduce(function (a, r) { return a + r.amount; }, 0);
+    var body = 'ALUMIBRO 鋁材兄弟 — 訂單付款通知\n\n';
+    body += order.name + ' 您好，感謝您的訂購，明細如下：\n\n';
+    body += detailText + '\n';
+    body += '———————————\n';
+    body += '商品小計：$' + sub + '\n';
+    if (proc > 0) body += '加工費：$' + proc + '\n';
+    if (ship > 0) body += '運費：$' + ship + '\n';
+    body += '應付總額：NT$' + (Number(order.total) || 0) + '\n';
+    body += '———————————\n\n';
+    body += '請匯款至：\n' + ALUMIBRO_BANK_LINES + '\n\n';
+    body += '匯款後請回覆末五碼，我們將盡快為您安排出貨，謝謝！';
+    return body;
+};
+
+window.triggerPaymentNotice = function (orderId) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
+    if (!o) return;
+    if (!o.email || String(o.email).indexOf('@') < 0) { alert('此訂單沒有有效 Email，無法寄付款通知。'); return; }
+    var subject = encodeURIComponent('ALUMIBRO 鋁材兄弟 — 訂單付款通知');
+    var body = encodeURIComponent(window.buildPaymentNoticeBody(o));
+    window.openGmail(o.email, subject, body);
+};
+
+window.printQuote = function (orderId) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
+    if (!o) return;
+    var m = window.getMeta(o);
+    var rows = _omParseRows(o.details);
+    var sub = rows.reduce(function (a, r) { return a + r.amount; }, 0);
+    var proc = (Number(o.outsourcePrice) || 0) + (Number(o.assemblyFee) || 0);
+    var ship = Number(o.shippingFee) || 0;
+    var tax = Number(o.taxAmount) || 0;
+    var total = Number(o.total) || 0;
+    var today = new Date();
+    var exp = new Date(today.getTime() + 14 * 86400000);
+    var fmtD = function (d) { return d.getFullYear() + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2); };
+    var payWay = (m.paymentStatus === '月結') ? '月結 30 天' : '匯款（見下方匯款資訊）';
+    var rowsHtml = rows.map(function (r, i) {
+        var unit = r.qty ? Math.round(r.amount / r.qty) : r.amount;
+        return '<tr><td>' + (i + 1) + '</td><td style="text-align:left">' + r.name + '</td><td>' + (r.spec || '') + '</td><td>' + r.qty + '</td><td>$' + unit + '</td><td>$' + r.amount + '</td></tr>';
+    }).join('');
+    var w = window.open('', '', 'width=900,height=1000');
+    w.document.write(
+        '<html><head><title>報價單 - ' + o.name + '</title><style>'
+        + '@page{size:A4;margin:14mm}body{font-family:"Noto Sans TC",sans-serif;color:#222;font-size:13px}'
+        + 'h1{font-size:22px;letter-spacing:8px;text-align:center;margin:0 0 6px}'
+        + '.head{display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;line-height:1.7}'
+        + '.co{text-align:right}'
+        + 'table.items{width:100%;border-collapse:collapse;margin:8px 0}'
+        + 'table.items th,table.items td{border:1px solid #999;padding:6px 8px;text-align:center}'
+        + 'table.items th{background:#f0f0f0}'
+        + '.tot{width:55%;margin-left:auto;border-collapse:collapse}'
+        + '.tot td{padding:3px 8px}.tot .k{text-align:right;color:#555}.tot .v{text-align:right;width:120px}'
+        + '.grand td{font-size:16px;font-weight:bold;border-top:2px solid #333;padding-top:6px}'
+        + '.terms{font-size:12px;margin-top:10px;line-height:1.9}'
+        + '.bank{margin-top:8px;padding:8px 10px;border:1px dashed #999;white-space:pre-line;font-size:12px}'
+        + '.sign{margin-top:16px;text-align:center;font-weight:bold;letter-spacing:4px;border:2px solid #333;padding:8px}'
+        + '</style></head><body>'
+        + '<h1>報　價　單</h1>'
+        + '<div class="head"><div><b>客戶：</b>' + (o.name || '') + '<br><b>電話：</b>' + (o.phone || '') + '<br><b>地址：</b>' + (o.address || '') + '<br><b>統一編號：</b>＿＿＿＿＿＿</div>'
+        + '<div class="co"><b>' + ALUMIBRO_CO.name + '</b><br>' + ALUMIBRO_CO.addr + '<br>電話：' + ALUMIBRO_CO.tel + '　傳真：' + ALUMIBRO_CO.fax + '<br>統編：' + ALUMIBRO_CO.tax + '　聯絡人：' + ALUMIBRO_CO.contact + '<br>日期：' + fmtD(today) + '</div></div>'
+        + '<table class="items"><thead><tr><th>項次</th><th>品名</th><th>規格</th><th>數量</th><th>單價</th><th>金額</th></tr></thead><tbody>'
+        + rowsHtml + '</tbody></table>'
+        + '<table class="tot">'
+        + '<tr><td class="k">商品小計</td><td class="v">$' + sub + '</td></tr>'
+        + (proc > 0 ? '<tr><td class="k">加工費</td><td class="v">$' + proc + '</td></tr>' : '')
+        + (ship > 0 ? '<tr><td class="k">運費</td><td class="v">$' + ship + '</td></tr>' : '')
+        + (tax > 0 ? '<tr><td class="k">稅金</td><td class="v">$' + tax + '</td></tr>' : '')
+        + '<tr class="grand"><td class="k">合計</td><td class="v">NT$' + total + '</td></tr>'
+        + '</table>'
+        + '<div class="terms"><b>交貨方式：</b>' + (o.delivery || '依約定') + '　|　<b>付款方式：</b>' + payWay + '<br><b>報價有效期：</b>至 ' + fmtD(exp) + ' 止</div>'
+        + '<div class="bank"><b>匯款資訊</b>\n' + ALUMIBRO_BANK_LINES + '</div>'
+        + '<div class="sign">確 認 後 請 簽 回</div>'
+        + '<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script>'
+        + '</body></html>'
+    );
+    w.document.close();
+};
+
+window.triggerQuoteOrNotice = function (orderId) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
+    if (!o) return;
+    var type = window.getMeta(o).customerType;
+    if (type === '公司') window.printQuote(orderId);
+    else window.triggerPaymentNotice(orderId);
+};
