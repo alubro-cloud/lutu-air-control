@@ -2501,11 +2501,11 @@ function createCard(order, index, currentStatus) {
 
     <div class="card-actions">
         ${prevBtnHtml}
-        <button class="btn-card-action btn-gmail"
+        ${currentStatus === 'unquoted' ? '' : `<button class="btn-card-action btn-gmail"
             style="background:${tagColor}; color:#fff;"
             onclick="event.stopPropagation(); window.triggerQuoteOrNotice('${order.timestamp}')">
             <i class="fas fa-envelope"></i> ${_quoteBtnLabel}
-        </button>
+        </button>`}
         ${nextBtnHtml}
     </div>
     `;
@@ -8428,6 +8428,52 @@ window.triggerQuoteOrNotice = function (orderId) {
     var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
     if (!o) return;
     var type = window.getMeta(o).customerType;
-    if (type === '公司') window.printQuote(orderId);
+    if (type === '公司') window.createQuoteDraft(orderId);
     else window.triggerPaymentNotice(orderId);
+};
+
+function _omToast(msg) {
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;left:50%;bottom:32px;transform:translateX(-50%);background:#333;color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;z-index:99999;max-width:82%;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+    document.body.appendChild(t);
+    setTimeout(function () { t.style.transition = 'opacity .4s'; t.style.opacity = '0'; setTimeout(function () { try { t.remove(); } catch (e) {} }, 400); }, 4200);
+}
+
+window.buildQuotePayload = function (o) {
+    var m = window.getMeta(o);
+    var rows = _omParseRows(o.details).map(function (r) {
+        return { name: r.name, spec: r.spec, qty: r.qty, amount: r.amount, unit: r.qty ? Math.round(r.amount / r.qty) : r.amount };
+    });
+    var sub = rows.reduce(function (a, r) { return a + r.amount; }, 0);
+    var today = new Date();
+    var exp = new Date(today.getTime() + 14 * 86400000);
+    var fmtD = function (d) { return d.getFullYear() + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2); };
+    return {
+        name: o.name || '', phone: o.phone || '', address: o.address || '', email: o.email || '',
+        company: _extractCompany(o.note), taxId: _extractTaxId(o.note),
+        delivery: o.delivery || '依約定',
+        payWay: (m.paymentStatus === '月結') ? '月結 30 天' : '匯款（見下方匯款資訊）',
+        rows: rows, sub: sub,
+        proc: (Number(o.outsourcePrice) || 0) + (Number(o.assemblyFee) || 0),
+        ship: Number(o.shippingFee) || 0,
+        tax: Number(o.taxAmount) || 0,
+        total: Number(o.total) || 0,
+        date: fmtD(today), exp: fmtD(exp)
+    };
+};
+
+window.createQuoteDraft = function (orderId) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
+    if (!o) return;
+    var payload = window.buildQuotePayload(o);
+    try {
+        fetch(ADMIN_API_URL, {
+            method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'createQuoteDraft', orderId: orderId, data: payload })
+        });
+        _omToast('報價單 PDF 產生中… 約 5–10 秒後到 Gmail「草稿匣」檢查後送出');
+    } catch (e) {
+        alert('產生報價單草稿失敗：' + e.message);
+    }
 };
