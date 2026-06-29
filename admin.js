@@ -8472,7 +8472,9 @@ window.createQuoteDraft = function (orderId) {
             method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action: 'createQuoteDraft', orderId: orderId, data: payload })
         });
-        _omToast('報價單 PDF 產生中… 約 5–10 秒後到 Gmail「草稿匣」檢查後送出');
+        // 順手把人帶到 Gmail 草稿匣（草稿約幾秒後出現，必要時重新整理）
+        window.open('https://mail.google.com/mail/u/0/#drafts', '_blank');
+        _omToast('報價單 PDF 產生中… 已開啟 Gmail 草稿匣，約幾秒後（必要時重新整理）即可檢查送出');
     } catch (e) {
         alert('產生報價單草稿失敗：' + e.message);
     }
