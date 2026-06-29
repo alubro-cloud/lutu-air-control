@@ -8478,12 +8478,15 @@ window.createQuoteDraft = function (orderId) {
     if (!o) return;
     var DRAFTS = 'https://mail.google.com/mail/u/0/#drafts';
     var m = window.getMeta(o);
-    var proc = (Number(o.outsourcePrice) || 0) + (Number(o.assemblyFee) || 0);
     var qs = '?action=createQuoteDraft&orderId=' + encodeURIComponent(orderId)
-        + '&total=' + (Number(o.total) || 0)
+        + '&sysTotal=' + (Number(o.sysTotal) || 0)
+        + '&out=' + (Number(o.outsourcePrice) || 0)
+        + '&asm=' + (Number(o.assemblyFee) || 0)
         + '&ship=' + (Number(o.shippingFee) || 0)
-        + '&proc=' + proc
+        + '&disc=' + (Number(o.discountAmount) || 0)
         + '&tax=' + (Number(o.taxAmount) || 0)
+        + '&taxType=' + encodeURIComponent(o.taxType || '')
+        + '&total=' + (Number(o.total) || 0)
         + '&pay=' + encodeURIComponent(m.paymentStatus || '')
         + '&t=' + Date.now();
     // 在點擊當下先開一個分頁（這時最不會被擋），拿到網址再把它導去那封草稿的撰寫畫面
