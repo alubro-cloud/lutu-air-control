@@ -8476,16 +8476,32 @@ function _omToastLink(msg, url, btnLabel) {
 window.createQuoteDraft = function (orderId) {
     var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
     if (!o) return;
-    var payload = window.buildQuotePayload(o);
-    var GMAIL_DRAFTS = 'https://mail.google.com/mail/u/0/#drafts';
-    try {
-        window.open(GMAIL_DRAFTS, '_blank'); // 嘗試自動開（被擋也沒關係，下面有可點按鈕）
-        fetch(ADMIN_API_URL, {
-            method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action: 'createQuoteDraft', orderId: orderId, data: payload })
+    var DRAFTS = 'https://mail.google.com/mail/u/0/#drafts';
+    var m = window.getMeta(o);
+    var proc = (Number(o.outsourcePrice) || 0) + (Number(o.assemblyFee) || 0);
+    var qs = '?action=createQuoteDraft&orderId=' + encodeURIComponent(orderId)
+        + '&total=' + (Number(o.total) || 0)
+        + '&ship=' + (Number(o.shippingFee) || 0)
+        + '&proc=' + proc
+        + '&tax=' + (Number(o.taxAmount) || 0)
+        + '&pay=' + encodeURIComponent(m.paymentStatus || '')
+        + '&t=' + Date.now();
+    // 在點擊當下先開一個分頁（這時最不會被擋），拿到網址再把它導去那封草稿的撰寫畫面
+    var win = window.open('about:blank', '_blank');
+    _omToast('報價單草稿產生中… 約幾秒後開啟撰寫畫面');
+    fetch(ADMIN_API_URL + qs)
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (res && res.status === 'success' && res.composeUrl) {
+                if (win && !win.closed) { win.location = res.composeUrl; }
+                else { _omToastLink('報價單草稿已建立，點這裡直接開啟撰寫：', res.composeUrl, '開啟報價單（撰寫）'); }
+            } else {
+                if (win && !win.closed) win.close();
+                _omToastLink('草稿可能尚未建立，先到草稿匣看看：', DRAFTS, '開啟 Gmail 草稿匣');
+            }
+        })
+        .catch(function (e) {
+            if (win && !win.closed) win.close();
+            _omToastLink('連線異常，先到草稿匣看看：', DRAFTS, '開啟 Gmail 草稿匣');
         });
-        _omToastLink('報價單草稿建立中（約幾秒）。沒自動跳轉就點這裡：', GMAIL_DRAFTS, '開啟 Gmail 草稿匣');
-    } catch (e) {
-        alert('產生報價單草稿失敗：' + e.message);
-    }
 };
