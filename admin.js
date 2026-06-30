@@ -8330,6 +8330,21 @@ function _omParseRows(details) {
 function _extractTaxId(note) { var m = String(note || '').match(/【統編】\s*([0-9]{6,})/); return m ? m[1] : ''; }
 function _extractCompany(note) { var m = String(note || '').match(/【公司】\s*([^<【]+)/); return m ? m[1].trim() : ''; }
 
+// 稱謂：把全名轉成「姓 + 先生/小姐」。複姓抓兩字、英文名/已有稱謂則原樣。
+window._honorific = function (name, company) {
+    name = String(name || '').trim();
+    if (!name) return '';
+    company = String(company || '').trim();
+    if (company && (name === company || company.indexOf(name) === 0)) return name;
+    if (/[A-Za-z]/.test(name)) return name;
+    if (/(公司|企業|有限|股份|工廠|實業|商行|企業社|科技|國際|集團|事業|貿易|機械|五金|金屬|鋁業|材料|營造|建設|開發|木業|塑膠|電子|裝潢|設計|工作室|中心|行號|工程)/.test(name)) return name;
+    if (/(先生|小姐|女士|經理|協理|副理|總|董事長|老闆|主任|課長|科長|專員|工程師|小弟|大哥)/.test(name)) return name;
+    var compound = ['歐陽', '司馬', '諸葛', '上官', '夏侯', '皇甫', '尉遲', '公孫', '慕容', '長孫', '宇文', '司徒', '司空', '令狐', '范姜', '張簡', '澹台', '淳于', '濮陽', '東方', '獨孤', '南宮', '鍾離', '赫連', '宗政'];
+    var surname = name.charAt(0);
+    for (var i = 0; i < compound.length; i++) { if (name.indexOf(compound[i]) === 0) { surname = compound[i]; break; } }
+    return surname + '先生/小姐';
+};
+
 window.buildPaymentNoticeBody = function (order) {
     var rows = _omParseRows(order.details);
     var detailText = rows.map(function (r) {
@@ -8339,7 +8354,8 @@ window.buildPaymentNoticeBody = function (order) {
     var ship = Number(order.shippingFee) || 0;
     var sub = rows.reduce(function (a, r) { return a + r.amount; }, 0);
     var body = 'ALUMIBRO 鋁材兄弟 — 訂單付款通知\n\n';
-    body += order.name + ' 您好，感謝您的訂購，明細如下：\n\n';
+    var greet = window._honorific(order.name, _extractCompany(order.note));
+    body += (greet ? greet + ' ' : '') + '您好，感謝您的訂購，明細如下：\n\n';
     body += detailText + '\n';
     body += '———————————\n';
     body += '商品小計：$' + sub + '\n';
