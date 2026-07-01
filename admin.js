@@ -2413,11 +2413,8 @@ function createCard(order, index, currentStatus) {
             nextStatus = 'picking';
             btnText = "開始撿貨 (店到店)";
         } else if (currentStatus === 'unquoted') {
-            if (!isSelfPickup) {
-                btnText = "輸入報價金額";
-            } else {
-                btnText = "已報價";
-            }
+            // [修正] 自取單也一樣開報價視窗，所以按鈕統一顯示「輸入報價金額」（不再顯示「已報價」快速動作）
+            btnText = "輸入報價金額";
         }
 
         if (currentStatus === 'quoted') {
