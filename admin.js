@@ -974,7 +974,8 @@ window.renderInventoryDashboard = function () {
             </div>`;
         };
 
-        const MAX_HEALTH_MAP = { 20: 120000, 30: 360000, 40: 240000 };
+        // 各系列健康度基準 = 該系列料件種類數 × 120,000cm(每種 200 根滿水位)。與單品標配庫存基準一致。
+        const MAX_HEALTH_MAP = { 20: 240000, 30: 720000, 40: 480000 };
         let health = { 20: 0, 30: 0, 40: 0 };
         const ALUMINUM_ALLOW_LIST = ["2020型", "2040型", "3030輕型", "3060輕型", "3030重型", "3060重型", "6060輕型", "6060重型", "4040輕型", "4080輕型", "4040重型", "4080重型"];
         let accessories = [];
@@ -5382,12 +5383,13 @@ function renderInventory(inventory, isPartial = false) {
                 <div style="display:flex; flex-direction:column; gap:9px;">`;
 
             ['20', '30', '40'].forEach(s => {
-                const itemEntry = seriesItems.find(it => {
+                // [修正] 同一系列可能有多個品項(如 ACC-9-M6-001 / -002)，全部列出，不再只取第一個
+                const _seriesMatches = seriesItems.filter(it => {
                     const n = (findValue(it, ['name', '品項名稱', '品項']) || "").toString();
                     const seriesCol = (findValue(it, ['series', '產品類型', '系列']) || "").toString().replace('系列', '').trim();
-                    // Match by prefix (old format: "20-三角連結塊") OR by series column (new format)
                     return n.startsWith(s + '-') || seriesCol === s;
                 });
+                (_seriesMatches.length > 0 ? _seriesMatches : [null]).forEach(itemEntry => {
 
                 const rawStock = itemEntry ? parseNum(findValue(itemEntry, ['qty', 'stock', '庫存數量', '數量'])) : 0;
                 let sku = itemEntry ? (itemEntry._sku || (findValue(itemEntry, ['sku', '內部編號', '編號', '內部編號(SKU)', 'SKU']) || "")) : "";
@@ -5441,6 +5443,7 @@ function renderInventory(inventory, isPartial = false) {
                         <span style="font-size:0.65rem; color:rgba(255,255,255,0.4);">件</span>
                     </div>
                 </div>`;
+                });
             });
             html += `</div></div>`;
 
@@ -5501,8 +5504,8 @@ function renderInventory(inventory, isPartial = false) {
             const sku = skuMatch ? `[${skuMatch[1]}]` : '[SKU]';
             const cleanName = name.replace(/\[[^\]]+\]/, '').trim();
 
-            // 2. 存量計算 (基準量 60,000 cm)
-            const defaultMaxLength = 60000;
+            // 2. 存量計算 (基準量 120,000 cm = 200 根滿水位)
+            const defaultMaxLength = 120000;
             const totalBars = Math.floor(rawStock / 600);
             const percentage = Math.round((rawStock / defaultMaxLength) * 100);
             const fillWidth = Math.max(0, Math.min(percentage, 100));
