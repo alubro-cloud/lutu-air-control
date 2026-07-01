@@ -974,8 +974,8 @@ window.renderInventoryDashboard = function () {
             </div>`;
         };
 
-        // 各系列健康度基準 = 該系列料件種類數 × 120,000cm(每種 200 根滿水位)。與單品標配庫存基準一致。
-        const MAX_HEALTH_MAP = { 20: 240000, 30: 720000, 40: 480000 };
+        // 各系列健康度基準：20系=2000支、30系=6000支、40系=4000支(×600cm)。= 種類數 × 每種1000支，與單品標配一致。
+        const MAX_HEALTH_MAP = { 20: 1200000, 30: 3600000, 40: 2400000 };
         let health = { 20: 0, 30: 0, 40: 0 };
         const ALUMINUM_ALLOW_LIST = ["2020型", "2040型", "3030輕型", "3060輕型", "3030重型", "3060重型", "6060輕型", "6060重型", "4040輕型", "4080輕型", "4040重型", "4080重型"];
         let accessories = [];
@@ -1011,7 +1011,7 @@ window.renderInventoryDashboard = function () {
                 health[series] += totalLen;
             } else {
                 // 2. Accessory Matching
-                if (rawName.match(/^(20|30|40|HR)-/) || rawName.match(/\[(A|M|HR)/)) {
+                if (rawName.match(/^(20|30|40|HR)-/) || rawName.match(/\[(A|M|HR|PH)/)) {
                     accessories.push(item);
                 }
             }
@@ -5504,8 +5504,8 @@ function renderInventory(inventory, isPartial = false) {
             const sku = skuMatch ? `[${skuMatch[1]}]` : '[SKU]';
             const cleanName = name.replace(/\[[^\]]+\]/, '').trim();
 
-            // 2. 存量計算 (基準量 120,000 cm = 200 根滿水位)
-            const defaultMaxLength = 120000;
+            // 2. 存量計算 (基準量 600,000 cm = 1000 支滿水位)
+            const defaultMaxLength = 600000;
             const totalBars = Math.floor(rawStock / 600);
             const percentage = Math.round((rawStock / defaultMaxLength) * 100);
             const fillWidth = Math.max(0, Math.min(percentage, 100));
