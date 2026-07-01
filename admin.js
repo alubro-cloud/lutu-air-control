@@ -2601,30 +2601,9 @@ window.advanceStatus = function (orderId, nextStatus) {
         if (isS2S && !_hasAlu) {
             nextStatus = 'picking';
             target.status = 'picking'; // Update locally for S2S jump
-        } else if (addr.includes("自取") || addr.includes("[自取]")) {
-            // Self-Pickup remains 'quoted' (price confirmed)
-            let currentTotal = parseInt(String(target.total).replace(/[^0-9]/g, '') || 0);
-            target.total = currentTotal;
-            target.shippingFee = 0;
-            target.status = nextStatus; // Update locally
-
-            // ... rest of logic ...
-            // [新流程] 自取單確認後改走新分流（公司→報價單 / 個人→付款通知），取代舊純文字報價信
-            if (window.triggerQuoteOrNotice && (target.email || window._guessCustomerType(target) === '公司')) {
-                window.triggerQuoteOrNotice(target.timestamp);
-            }
-
-            // Persist
-            fetch(ADMIN_API_URL, {
-                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({ action: 'updateOrderPrice', orderId: orderId, newTotal: target.total, shippingFee: 0, status: nextStatus })
-            });
-
-            applyFilter();
-            window.lastActiveOrderId = orderId;
-            closeModal();
-            return;
         } else {
+            // [修正] 自取單(不論個人/公司)也一律走報價視窗，讓使用者自己決定要不要開發票/選稅別。
+            //        自取單的運費預設為 0（modal 會沿用 shippingFee，本來就是 0）。
             // Show Modal for Shipping Fee (Default Delivery)
             showPriceModal(target, nextStatus);
             return;
