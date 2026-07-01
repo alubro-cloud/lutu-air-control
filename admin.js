@@ -1001,12 +1001,9 @@ window.renderInventoryDashboard = function () {
                     let len = parseNum(findValue(item, ['長度', '長度(cm)', 'length']));
                     if (len === 0) len = 600;
 
-                    // HEURISTIC: If qty is > 5000, it's likely already the total CM
-                    if (qty > 5000) {
-                        totalLen = qty;
-                    } else {
-                        totalLen = qty * len;
-                    }
+                    // [修正] qty 欄位一律是 cm（與「點進去的單品」5499行一致），直接採用。
+                    // 舊版對 qty<5000 做 qty×600，會把 600cm(=1支) 誤放大成 600支 → 40系快空了卻顯示 60%。
+                    totalLen = qty;
                 }
                 health[series] += totalLen;
             } else {
