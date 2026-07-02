@@ -1742,6 +1742,9 @@ async function generateConsolidatedCuttingList() {
         return;
     }
 
+    // 配發本批 A/B/C 代號（依「進切料」的單、時間序）— 供切料表與出貨單對照
+    if (window.assignBatchLetters) window.assignBatchLetters(cuttingOrders);
+
     // 2. Parse and Aggregate Items
     let aggregated = {}; // Key: "Series-Name-Length", Value: {qty, name, length, series, refs}
 
@@ -2501,6 +2504,10 @@ function createCard(order, index, currentStatus) {
             onclick="event.stopPropagation(); window.triggerQuoteOrNotice('${order.timestamp}')">
             <i class="fas fa-envelope"></i> ${_quoteBtnLabel}
         </button>`}
+        ${!['unquoted', 'quoted'].includes(currentStatus) ? `<button class="btn-card-action" style="background:#556270; color:#fff;" title="印出貨貼紙 + 裝箱單"
+            onclick="event.stopPropagation(); window.printShippingDocs('${order.timestamp}')">
+            <i class="fas fa-print"></i> 出貨單
+        </button>` : ''}
         ${nextBtnHtml}
     </div>
     `;
@@ -5976,8 +5983,8 @@ window.runCuttingOptimization = async function () {
 
         // 灰色系（余料/废料）
         const grayColors = {
-            offcut: '#94a3b8',    // 淺灰色（餘料）
-            waste: '#475569'      // 深灰色（廢料）
+            offcut: '#64748b',    // 深灰色（餘料）
+            waste: '#334155'      // 更深灰（廢料）
         };
 
         // Render
@@ -5989,7 +5996,7 @@ window.runCuttingOptimization = async function () {
         // Render Used Offcuts
         let usedOffs = offcutBins.filter(b => b.cuts.length > 0);
         if (usedOffs.length > 0) {
-            visualsHtml += `<div style="font-size:0.85rem; font-weight:bold; color:#64748b; margin:5px 0;">使用餘料(${usedOffs.length} 支):</div>`;
+            visualsHtml += `<div style="font-size:0.85rem; font-weight:bold; color:#222; margin:5px 0;">使用餘料(${usedOffs.length} 支):</div>`;
             usedOffs.forEach((bin, idx) => {
                 let remain = bin.remain < 0 ? 0 : bin.remain; // clamp
                 let widthPct = (bin.capacity / 600) * 100; // Relative to 600 for scale
@@ -5999,20 +6006,20 @@ window.runCuttingOptimization = async function () {
                 bin.cuts.forEach(c => { let k = (c * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
                 let cutListStr = Object.keys(cutCounts).map(k => `${k} x${cutCounts[k]}`).join(', ');
                 visualsHtml += `<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:5px;">`;
-                visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#64748b; margin-right:10px;">餘料 ${bin.sourceLen * 10}mm</div>`;
-                visualsHtml += `<div style="font-size:0.85rem; color:#555; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
+                visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#222; margin-right:10px; font-size:0.95rem;">餘料 ${bin.sourceLen * 10}mm</div>`;
+                visualsHtml += `<div style="font-size:0.85rem; color:#222; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
                 visualsHtml += `</div>`;
                 visualsHtml += `<div style="width:100%; max-width:${widthPct}%; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
 
                 bin.cuts.forEach(c => {
                     let pct = (c / bin.capacity) * 100;
-                    visualsHtml += `<div class="cut-segment" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #fff; color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center;" title="切割 ${c * 10}mm">
+                    visualsHtml += `<div class="cut-segment" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #000; color:#222; font-size:10px; display:flex; align-items:center; justify-content:center;" title="切割 ${c * 10}mm">
         切 ${c * 10} mm
                      </div>`;
                 });
                 if (remain > 0) {
                     let rPct = (remain / bin.capacity) * 100;
-                    visualsHtml += `<div class="cut-remain leftover" style="width:${rPct}%; background:${grayColors.offcut}; opacity:0.7; font-size:10px; display:flex; align-items:center; justify-content:center; color:#fff;" title="剩餘 ${(remain * 10).toFixed(0)}mm (餘料)">
+                    visualsHtml += `<div class="cut-remain leftover" style="width:${rPct}%; background:${grayColors.offcut}; font-size:10px; display:flex; align-items:center; justify-content:center; color:#fff;" title="剩餘 ${(remain * 10).toFixed(0)}mm (餘料)">
         ${(remain * 10).toFixed(0)}
                      </div>`;
                 }
@@ -6022,7 +6029,7 @@ window.runCuttingOptimization = async function () {
 
         // Render New Bars
         if (newBarBins.length > 0) {
-            visualsHtml += `<div style="font-size:0.85rem; font-weight:bold; color:${seriesColor}; margin:10px 0 5px 0;">使用新料(${newBarBins.length} 支):</div>`;
+            visualsHtml += `<div style="font-size:0.85rem; font-weight:bold; color:#222; margin:10px 0 5px 0;">使用新料(${newBarBins.length} 支):</div>`;
             newBarBins.forEach((bin, idx) => {
                 let remain = bin.remain;
                 let isRemCheck = remain >= 10;
@@ -6032,14 +6039,14 @@ window.runCuttingOptimization = async function () {
                 bin.cuts.forEach(c => { let k = (c * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
                 let cutListStr = Object.keys(cutCounts).map(k => `${k} x${cutCounts[k]}`).join(', ');
                 visualsHtml += `<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:5px;">`;
-                visualsHtml += `<div class="bin-header" style="font-weight:bold; color:${seriesColor}; margin-right:10px;">新料 #${idx + 1}</div>`;
-                visualsHtml += `<div style="font-size:0.85rem; color:#555; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
+                visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#222; margin-right:10px; font-size:0.95rem;">新料 #${idx + 1}（${(bin.capacity || 600) * 10}mm）</div>`;
+                visualsHtml += `<div style="font-size:0.85rem; color:#222; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
                 visualsHtml += `</div>`;
                 visualsHtml += `<div style="width:100%; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
 
                 bin.cuts.forEach(cutLen => {
                     let pct = (cutLen / 600) * 100;
-                    visualsHtml += `<div class="cut-block" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #fff; color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center;" title="切割 ${cutLen * 10}mm">
+                    visualsHtml += `<div class="cut-block" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #000; color:#222; font-size:11px; display:flex; align-items:center; justify-content:center;" title="切割 ${cutLen * 10}mm">
                         <span>切 ${cutLen * 10} mm</span>
                     </div>`;
                 });
@@ -6050,7 +6057,7 @@ window.runCuttingOptimization = async function () {
                     let type = isRemCheck ? '余料' : '废料';
                     let cls = isRemCheck ? 'cut-remain leftover' : 'cut-remain waste';
 
-                    visualsHtml += `<div class="${cls}" style="width:${rPct}%; background:${color}; color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center; opacity:0.8;" title="剩余 ${(remain * 10).toFixed(0)}mm (${type})">
+                    visualsHtml += `<div class="${cls}" style="width:${rPct}%; background:${color}; color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center;" title="剩余 ${(remain * 10).toFixed(0)}mm (${type})">
                         ${(remain * 10).toFixed(0)} mm
                     </div>`;
                 }
@@ -6070,6 +6077,9 @@ window.runCuttingOptimization = async function () {
             <button onclick="window.printCuttingList('zh')" style="background:var(--accent-20); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">中文</button>
             <button onclick="window.printCuttingList('vi')" style="background:var(--accent-30); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Tiếng Việt</button>
             <button onclick="window.printCuttingList('id')" style="background:var(--accent-40); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Bahasa</button>
+        </div>
+        <div style="display:inline-flex; gap:8px; align-items:center;">
+            <button onclick="window.printAllShippingDocs()" title="把本批（進切料）每張的貼紙+裝箱單一次印給包裝" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-box-open"></i> 批次印本批出貨單</button>
         </div>
         <button class="btn-record-offcut" onclick="try{window.recordCuttingPlanToInventory()}catch(e){alert('Error: '+e.message)}" style="background:var(--accent-20); color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
             <i class="fas fa-save"></i> 確認切割計畫並更新庫存
@@ -6191,6 +6201,149 @@ window.printCuttingList = function (lang) {
     `);
 
     printWindow.document.close();
+};
+
+// [出貨] 每張訂單的「出貨貼紙(頁1，貼箱) + 裝箱單(頁2，A4放箱內)」列印
+// [出貨代號] 以「進切料狀態」的單為一批，依時間序給 A/B/C（每批重配），存在各單上
+window.assignBatchLetters = function (orders) {
+    const sorted = (orders || []).slice().sort((a, b) => {
+        const ta = window.safeParseDate ? window.safeParseDate(a.timestamp) : new Date(a.timestamp);
+        const tb = window.safeParseDate ? window.safeParseDate(b.timestamp) : new Date(b.timestamp);
+        return ta - tb;
+    });
+    const map = {};
+    sorted.forEach((o, i) => {
+        let L = String.fromCharCode(65 + (i % 26));
+        if (i >= 26) L += (Math.floor(i / 26) + 1); // 超過26支：A2、B2…（極少見）
+        map[String(o.timestamp)] = L;
+        try { localStorage.setItem('cutLetter_' + o.timestamp, L); } catch (e) { }
+    });
+    return map;
+};
+window.getBatchLetter = function (order) {
+    if (!order) return '';
+    try { return localStorage.getItem('cutLetter_' + order.timestamp) || ''; } catch (e) { return ''; }
+};
+
+// [出貨] 產生單張訂單的「貼紙頁 + 裝箱單頁」HTML（單張 / 批次共用）
+window._shipDocPages = function (order) {
+    const company = (typeof _extractCompany === 'function') ? _extractCompany(order.note) : '';
+    const taxId = (typeof _extractTaxId === 'function') ? _extractTaxId(order.note) : '';
+    const meta = window.getMeta ? window.getMeta(order) : {};
+    const payMap = { '已付清': '已付清 ✔', '收訂金': '已收訂金', '月結': '月結', '未付': '未付款 ⚠' };
+    const payText = payMap[meta.paymentStatus] || (meta.paymentStatus || '—');
+    const letter = window.getBatchLetter ? window.getBatchLetter(order) : '';
+
+    const addrRaw = String(order.address || '');
+    let method = '宅配';
+    if (/自取/.test(addrRaw)) method = '自取';
+    else if (/店到店|超商|7-?11|全家|萊爾富|統一超商|FamilyMart|Hi-?Life|OK ?超商/i.test(addrRaw)) method = '店到店';
+    let cleanAddr = addrRaw.replace(/^\s*\[[^\]]*\]\s*/, '').replace(/^(宅配|自取|店到店)\s*[:：]?\s*/, '').trim();
+    if (method === '自取' && !cleanAddr) cleanAddr = '（自取 · 來店取貨）';
+
+    const lines = String(order.details || '').split(/<br\s*\/?>|\n/).map(s => s.trim()).filter(Boolean);
+    const items = lines.map(line => {
+        const qm = line.match(/\(\s*x\s*([0-9]+)\s*\)/i);
+        const name = line.replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/--\s*\$[0-9.]+/, '').replace(/\(\s*x\s*[0-9]+\s*\)/i, '').replace(/\s+/g, ' ').trim();
+        return { name: name, qty: qm ? qm[1] : '' };
+    });
+    const itemCount = items.length;
+
+    let idStr = String(order.timestamp || '');
+    try {
+        const d = window.safeParseDate ? window.safeParseDate(order.timestamp) : new Date(order.timestamp);
+        if (d && !isNaN(d)) { const p = n => String(n).padStart(2, '0'); idStr = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
+    } catch (e) { }
+
+    const recipient = (method !== '自取' && company) ? company : order.name;
+    const contactLine = (company && recipient !== order.name) ? `<div style="font-size:0.95rem;margin-top:2px;">聯絡人：${order.name}</div>` : '';
+    const slipRows = items.map((it, i) => `<tr><td style="text-align:center;color:#888;">${i + 1}</td><td>${it.name}</td><td style="text-align:center;font-weight:bold;">${it.qty || '—'}</td><td>&nbsp;</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">（無品項）</td></tr>';
+    const FROM = '鋅峰鋁業股份有限公司（ALUMIBRO 鋁材兄弟）<br>台中市大里區仁美路159巷11號　TEL 04-24962319';
+    const badgeSticker = letter ? `<div style="font-size:1.4rem;font-weight:900;line-height:1;">單 ${letter}</div>` : '';
+    const badgeSlip = letter ? `<span style="display:inline-block;background:#2b2f36;color:#fff;border-radius:6px;padding:2px 12px;margin-left:8px;font-size:1.2rem;">單 ${letter}</span>` : '';
+
+    return `
+    <div class="page">
+      <div class="label">
+        <div class="lhd"><div class="b"><i class="fas fa-cut"></i> ALUMIBRO 出貨貼紙</div>
+          <div style="text-align:right;">${badgeSticker}<div class="o">#${idStr}</div></div></div>
+        <div class="lsec"><span class="badge">${method}</span><div class="k">收件人 TO</div>
+          <div class="to-name">${recipient}</div>
+          <div class="to-ph">${order.phone || ''}</div>${contactLine}
+          <div class="to-addr">${cleanAddr || '—'}</div></div>
+        <div class="lsec" style="border-bottom:none;"><div class="k">寄件人 FROM</div><div style="font-size:0.8rem;color:#555;line-height:1.5;">${FROM}</div></div>
+        <div class="lfoot"><span style="font-weight:900;">付款：${payText}</span><span style="color:#666;">共 ${itemCount} 項${taxId ? ` · 統編 ${taxId}` : ''}</span></div>
+      </div>
+      <div class="cut-hint">✂ 沿框裁下貼於外箱</div>
+    </div>
+    <div class="page">
+      <div class="shead"><div><h1><i class="fas fa-box-open"></i> ALUMIBRO 裝箱單 ${badgeSlip}</h1>
+        <div style="font-size:0.85rem;color:#666;">訂單 #${idStr}　·　配送：${method}</div></div>
+        <div style="text-align:right;font-size:0.8rem;color:#666;">列印：${new Date().toLocaleString()}</div></div>
+      <div class="box"><div class="k">收件人</div>
+        <div style="font-size:1.1rem;font-weight:bold;">${recipient}　${order.phone || ''}</div>
+        ${company && recipient !== order.name ? `<div>聯絡人：${order.name}</div>` : ''}
+        <div>${cleanAddr || '—'}</div>${taxId ? `<div style="font-size:0.85rem;color:#666;">統編：${taxId}</div>` : ''}</div>
+      <table><thead><tr><th style="width:36px;">#</th><th>品項（含對外型號）</th><th style="width:64px;">數量</th><th style="width:90px;">點收 ✓</th></tr></thead>
+        <tbody>${slipRows}</tbody></table>
+      <div class="tot">品項數：${itemCount} 項　·　付款：${payText}</div>
+      <div class="box" style="margin-top:14px;"><div class="k">寄件人 FROM</div><div style="font-size:0.85rem;color:#555;line-height:1.6;">${FROM}</div></div>
+      <div style="margin-top:20px;display:flex;justify-content:space-between;font-size:0.85rem;color:#555;"><div>撿貨：____________</div><div>包裝：____________</div><div>出貨：____________</div></div>
+    </div>`;
+};
+
+// 共用外層（CSS + 自動列印）
+window._shipDocWrap = function (titleText, innerHtml) {
+    const ACCENT = '#b08d57';
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titleText}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+      *{ -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; box-sizing:border-box; }
+      body{ font-family:'Noto Sans TC',sans-serif; margin:0; color:#222; }
+      @page{ size:A4; margin:12mm; }
+      .page{ page-break-after:always; } .page:last-child{ page-break-after:auto; }
+      .label{ width:100mm; border:1.5px solid #333; border-radius:6px; overflow:hidden; }
+      .lhd{ display:flex; justify-content:space-between; align-items:center; background:#2b2f36; color:#fff; padding:8px 12px; }
+      .lhd .b{ font-size:1.05rem; font-weight:900; } .lhd .o{ font-size:0.72rem; font-family:monospace; }
+      .lsec{ padding:8px 12px; border-bottom:1px dashed #ccc; }
+      .k{ font-size:0.66rem; color:#999; font-weight:bold; letter-spacing:1px; margin-bottom:2px; }
+      .to-name{ font-size:1.3rem; font-weight:900; } .to-ph{ font-size:1.05rem; font-weight:bold; }
+      .to-addr{ font-size:0.98rem; margin-top:2px; }
+      .badge{ float:right; background:${ACCENT}; color:#fff; font-size:0.75rem; font-weight:bold; padding:2px 11px; border-radius:20px; }
+      .lfoot{ display:flex; justify-content:space-between; padding:7px 12px; background:#f6f7f9; font-size:0.85rem; }
+      .cut-hint{ font-size:0.7rem; color:#aaa; margin-top:6px; margin-bottom:18px; }
+      h1{ font-size:1.5rem; margin:0; }
+      .shead{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #000; padding-bottom:8px; margin-bottom:14px; }
+      .box{ border:1px solid #ccc; border-radius:6px; padding:10px 14px; margin-bottom:14px; }
+      table{ width:100%; border-collapse:collapse; }
+      th{ background:#333f4d; color:#fff; padding:7px; font-size:0.85rem; }
+      td{ padding:7px; border-bottom:1px solid #eee; font-size:0.9rem; }
+      .tot{ text-align:right; margin-top:10px; font-weight:bold; }
+    </style></head><body>
+    ${innerHtml}
+    <script>window.onload=function(){ setTimeout(function(){ window.print(); }, 400); };<\/script>
+    </body></html>`;
+};
+
+// 單張出貨單（貼紙 + 裝箱單）
+window.printShippingDocs = function (orderId) {
+    const order = ordersData.find(o => String(o.timestamp) === String(orderId));
+    if (!order) { alert('找不到訂單'); return; }
+    const w = window.open('', '_blank');
+    w.document.write(window._shipDocWrap('出貨單', window._shipDocPages(order)));
+    w.document.close();
+};
+
+// 批次列印本批（進切料狀態）全部出貨單
+window.printAllShippingDocs = function () {
+    const batch = ordersData.filter(o => o.status === 'cutting');
+    if (batch.length === 0) { alert('目前沒有「進切料」狀態的訂單，無法批次列印出貨單。'); return; }
+    if (window.assignBatchLetters) window.assignBatchLetters(batch);
+    const sorted = batch.slice().sort((a, b) => String(window.getBatchLetter(a)).localeCompare(String(window.getBatchLetter(b))));
+    const inner = sorted.map(o => window._shipDocPages(o)).join('');
+    const w = window.open('', '_blank');
+    w.document.write(window._shipDocWrap(`本批出貨單（${sorted.length} 張）`, inner));
+    w.document.close();
 };
 
 
