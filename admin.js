@@ -2504,9 +2504,13 @@ function createCard(order, index, currentStatus) {
             onclick="event.stopPropagation(); window.triggerQuoteOrNotice('${order.timestamp}')">
             <i class="fas fa-envelope"></i> ${_quoteBtnLabel}
         </button>`}
-        ${!['unquoted', 'quoted'].includes(currentStatus) ? `<button class="btn-card-action" style="background:#556270; color:#fff;" title="印出貨貼紙 + 裝箱單"
-            onclick="event.stopPropagation(); window.printShippingDocs('${order.timestamp}')">
-            <i class="fas fa-print"></i> 出貨單
+        ${!['unquoted', 'quoted'].includes(currentStatus) ? `<button class="btn-card-action" style="background:#7a6f5d; color:#fff;" title="印貼紙（標籤機 100×150mm）"
+            onclick="event.stopPropagation(); window.printSticker('${order.timestamp}')">
+            <i class="fas fa-tag"></i> 貼紙
+        </button>
+        <button class="btn-card-action" style="background:#556270; color:#fff;" title="印裝箱單（A4）"
+            onclick="event.stopPropagation(); window.printPackingSlip('${order.timestamp}')">
+            <i class="fas fa-box-open"></i> 裝箱單
         </button>` : ''}
         ${nextBtnHtml}
     </div>
@@ -5860,7 +5864,7 @@ window.runCuttingOptimization = async function () {
 
     // 3. Bin Packing with Offcut Priority & Kerf Loss
     const KERF = 0.5; // Saw blade thickness
-    let visualsHtml = "";
+    let visualsHtml = '<div style="background:#fff; color:#222; padding:18px; border-radius:10px;">';
 
     for (let model in grouped) {
         let needs = grouped[model];
@@ -6079,13 +6083,15 @@ window.runCuttingOptimization = async function () {
             <button onclick="window.printCuttingList('id')" style="background:var(--accent-40); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Bahasa</button>
         </div>
         <div style="display:inline-flex; gap:8px; align-items:center;">
-            <button onclick="window.printAllShippingDocs()" title="把本批（進切料）每張的貼紙+裝箱單一次印給包裝" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-box-open"></i> 批次印本批出貨單</button>
+            <button onclick="window.printAllStickers()" title="本批（進切料）全部貼紙，走標籤機 100×150mm" style="background:#7a6f5d; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-tag"></i> 本批貼紙</button>
+            <button onclick="window.printAllPackingSlips()" title="本批（進切料）全部裝箱單，A4" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-box-open"></i> 本批裝箱單</button>
         </div>
         <button class="btn-record-offcut" onclick="try{window.recordCuttingPlanToInventory()}catch(e){alert('Error: '+e.message)}" style="background:var(--accent-20); color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
             <i class="fas fa-save"></i> 確認切割計畫並更新庫存
         </button>
     </div>`;
 
+    visualsHtml += '</div>'; // close white paper panel
     area.innerHTML = visualsHtml;
 };
 
@@ -6226,125 +6232,178 @@ window.getBatchLetter = function (order) {
 };
 
 // [出貨] 產生單張訂單的「貼紙頁 + 裝箱單頁」HTML（單張 / 批次共用）
-window._shipDocPages = function (order) {
+// [出貨] 共用資料整理（貼紙 / 裝箱單共用）
+window._shipData = function (order) {
     const company = (typeof _extractCompany === 'function') ? _extractCompany(order.note) : '';
     const taxId = (typeof _extractTaxId === 'function') ? _extractTaxId(order.note) : '';
     const meta = window.getMeta ? window.getMeta(order) : {};
     const payMap = { '已付清': '已付清 ✔', '收訂金': '已收訂金', '月結': '月結', '未付': '未付款 ⚠' };
     const payText = payMap[meta.paymentStatus] || (meta.paymentStatus || '—');
     const letter = window.getBatchLetter ? window.getBatchLetter(order) : '';
-
     const addrRaw = String(order.address || '');
     let method = '宅配';
     if (/自取/.test(addrRaw)) method = '自取';
     else if (/店到店|超商|7-?11|全家|萊爾富|統一超商|FamilyMart|Hi-?Life|OK ?超商/i.test(addrRaw)) method = '店到店';
     let cleanAddr = addrRaw.replace(/^\s*\[[^\]]*\]\s*/, '').replace(/^(宅配|自取|店到店)\s*[:：]?\s*/, '').trim();
     if (method === '自取' && !cleanAddr) cleanAddr = '（自取 · 來店取貨）';
-
     const lines = String(order.details || '').split(/<br\s*\/?>|\n/).map(s => s.trim()).filter(Boolean);
     const items = lines.map(line => {
         const qm = line.match(/\(\s*x\s*([0-9]+)\s*\)/i);
         const name = line.replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/--\s*\$[0-9.]+/, '').replace(/\(\s*x\s*[0-9]+\s*\)/i, '').replace(/\s+/g, ' ').trim();
         return { name: name, qty: qm ? qm[1] : '' };
     });
-    const itemCount = items.length;
-
-    let idStr = String(order.timestamp || '');
-    try {
-        const d = window.safeParseDate ? window.safeParseDate(order.timestamp) : new Date(order.timestamp);
-        if (d && !isNaN(d)) { const p = n => String(n).padStart(2, '0'); idStr = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
-    } catch (e) { }
-
+    // 訂單流水號：用系統 projectId（= Sheet S 欄，與卡片/明細顯示一致）；缺才用備援
+    let idStr = order.projectId || '';
+    if (!idStr) {
+        try {
+            const d = window.safeParseDate ? window.safeParseDate(order.timestamp) : new Date(order.timestamp);
+            const p = n => String(n).padStart(2, '0');
+            idStr = `B${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${String(order.timestamp || '').slice(-4)}`;
+        } catch (e) { idStr = String(order.timestamp || ''); }
+    }
     const recipient = (method !== '自取' && company) ? company : order.name;
-    const contactLine = (company && recipient !== order.name) ? `<div style="font-size:0.95rem;margin-top:2px;">聯絡人：${order.name}</div>` : '';
-    const slipRows = items.map((it, i) => `<tr><td style="text-align:center;color:#888;">${i + 1}</td><td>${it.name}</td><td style="text-align:center;font-weight:bold;">${it.qty || '—'}</td><td>&nbsp;</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">（無品項）</td></tr>';
-    const FROM = '鋅峰鋁業股份有限公司（ALUMIBRO 鋁材兄弟）<br>台中市大里區仁美路159巷11號　TEL 04-24962319';
-    const badgeSticker = letter ? `<div style="font-size:1.4rem;font-weight:900;line-height:1;">單 ${letter}</div>` : '';
-    const badgeSlip = letter ? `<span style="display:inline-block;background:#2b2f36;color:#fff;border-radius:6px;padding:2px 12px;margin-left:8px;font-size:1.2rem;">單 ${letter}</span>` : '';
+    return {
+        company, taxId, payText, letter, method, cleanAddr, items, itemCount: items.length, idStr, recipient,
+        phone: order.phone || '', name: order.name,
+        FROM: '鋅峰鋁業股份有限公司（ALUMIBRO 鋁材兄弟）<br>台中市大里區仁美路159巷11號　TEL 04-24962319'
+    };
+};
 
-    return `
-    <div class="page">
-      <div class="label">
-        <div class="lhd"><div class="b"><i class="fas fa-cut"></i> ALUMIBRO 出貨貼紙</div>
-          <div style="text-align:right;">${badgeSticker}<div class="o">#${idStr}</div></div></div>
-        <div class="lsec"><span class="badge">${method}</span><div class="k">收件人 TO</div>
-          <div class="to-name">${recipient}</div>
-          <div class="to-ph">${order.phone || ''}</div>${contactLine}
-          <div class="to-addr">${cleanAddr || '—'}</div></div>
-        <div class="lsec" style="border-bottom:none;"><div class="k">寄件人 FROM</div><div style="font-size:0.8rem;color:#555;line-height:1.5;">${FROM}</div></div>
-        <div class="lfoot"><span style="font-weight:900;">付款：${payText}</span><span style="color:#666;">共 ${itemCount} 項${taxId ? ` · 統編 ${taxId}` : ''}</span></div>
-      </div>
-      <div class="cut-hint">✂ 沿框裁下貼於外箱</div>
-    </div>
-    <div class="page">
-      <div class="shead"><div><h1><i class="fas fa-box-open"></i> ALUMIBRO 裝箱單 ${badgeSlip}</h1>
-        <div style="font-size:0.85rem;color:#666;">訂單 #${idStr}　·　配送：${method}</div></div>
-        <div style="text-align:right;font-size:0.8rem;color:#666;">列印：${new Date().toLocaleString()}</div></div>
-      <div class="box"><div class="k">收件人</div>
-        <div style="font-size:1.1rem;font-weight:bold;">${recipient}　${order.phone || ''}</div>
-        ${company && recipient !== order.name ? `<div>聯絡人：${order.name}</div>` : ''}
-        <div>${cleanAddr || '—'}</div>${taxId ? `<div style="font-size:0.85rem;color:#666;">統編：${taxId}</div>` : ''}</div>
-      <table><thead><tr><th style="width:36px;">#</th><th>品項（含對外型號）</th><th style="width:64px;">數量</th><th style="width:90px;">點收 ✓</th></tr></thead>
-        <tbody>${slipRows}</tbody></table>
-      <div class="tot">品項數：${itemCount} 項　·　付款：${payText}</div>
-      <div class="box" style="margin-top:14px;"><div class="k">寄件人 FROM</div><div style="font-size:0.85rem;color:#555;line-height:1.6;">${FROM}</div></div>
-      <div style="margin-top:20px;display:flex;justify-content:space-between;font-size:0.85rem;color:#555;"><div>撿貨：____________</div><div>包裝：____________</div><div>出貨：____________</div></div>
+// 貼紙內容（標籤機 100×150mm，一單一張）
+window._stickerHtml = function (order) {
+    const d = window._shipData(order);
+    const contactLine = (d.company && d.recipient !== d.name) ? `<div class="ct">聯絡人：${d.name}</div>` : '';
+    return `<div class="sticker">
+      <div class="shd"><div class="b"><i class="fas fa-cut"></i> ALUMIBRO</div>${d.letter ? `<div class="bg">單 ${d.letter}</div>` : ''}</div>
+      <div class="meta"><span class="badge">${d.method}</span><span class="oid">#${d.idStr}</span></div>
+      <div class="k">收件人 TO</div>
+      <div class="nm">${d.recipient}</div>
+      <div class="ph">${d.phone}</div>${contactLine}
+      <div class="ad">${d.cleanAddr || '—'}</div>
+      <div class="spacer"></div>
+      <div class="from"><div class="k">寄件人 FROM</div><div class="fromtxt">${d.FROM}</div></div>
+      <div class="foot"><span class="pay">付款：${d.payText}</span><span class="cnt">共 ${d.itemCount} 項${d.taxId ? ` · 統編 ${d.taxId}` : ''}</span></div>
     </div>`;
 };
 
-// 共用外層（CSS + 自動列印）
-window._shipDocWrap = function (titleText, innerHtml) {
-    const ACCENT = '#b08d57';
+// 裝箱單內容（A4，一單一張）
+window._slipHtml = function (order) {
+    const d = window._shipData(order);
+    const slipRows = d.items.map((it, i) => `<tr><td style="text-align:center;color:#888;">${i + 1}</td><td>${it.name}</td><td style="text-align:center;font-weight:bold;">${it.qty || '—'}</td><td>&nbsp;</td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#888;padding:12px;">（無品項）</td></tr>';
+    const badgeSlip = d.letter ? `<span class="bslip">單 ${d.letter}</span>` : '';
+    return `<div class="slip">
+      <div class="shead"><div><h1><i class="fas fa-box-open"></i> ALUMIBRO 裝箱單 ${badgeSlip}</h1>
+        <div class="sub">訂單 #${d.idStr}　·　配送：${d.method}</div></div>
+        <div class="pt">列印：${new Date().toLocaleString()}</div></div>
+      <div class="box"><div class="k">收件人</div>
+        <div class="rname">${d.recipient}　${d.phone}</div>
+        ${d.company && d.recipient !== d.name ? `<div>聯絡人：${d.name}</div>` : ''}
+        <div>${d.cleanAddr || '—'}</div>${d.taxId ? `<div class="tax">統編：${d.taxId}</div>` : ''}</div>
+      <table><thead><tr><th style="width:36px;">#</th><th>品項（含對外型號）</th><th style="width:64px;">數量</th><th style="width:90px;">點收 ✓</th></tr></thead>
+        <tbody>${slipRows}</tbody></table>
+      <div class="tot">品項數：${d.itemCount} 項　·　付款：${d.payText}</div>
+      <div class="box" style="margin-top:14px;"><div class="k">寄件人 FROM</div><div class="fromtxt">${d.FROM}</div></div>
+      <div class="sign"><div>撿貨：____________</div><div>包裝：____________</div><div>出貨：____________</div></div>
+    </div>`;
+};
+
+// 貼紙外層（@page 100×150mm，走標籤機）
+window._stickerWrap = function (titleText, inner) {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titleText}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+      *{ -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; box-sizing:border-box; }
+      html,body{ margin:0; padding:0; font-family:'Noto Sans TC',sans-serif; color:#111; }
+      @page{ size:100mm 150mm; margin:0; }
+      .sticker{ width:100mm; height:150mm; padding:5mm; display:flex; flex-direction:column; page-break-after:always; overflow:hidden; }
+      .sticker:last-child{ page-break-after:auto; }
+      .shd{ display:flex; justify-content:space-between; align-items:center; background:#2b2f36; color:#fff; padding:6px 10px; border-radius:4px; }
+      .shd .b{ font-size:1rem; font-weight:900; } .shd .bg{ font-size:1.6rem; font-weight:900; line-height:1; }
+      .meta{ display:flex; justify-content:space-between; align-items:center; margin:6px 0; }
+      .badge{ background:#b08d57; color:#fff; font-size:0.85rem; font-weight:bold; padding:2px 12px; border-radius:20px; }
+      .oid{ font-size:0.72rem; font-family:monospace; color:#888; }
+      .k{ font-size:0.68rem; color:#999; font-weight:bold; letter-spacing:1px; }
+      .nm{ font-size:1.6rem; font-weight:900; line-height:1.15; margin-top:2px; }
+      .ph{ font-size:1.25rem; font-weight:bold; margin-top:2px; }
+      .ct{ font-size:0.95rem; margin-top:2px; }
+      .ad{ font-size:1.1rem; margin-top:4px; line-height:1.3; }
+      .spacer{ flex:1; }
+      .from{ border-top:1px dashed #bbb; padding-top:5px; }
+      .fromtxt{ font-size:0.72rem; color:#555; line-height:1.4; }
+      .foot{ display:flex; justify-content:space-between; align-items:center; margin-top:5px; padding-top:5px; border-top:2px solid #2b2f36; }
+      .pay{ font-weight:900; font-size:0.95rem; } .cnt{ font-size:0.75rem; color:#666; }
+    </style></head><body>${inner}
+    <script>window.onload=function(){ setTimeout(function(){ window.print(); }, 400); };<\/script>
+    </body></html>`;
+};
+
+// 裝箱單外層（@page A4）
+window._slipWrap = function (titleText, inner) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titleText}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
       *{ -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; box-sizing:border-box; }
       body{ font-family:'Noto Sans TC',sans-serif; margin:0; color:#222; }
       @page{ size:A4; margin:12mm; }
-      .page{ page-break-after:always; } .page:last-child{ page-break-after:auto; }
-      .label{ width:100mm; border:1.5px solid #333; border-radius:6px; overflow:hidden; }
-      .lhd{ display:flex; justify-content:space-between; align-items:center; background:#2b2f36; color:#fff; padding:8px 12px; }
-      .lhd .b{ font-size:1.05rem; font-weight:900; } .lhd .o{ font-size:0.72rem; font-family:monospace; }
-      .lsec{ padding:8px 12px; border-bottom:1px dashed #ccc; }
-      .k{ font-size:0.66rem; color:#999; font-weight:bold; letter-spacing:1px; margin-bottom:2px; }
-      .to-name{ font-size:1.3rem; font-weight:900; } .to-ph{ font-size:1.05rem; font-weight:bold; }
-      .to-addr{ font-size:0.98rem; margin-top:2px; }
-      .badge{ float:right; background:${ACCENT}; color:#fff; font-size:0.75rem; font-weight:bold; padding:2px 11px; border-radius:20px; }
-      .lfoot{ display:flex; justify-content:space-between; padding:7px 12px; background:#f6f7f9; font-size:0.85rem; }
-      .cut-hint{ font-size:0.7rem; color:#aaa; margin-top:6px; margin-bottom:18px; }
+      .slip{ page-break-after:always; } .slip:last-child{ page-break-after:auto; }
       h1{ font-size:1.5rem; margin:0; }
+      .bslip{ display:inline-block; background:#2b2f36; color:#fff; border-radius:6px; padding:2px 12px; margin-left:8px; font-size:1.2rem; }
       .shead{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:3px solid #000; padding-bottom:8px; margin-bottom:14px; }
+      .sub{ font-size:0.85rem; color:#666; } .pt{ text-align:right; font-size:0.8rem; color:#666; }
       .box{ border:1px solid #ccc; border-radius:6px; padding:10px 14px; margin-bottom:14px; }
+      .k{ font-size:0.72rem; color:#999; font-weight:bold; letter-spacing:1px; margin-bottom:2px; }
+      .rname{ font-size:1.1rem; font-weight:bold; } .tax{ font-size:0.85rem; color:#666; }
+      .fromtxt{ font-size:0.85rem; color:#555; line-height:1.6; }
       table{ width:100%; border-collapse:collapse; }
       th{ background:#333f4d; color:#fff; padding:7px; font-size:0.85rem; }
       td{ padding:7px; border-bottom:1px solid #eee; font-size:0.9rem; }
       .tot{ text-align:right; margin-top:10px; font-weight:bold; }
-    </style></head><body>
-    ${innerHtml}
+      .sign{ margin-top:20px; display:flex; justify-content:space-between; font-size:0.85rem; color:#555; }
+    </style></head><body>${inner}
     <script>window.onload=function(){ setTimeout(function(){ window.print(); }, 400); };<\/script>
     </body></html>`;
 };
 
-// 單張出貨單（貼紙 + 裝箱單）
-window.printShippingDocs = function (orderId) {
+// 列印：單張貼紙 / 批次貼紙（走標籤機）
+window.printSticker = function (orderId) {
     const order = ordersData.find(o => String(o.timestamp) === String(orderId));
     if (!order) { alert('找不到訂單'); return; }
     const w = window.open('', '_blank');
-    w.document.write(window._shipDocWrap('出貨單', window._shipDocPages(order)));
+    w.document.write(window._stickerWrap('貼紙', window._stickerHtml(order)));
+    w.document.close();
+};
+window.printAllStickers = function () {
+    const batch = ordersData.filter(o => o.status === 'cutting');
+    if (batch.length === 0) { alert('目前沒有「進切料」狀態的訂單，無法批次列印貼紙。'); return; }
+    if (window.assignBatchLetters) window.assignBatchLetters(batch);
+    const sorted = batch.slice().sort((a, b) => String(window.getBatchLetter(a)).localeCompare(String(window.getBatchLetter(b))));
+    const inner = sorted.map(o => window._stickerHtml(o)).join('');
+    const w = window.open('', '_blank');
+    w.document.write(window._stickerWrap(`本批貼紙（${sorted.length} 張）`, inner));
     w.document.close();
 };
 
-// 批次列印本批（進切料狀態）全部出貨單
-window.printAllShippingDocs = function () {
-    const batch = ordersData.filter(o => o.status === 'cutting');
-    if (batch.length === 0) { alert('目前沒有「進切料」狀態的訂單，無法批次列印出貨單。'); return; }
-    if (window.assignBatchLetters) window.assignBatchLetters(batch);
-    const sorted = batch.slice().sort((a, b) => String(window.getBatchLetter(a)).localeCompare(String(window.getBatchLetter(b))));
-    const inner = sorted.map(o => window._shipDocPages(o)).join('');
+// 列印：單張裝箱單 / 批次裝箱單（走 A4）
+window.printPackingSlip = function (orderId) {
+    const order = ordersData.find(o => String(o.timestamp) === String(orderId));
+    if (!order) { alert('找不到訂單'); return; }
     const w = window.open('', '_blank');
-    w.document.write(window._shipDocWrap(`本批出貨單（${sorted.length} 張）`, inner));
+    w.document.write(window._slipWrap('裝箱單', window._slipHtml(order)));
     w.document.close();
 };
+window.printAllPackingSlips = function () {
+    const batch = ordersData.filter(o => o.status === 'cutting');
+    if (batch.length === 0) { alert('目前沒有「進切料」狀態的訂單，無法批次列印裝箱單。'); return; }
+    if (window.assignBatchLetters) window.assignBatchLetters(batch);
+    const sorted = batch.slice().sort((a, b) => String(window.getBatchLetter(a)).localeCompare(String(window.getBatchLetter(b))));
+    const inner = sorted.map(o => window._slipHtml(o)).join('');
+    const w = window.open('', '_blank');
+    w.document.write(window._slipWrap(`本批裝箱單（${sorted.length} 張）`, inner));
+    w.document.close();
+};
+
+// 相容舊呼叫（預設印裝箱單 A4）
+window.printShippingDocs = function (orderId) { window.printPackingSlip(orderId); };
 
 
 window.recordCuttingPlanToInventory = async function () {
