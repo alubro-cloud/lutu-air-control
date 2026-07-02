@@ -6028,21 +6028,8 @@ window.runCuttingOptimization = async function () {
                 visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#222; margin-right:10px; font-size:0.95rem;">餘料 ${bin.sourceLen * 10}mm</div>`;
                 visualsHtml += `<div style="font-size:0.85rem; color:#222; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
                 visualsHtml += `</div>`;
-                visualsHtml += `<div style="width:100%; max-width:${widthPct}%; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
-
-                bin.cuts.forEach(c => {
-                    let pct = (c.len / bin.capacity) * 100;
-                    let _lc = window._cutLetterColor ? window._cutLetterColor(c.letter) : '#888';
-                    let _tag = c.letter ? `<span style="background:${_lc}; color:#fff; font-weight:900; border-radius:3px; padding:0 4px; margin-left:3px; font-size:10px;">${c.letter}</span>` : '';
-                    visualsHtml += `<div class="cut-segment" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #000; color:#222; font-size:10px; display:flex; align-items:center; justify-content:center; gap:2px;" title="切割 ${c.len * 10}mm（單 ${c.letter || '-'}）">切 ${c.len * 10}${_tag}</div>`;
-                });
-                if (remain > 0) {
-                    let rPct = (remain / bin.capacity) * 100;
-                    visualsHtml += `<div class="cut-remain leftover" style="width:${rPct}%; background:${grayColors.offcut}; font-size:10px; display:flex; align-items:center; justify-content:center; color:#fff;" title="剩餘 ${(remain * 10).toFixed(0)}mm (餘料)">
-        ${(remain * 10).toFixed(0)}
-                     </div>`;
-                }
-                visualsHtml += `</div></div>`;
+                visualsHtml += window._cutTrackHtml(bin.cuts, remain, seriesColor, grayColors.offcut, widthPct);
+                visualsHtml += `</div>`; // close cut-row
             });
         }
 
@@ -6061,28 +6048,9 @@ window.runCuttingOptimization = async function () {
                 visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#222; margin-right:10px; font-size:0.95rem;">新料 #${idx + 1}（${(bin.capacity || 600) * 10}mm）</div>`;
                 visualsHtml += `<div style="font-size:0.85rem; color:#222; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
                 visualsHtml += `</div>`;
-                visualsHtml += `<div style="width:100%; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
-
-                bin.cuts.forEach(cut => {
-                    let cutLen = cut.len;
-                    let pct = (cutLen / 600) * 100;
-                    let _lc = window._cutLetterColor ? window._cutLetterColor(cut.letter) : '#888';
-                    let _tag = cut.letter ? `<span style="background:${_lc}; color:#fff; font-weight:900; border-radius:3px; padding:0 4px; margin-left:3px; font-size:10px;">${cut.letter}</span>` : '';
-                    visualsHtml += `<div class="cut-block" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #000; color:#222; font-size:11px; display:flex; align-items:center; justify-content:center; gap:2px;" title="切割 ${cutLen * 10}mm（單 ${cut.letter || '-'}）"><span>切 ${cutLen * 10} mm</span>${_tag}</div>`;
-                });
-
-                if (remain > 0) {
-                    let rPct = (remain / 600) * 100;
-                    let color = isRemCheck ? grayColors.offcut : grayColors.waste;
-                    let type = isRemCheck ? '余料' : '废料';
-                    let cls = isRemCheck ? 'cut-remain leftover' : 'cut-remain waste';
-
-                    visualsHtml += `<div class="${cls}" style="width:${rPct}%; background:${color}; color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center;" title="剩余 ${(remain * 10).toFixed(0)}mm (${type})">
-                        ${(remain * 10).toFixed(0)} mm
-                    </div>`;
-                }
-
-                visualsHtml += `</div></div>`;
+                let _remColor = isRemCheck ? grayColors.offcut : grayColors.waste;
+                visualsHtml += window._cutTrackHtml(bin.cuts, remain, seriesColor, _remColor, 100);
+                visualsHtml += `</div>`; // close cut-row
             });
         }
 
@@ -6174,6 +6142,7 @@ window.printCuttingList = function (lang) {
                     print-color-adjust: exact !important;
                     color-adjust: exact !important;
                 }
+                @page { size: A4 landscape; margin: 10mm; }
                 body { 
                     font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
                     padding: 20px;
@@ -6252,6 +6221,23 @@ window._cutLetterColor = function (L) {
     const pal = ['#3b6fb0', '#3f8f5e', '#c07a2b', '#8256c4', '#c0504d', '#2aa3a3', '#7a6f5d', '#d1478c'];
     const i = L.charCodeAt(0) - 65;
     return pal[((i % pal.length) + pal.length) % pal.length];
+};
+// 切料表「直欄」渲染：每段上方=長度數字格、下方=置中的訂單字母；橫向依比例排
+window._cutTrackHtml = function (cuts, remain, seriesColor, remainColor, widthPct) {
+    let cols = (cuts || []).map(c => {
+        const lc = window._cutLetterColor ? window._cutLetterColor(c.letter) : '#888';
+        const chip = c.letter ? `<span style="background:${lc}; color:#fff; font-weight:900; border-radius:3px; padding:1px 6px; font-size:12px;">${c.letter}</span>` : '';
+        return `<div style="display:flex; flex-direction:column; flex-grow:${c.len}; min-width:28px;">`
+            + `<div style="background:${seriesColor}; border-right:1px solid #000; color:#111; font-size:13px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; overflow:hidden;">${Math.round(c.len * 10)}</div>`
+            + `<div style="height:24px; display:flex; align-items:center; justify-content:center; margin-top:3px;">${chip}</div></div>`;
+    }).join('');
+    let remCol = '';
+    if (remain > 0) {
+        remCol = `<div style="display:flex; flex-direction:column; flex-grow:${remain}; min-width:46px;">`
+            + `<div style="background:${remainColor}; color:#fff; font-size:11px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center;">餘 ${Math.round(remain * 10)}</div>`
+            + `<div style="height:24px; margin-top:3px;"></div></div>`;
+    }
+    return `<div class="cut-track" style="display:flex; align-items:stretch; width:${widthPct}%;">${cols}${remCol}</div>`;
 };
 
 // [出貨] 產生單張訂單的「貼紙頁 + 裝箱單頁」HTML（單張 / 批次共用）
