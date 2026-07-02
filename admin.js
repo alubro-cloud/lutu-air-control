@@ -6233,8 +6233,12 @@ window._cutTrackHtml = function (cuts, remain, seriesColor, remainColor, widthPc
     }).join('');
     let remCol = '';
     if (remain > 0) {
-        remCol = `<div style="display:flex; flex-direction:column; flex-grow:${remain}; min-width:46px;">`
-            + `<div style="background:${remainColor}; color:#fff; font-size:11px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center;">餘 ${Math.round(remain * 10)}</div>`
+        // [修正] 餘料方塊必須帶 cut-remain class 與 title(mm)，
+        // recordCuttingPlanToInventory() 才抓得到並寫入 addOffcuts / F欄餘料。
+        var remMm = Math.round(remain * 10);
+        var remTypeClass = (remain >= 10) ? 'leftover' : 'waste'; // ≥10cm=餘料, <10cm=廢料
+        remCol = `<div class="cut-remain ${remTypeClass}" title="剩餘 ${remMm}mm" style="display:flex; flex-direction:column; flex-grow:${remain}; min-width:46px;">`
+            + `<div style="background:${remainColor}; color:#fff; font-size:11px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center;">餘 ${remMm}</div>`
             + `<div style="height:24px; margin-top:3px;"></div></div>`;
     }
     return `<div class="cut-track" style="display:flex; align-items:stretch; width:${widthPct}%;">${cols}${remCol}</div>`;
