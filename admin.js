@@ -2455,8 +2455,12 @@ function createCard(order, index, currentStatus) {
     }
 
     let prevBtnHtml = '';
-    // [Fix] Block regression to 'unquoted', 'dispatched' AND 'completed' (Committed)
-    if (prevStatus && prevStatus !== 'unquoted' && currentStatus !== 'dispatched' && currentStatus !== 'completed') {
+    // [Fix] 不可回推的情況：
+    //  - 退回「未報價」(需重報價，另有確認流程)
+    //  - 已在「待出貨/已出貨/已完成」(配件已扣帳，且不該倒退已出貨的單)
+    //  - 目標是退回「切料單」(代表目前在對料，鋁材已切料扣帳 → 跨越扣料點)
+    if (prevStatus && prevStatus !== 'unquoted' && prevStatus !== 'cutting'
+        && currentStatus !== 'shipping' && currentStatus !== 'dispatched' && currentStatus !== 'completed') {
         let prevLabel = STATUS_LABELS[prevStatus];
         prevBtnHtml = `
         <button class="btn-card-action btn-prev" title="退回${prevLabel}"
@@ -2504,7 +2508,7 @@ function createCard(order, index, currentStatus) {
             onclick="event.stopPropagation(); window.triggerQuoteOrNotice('${order.timestamp}')">
             <i class="fas fa-envelope"></i> ${_quoteBtnLabel}
         </button>`}
-        ${!['unquoted', 'quoted'].includes(currentStatus) ? `<button class="btn-card-action" style="background:#7a6f5d; color:#fff;" title="印貼紙（標籤機 100×150mm）"
+        ${!['unquoted', 'quoted'].includes(currentStatus) ? `<button class="btn-card-action" style="background:#7a6f5d; color:#fff;" title="印貼紙（標籤機 110×150mm）"
             onclick="event.stopPropagation(); window.printSticker('${order.timestamp}')">
             <i class="fas fa-tag"></i> 貼紙
         </button>
@@ -2533,9 +2537,12 @@ window.regressStatus = function (orderId, prevStatus) {
             return;
         }
 
-        // [Safety Guard] Prevent regression to Cutting if Aluminum was deducted
-        if ((prevStatus === 'cutting' || prevStatus === 'paid') && window.isProfileDeducted(target)) {
-            alert("⚠️ 無法退回上一步！\n\n此訂單的鋁材已經切料扣帳。\n若強制退回將導致庫存重複扣除或數據不一致。\n若必須退回，請聯繫管理員手動調整庫存。");
+        // [Safety Guard] 跨越「扣料」點不可退回。
+        // 改用「狀態」判斷（不再依賴 localStorage 記號）：有鋁材的單一定是先「切料扣帳」
+        // 才會被推進到「對料」，所以只要目標是退回「切料單」，就代表鋁材已扣帳 → 一律擋。
+        // 這樣不論在哪台電腦、有沒有清快取都有效，避免退回後重切造成庫存重複扣除。
+        if (prevStatus === 'cutting') {
+            alert("⚠️ 無法退回上一步！\n\n此訂單的鋁材已在切料時扣帳，退回「切料單」會造成庫存重複扣除。\n若必須退回，請聯繫管理員手動調整庫存。");
             return;
         }
 
@@ -5580,18 +5587,18 @@ function renderInventory(inventory, isPartial = false) {
                             <div style="font-size:0.62rem; color:rgba(255,255,255,0.4); margin-top:3px; letter-spacing:0.3px;">片餘料</div>
                         </div>
                         <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 10px; text-align:center; min-width:52px;">
-                            <div style="font-size:0.95rem; font-weight:500; color:rgba(255,255,255,0.85); line-height:1;">${wasteValue}</div>
-                            <div style="font-size:0.62rem; color:rgba(255,255,255,0.4); margin-top:3px; letter-spacing:0.3px;">cm 廢料</div>
+                            <div style="font-size:0.95rem; font-weight:500; color:rgba(255,255,255,0.85); line-height:1;">${Math.round(wasteValue * 10)}</div>
+                            <div style="font-size:0.62rem; color:rgba(255,255,255,0.4); margin-top:3px; letter-spacing:0.3px;">mm 廢料</div>
                         </div>
                         ${offcutCount > 0 ? `
                         <div class="offcut-tooltip">
-                            <div style="font-size:0.75rem; font-weight:300; color:rgba(255,255,255,0.75); border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:5px; margin-bottom:5px;">餘料分布 (cm)</div>
+                            <div style="font-size:0.75rem; font-weight:300; color:rgba(255,255,255,0.75); border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:5px; margin-bottom:5px;">餘料分布 (mm)</div>
                             <div class="offcut-list">
                                 ${Object.entries(offcuts.reduce((acc, len) => {
                 acc[len] = (acc[len] || 0) + 1;
                 return acc;
             }, {})).map(([len, count]) => `
-                                    <span class="offcut-item">${len}${count > 1 ? ` <small style="opacity:0.6; margin-left:2px;">x${count}</small>` : ''}</span>
+                                    <span class="offcut-item">${Math.round(len * 10)}${count > 1 ? ` <small style="opacity:0.6; margin-left:2px;">x${count}</small>` : ''}</span>
                                 `).join('')}
                             </div>
                         </div>` : ''}
@@ -6067,7 +6074,7 @@ window.runCuttingOptimization = async function () {
             <button onclick="window.printCuttingList('id')" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Bahasa</button>
         </div>
         <div style="display:inline-flex; gap:8px; align-items:center;">
-            <button onclick="window.printAllStickers()" title="本批（進切料）全部貼紙，走標籤機 100×150mm" style="background:#7a6f5d; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-tag"></i> 本批貼紙</button>
+            <button onclick="window.printAllStickers()" title="本批（進切料）全部貼紙，走標籤機 110×150mm" style="background:#7a6f5d; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-tag"></i> 本批貼紙</button>
             <button onclick="window.printAllPackingSlips()" title="本批（進切料）全部裝箱單，A4" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-box-open"></i> 本批裝箱單</button>
         </div>
         <button class="btn-record-offcut" onclick="try{window.recordCuttingPlanToInventory()}catch(e){alert('Error: '+e.message)}" style="background:#556270; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
@@ -6282,7 +6289,7 @@ window._shipData = function (order) {
     };
 };
 
-// 貼紙內容（標籤機 100×150mm，一單一張）
+// 貼紙內容（標籤機 110×150mm，一單一張）
 window._stickerHtml = function (order) {
     const d = window._shipData(order);
     const contactLine = (d.company && d.recipient !== d.name) ? `<div class="ct">聯絡人：${d.name}</div>` : '';
@@ -6320,15 +6327,15 @@ window._slipHtml = function (order) {
     </div>`;
 };
 
-// 貼紙外層（@page 100×150mm，走標籤機）
+// 貼紙外層（@page 110×150mm，走標籤機）
 window._stickerWrap = function (titleText, inner) {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titleText}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
       *{ -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; box-sizing:border-box; }
       html,body{ margin:0; padding:0; font-family:'Noto Sans TC',sans-serif; color:#111; }
-      @page{ size:100mm 150mm; margin:0; }
-      .sticker{ width:100mm; height:150mm; padding:5mm; display:flex; flex-direction:column; page-break-after:always; overflow:hidden; }
+      @page{ size:110mm 150mm portrait; margin:0; }
+      .sticker{ width:110mm; height:150mm; padding:5mm; display:flex; flex-direction:column; page-break-after:always; overflow:hidden; }
       .sticker:last-child{ page-break-after:auto; }
       .shd{ display:flex; justify-content:space-between; align-items:center; background:#2b2f36; color:#fff; padding:6px 10px; border-radius:4px; }
       .shd .b{ font-size:1rem; font-weight:900; } .shd .bg{ font-size:1.6rem; font-weight:900; line-height:1; }
