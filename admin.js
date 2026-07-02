@@ -5802,7 +5802,9 @@ window.runCuttingOptimization = async function () {
 
     // 1. Parse all items
     let allItems = [];
-    ordersData.filter(o => o.status === 'cutting').forEach(o => {
+    const _cuttingBatch = ordersData.filter(o => o.status === 'cutting');
+    if (window.assignBatchLetters) window.assignBatchLetters(_cuttingBatch);
+    _cuttingBatch.forEach(o => {
         let details = o.details || "";
         let lines = details.split(/\\n|\n/).filter(l => l.trim().length > 0);
         lines.forEach(line => {
@@ -5859,16 +5861,28 @@ window.runCuttingOptimization = async function () {
     let grouped = {};
     allItems.forEach(item => {
         if (!grouped[item.model]) grouped[item.model] = [];
-        for (let i = 0; i < item.qty; i++) grouped[item.model].push(item.length);
+        const _L = window.getBatchLetter ? window.getBatchLetter({ timestamp: item.orderId }) : '';
+        for (let i = 0; i < item.qty; i++) grouped[item.model].push({ len: item.length, letter: _L });
     });
 
     // 3. Bin Packing with Offcut Priority & Kerf Loss
     const KERF = 0.5; // Saw blade thickness
     let visualsHtml = '<div style="background:#fff; color:#222; padding:18px; border-radius:10px;">';
 
+    // 代號對照表（A/B/C → 客戶），讓看切料表的人知道字母對哪張單
+    if (window.getBatchLetter && window._cutLetterColor && _cuttingBatch && _cuttingBatch.length) {
+        const legend = _cuttingBatch.slice()
+            .map(o => ({ L: window.getBatchLetter(o), name: o.name }))
+            .filter(x => x.L)
+            .sort((a, b) => String(a.L).localeCompare(String(b.L)))
+            .map(x => `<span style="display:inline-block; background:${window._cutLetterColor(x.L)}; color:#fff; font-weight:900; border-radius:3px; padding:1px 8px; margin-right:4px;">${x.L}</span><span style="margin-right:16px;">${x.name}</span>`)
+            .join('');
+        if (legend) visualsHtml += `<div class="cut-legend" style="font-size:0.9rem; color:#333; margin-bottom:14px; padding:8px 12px; background:#f6f7f9; border-radius:6px;"><b style="margin-right:10px;">代號對照</b>${legend}</div>`;
+    }
+
     for (let model in grouped) {
         let needs = grouped[model];
-        needs.sort((a, b) => b - a); // Descending
+        needs.sort((a, b) => b.len - a.len); // Descending
 
         // Find Inventory Item (Unified Key Match)
         let invItem = window.allInventory.find(i => {
@@ -5929,7 +5943,8 @@ window.runCuttingOptimization = async function () {
 
         let newBarBins = [];
 
-        needs.forEach(len => {
+        needs.forEach(cut => {
+            const len = cut.len;
             let placed = false;
             let neededSpace = len + KERF;
 
@@ -5940,12 +5955,12 @@ window.runCuttingOptimization = async function () {
                 // Simplified Logic: If remain >= len + kerf OR (remain >= len AND abs(remain-len)<0.1)
 
                 if (Math.abs(bin.remain - len) < 0.1) {
-                    bin.cuts.push(len);
+                    bin.cuts.push(cut);
                     bin.remain = 0;
                     placed = true;
                     break;
                 } else if (bin.remain >= neededSpace) {
-                    bin.cuts.push(len);
+                    bin.cuts.push(cut);
                     bin.remain -= neededSpace;
                     placed = true;
                     break;
@@ -5956,7 +5971,7 @@ window.runCuttingOptimization = async function () {
                 // B. Try Existing New Bars
                 for (let bin of newBarBins) {
                     if (bin.remain >= neededSpace) {
-                        bin.cuts.push(len);
+                        bin.cuts.push(cut);
                         bin.remain -= neededSpace;
                         placed = true;
                         break;
@@ -5972,7 +5987,7 @@ window.runCuttingOptimization = async function () {
                     remain: 600,
                     cuts: []
                 };
-                bin.cuts.push(len);
+                bin.cuts.push(cut);
                 bin.remain -= neededSpace;
                 newBarBins.push(bin);
             }
@@ -6007,7 +6022,7 @@ window.runCuttingOptimization = async function () {
 
                 visualsHtml += `<div class="cut-row" style="display:flex; flex-direction:column; margin-bottom:10px; border:1px solid #94a3b8; border-left:3px solid #94a3b8; padding:5px; border-radius:4px; background:#f8f9fa;">`;
                 let cutCounts = {};
-                bin.cuts.forEach(c => { let k = (c * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
+                bin.cuts.forEach(c => { let k = (c.len * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
                 let cutListStr = Object.keys(cutCounts).map(k => `${k} x${cutCounts[k]}`).join(', ');
                 visualsHtml += `<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:5px;">`;
                 visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#222; margin-right:10px; font-size:0.95rem;">餘料 ${bin.sourceLen * 10}mm</div>`;
@@ -6016,10 +6031,10 @@ window.runCuttingOptimization = async function () {
                 visualsHtml += `<div style="width:100%; max-width:${widthPct}%; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
 
                 bin.cuts.forEach(c => {
-                    let pct = (c / bin.capacity) * 100;
-                    visualsHtml += `<div class="cut-segment" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #000; color:#222; font-size:10px; display:flex; align-items:center; justify-content:center;" title="切割 ${c * 10}mm">
-        切 ${c * 10} mm
-                     </div>`;
+                    let pct = (c.len / bin.capacity) * 100;
+                    let _lc = window._cutLetterColor ? window._cutLetterColor(c.letter) : '#888';
+                    let _tag = c.letter ? `<span style="background:${_lc}; color:#fff; font-weight:900; border-radius:3px; padding:0 4px; margin-left:3px; font-size:10px;">${c.letter}</span>` : '';
+                    visualsHtml += `<div class="cut-segment" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #000; color:#222; font-size:10px; display:flex; align-items:center; justify-content:center; gap:2px;" title="切割 ${c.len * 10}mm（單 ${c.letter || '-'}）">切 ${c.len * 10}${_tag}</div>`;
                 });
                 if (remain > 0) {
                     let rPct = (remain / bin.capacity) * 100;
@@ -6040,7 +6055,7 @@ window.runCuttingOptimization = async function () {
 
                 visualsHtml += `<div class="cut-row" style="display:flex; flex-direction:column; margin-bottom:10px; border:1px solid ${seriesColor}; border-left:3px solid ${seriesColor}; padding:5px; border-radius:4px; background:#fff;">`;
                 let cutCounts = {};
-                bin.cuts.forEach(c => { let k = (c * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
+                bin.cuts.forEach(c => { let k = (c.len * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
                 let cutListStr = Object.keys(cutCounts).map(k => `${k} x${cutCounts[k]}`).join(', ');
                 visualsHtml += `<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:5px;">`;
                 visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#222; margin-right:10px; font-size:0.95rem;">新料 #${idx + 1}（${(bin.capacity || 600) * 10}mm）</div>`;
@@ -6048,11 +6063,12 @@ window.runCuttingOptimization = async function () {
                 visualsHtml += `</div>`;
                 visualsHtml += `<div style="width:100%; display:flex; height:30px; background:#eee; border-radius:4px; overflow:hidden;">`;
 
-                bin.cuts.forEach(cutLen => {
+                bin.cuts.forEach(cut => {
+                    let cutLen = cut.len;
                     let pct = (cutLen / 600) * 100;
-                    visualsHtml += `<div class="cut-block" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #000; color:#222; font-size:11px; display:flex; align-items:center; justify-content:center;" title="切割 ${cutLen * 10}mm">
-                        <span>切 ${cutLen * 10} mm</span>
-                    </div>`;
+                    let _lc = window._cutLetterColor ? window._cutLetterColor(cut.letter) : '#888';
+                    let _tag = cut.letter ? `<span style="background:${_lc}; color:#fff; font-weight:900; border-radius:3px; padding:0 4px; margin-left:3px; font-size:10px;">${cut.letter}</span>` : '';
+                    visualsHtml += `<div class="cut-block" style="width:${pct}%; background:${seriesColor}; border-right:1px solid #000; color:#222; font-size:11px; display:flex; align-items:center; justify-content:center; gap:2px;" title="切割 ${cutLen * 10}mm（單 ${cut.letter || '-'}）"><span>切 ${cutLen * 10} mm</span>${_tag}</div>`;
                 });
 
                 if (remain > 0) {
@@ -6229,6 +6245,13 @@ window.assignBatchLetters = function (orders) {
 window.getBatchLetter = function (order) {
     if (!order) return '';
     try { return localStorage.getItem('cutLetter_' + order.timestamp) || ''; } catch (e) { return ''; }
+};
+// 每個訂單代號對應一個顏色（切料表每一刀的色標用）
+window._cutLetterColor = function (L) {
+    if (!L) return '#888';
+    const pal = ['#3b6fb0', '#3f8f5e', '#c07a2b', '#8256c4', '#c0504d', '#2aa3a3', '#7a6f5d', '#d1478c'];
+    const i = L.charCodeAt(0) - 65;
+    return pal[((i % pal.length) + pal.length) % pal.length];
 };
 
 // [出貨] 產生單張訂單的「貼紙頁 + 裝箱單頁」HTML（單張 / 批次共用）
