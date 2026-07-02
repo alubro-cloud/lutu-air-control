@@ -6065,9 +6065,12 @@ window.runCuttingOptimization = async function () {
 
     // Add Action Buttons (Print + Confirm)
     visualsHtml += `<div class="no-print" style="text-align:center; margin-top:30px; border-top:1px solid #eee; padding-top:20px; display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
-        <button onclick="window.printCuttingList()" style="background:var(--accent-20); color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-            <i class="fas fa-print"></i> 列印切料表
-        </button>
+        <div style="display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center;">
+            <span style="font-size:0.95rem; color:#888; font-weight:bold;"><i class="fas fa-print"></i> 列印切料表：</span>
+            <button onclick="window.printCuttingList('zh')" style="background:var(--accent-20); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">中文</button>
+            <button onclick="window.printCuttingList('vi')" style="background:var(--accent-30); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Tiếng Việt</button>
+            <button onclick="window.printCuttingList('id')" style="background:var(--accent-40); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Bahasa</button>
+        </div>
         <button class="btn-record-offcut" onclick="try{window.recordCuttingPlanToInventory()}catch(e){alert('Error: '+e.message)}" style="background:var(--accent-20); color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
             <i class="fas fa-save"></i> 確認切割計畫並更新庫存
         </button>
@@ -6076,22 +6079,56 @@ window.runCuttingOptimization = async function () {
     area.innerHTML = visualsHtml;
 };
 
-// 列印切料表函數
-window.printCuttingList = function () {
+// 切料表多語系字典（給切割現場的越南/印尼師傅看）
+window.CUT_I18N = {
+    zh: {
+        title: '合併切料表', doc: '切料表列印', gen: '產生時間',
+        n1: '依切料清單裁切；不同規格/長度不可混切。切法相同的料（如本單各支都一樣）可整批一次切。',
+        n2: '切完後，每段餘料務必「量長度並標示」後歸位。'
+    },
+    vi: {
+        title: 'PHIẾU CẮT LIỆU (GỘP)', doc: 'In phiếu cắt liệu', gen: 'Thời gian',
+        n1: 'Cắt theo danh sách. KHÔNG cắt lẫn các quy cách / chiều dài khác nhau. Các cây cùng kiểu cắt (như phiếu này) có thể cắt CHUNG MỘT LƯỢT.',
+        n2: 'Sau khi cắt, mỗi đoạn liệu thừa PHẢI ĐO chiều dài và DÁN NHÃN trước khi cất.'
+    },
+    id: {
+        title: 'DAFTAR POTONG BAHAN (GABUNGAN)', doc: 'Cetak daftar potong', gen: 'Waktu',
+        n1: 'Potong sesuai daftar. JANGAN campur spesifikasi / panjang berbeda. Batang dengan pola potong sama (seperti order ini) boleh dipotong SEKALIGUS.',
+        n2: 'Setelah memotong, tiap sisa WAJIB DIUKUR panjangnya & DIBERI LABEL sebelum disimpan.'
+    }
+};
+// 把已渲染的切料 HTML 裡的中文標籤換成越南/印尼文（zh 原樣返回）
+window.translateCutHtml = function (html, lang) {
+    if (lang === 'zh' || !window.CUT_I18N[lang]) return html;
+    var map = lang === 'vi' ? {
+        '切料清單': 'Danh sách cắt', '使用新料': 'Liệu mới dùng', '使用餘料': 'Liệu thừa dùng',
+        '新料 #': 'Cây mới #', '餘料 ': 'Liệu thừa ', '切 ': 'Cắt ', ' 支)': ' cây)'
+    } : {
+        '切料清單': 'Daftar potong', '使用新料': 'Bahan baru dipakai', '使用餘料': 'Sisa dipakai',
+        '新料 #': 'Batang baru #', '餘料 ': 'Sisa ', '切 ': 'Potong ', ' 支)': ' batang)'
+    };
+    Object.keys(map).forEach(function (k) { html = html.split(k).join(map[k]); });
+    return html;
+};
+
+// 列印切料表函數（lang: 'zh' | 'vi' | 'id'）
+window.printCuttingList = function (lang) {
+    lang = lang || 'zh';
+    const L = window.CUT_I18N[lang] || window.CUT_I18N.zh;
     const resultsArea = document.getElementById('opt-results-area');
     if (!resultsArea) {
         alert('找不到切割計畫內容');
         return;
     }
 
-    const printContent = resultsArea.innerHTML;
+    const printContent = window.translateCutHtml(resultsArea.innerHTML, lang);
     const printWindow = window.open('', '_blank');
 
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
-            <title>切料表列印</title>
+            <title>${L.doc}</title>
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
             <style>
                 :root {
@@ -6135,9 +6172,14 @@ window.printCuttingList = function () {
             </style>
         </head>
         <body>
-            <h1 style="text-align:center; margin-bottom:30px; border-bottom:2px solid #333; padding-bottom:15px;">
-                <i class="fas fa-cut"></i> 合併切料表
+            <h1 style="text-align:center; margin-bottom:12px; border-bottom:2px solid #333; padding-bottom:15px;">
+                <i class="fas fa-cut"></i> ${L.title}
             </h1>
+            <div style="border:2px solid #c0392b; background:#fdecea; border-radius:6px; padding:12px 16px; margin-bottom:24px; line-height:1.7;">
+                <div style="font-weight:bold; color:#c0392b; font-size:1.1rem;">① ${L.n1}</div>
+                <div style="font-weight:bold; color:#c0392b; font-size:1.1rem;">② ${L.n2}</div>
+                ${lang !== 'zh' ? `<div style="margin-top:7px; font-size:0.82rem; color:#7a4a45;">① ${window.CUT_I18N.zh.n1}　② ${window.CUT_I18N.zh.n2}</div>` : ''}
+            </div>
             ${printContent}
             <script>
                 window.onload = function() {
