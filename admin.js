@@ -6078,15 +6078,15 @@ window.runCuttingOptimization = async function () {
     visualsHtml += `<div class="no-print" style="text-align:center; margin-top:30px; border-top:1px solid #eee; padding-top:20px; display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
         <div style="display:inline-flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center;">
             <span style="font-size:0.95rem; color:#888; font-weight:bold;"><i class="fas fa-print"></i> 列印切料表：</span>
-            <button onclick="window.printCuttingList('zh')" style="background:var(--accent-20); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">中文</button>
-            <button onclick="window.printCuttingList('vi')" style="background:var(--accent-30); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Tiếng Việt</button>
-            <button onclick="window.printCuttingList('id')" style="background:var(--accent-40); color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Bahasa</button>
+            <button onclick="window.printCuttingList('zh')" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">中文</button>
+            <button onclick="window.printCuttingList('vi')" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Tiếng Việt</button>
+            <button onclick="window.printCuttingList('id')" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Bahasa</button>
         </div>
         <div style="display:inline-flex; gap:8px; align-items:center;">
             <button onclick="window.printAllStickers()" title="本批（進切料）全部貼紙，走標籤機 100×150mm" style="background:#7a6f5d; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-tag"></i> 本批貼紙</button>
             <button onclick="window.printAllPackingSlips()" title="本批（進切料）全部裝箱單，A4" style="background:#556270; color:white; padding:12px 20px; border:none; border-radius:6px; font-size:1.05rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);"><i class="fas fa-box-open"></i> 本批裝箱單</button>
         </div>
-        <button class="btn-record-offcut" onclick="try{window.recordCuttingPlanToInventory()}catch(e){alert('Error: '+e.message)}" style="background:var(--accent-20); color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <button class="btn-record-offcut" onclick="try{window.recordCuttingPlanToInventory()}catch(e){alert('Error: '+e.message)}" style="background:#556270; color:white; padding:12px 24px; border:none; border-radius:6px; font-size:1.1rem; cursor:pointer; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
             <i class="fas fa-save"></i> 確認切割計畫並更新庫存
         </button>
     </div>`;
