@@ -1692,7 +1692,10 @@ function renderKanban(data) {
     };
 
     // Render HTML Structure
-    let html = `
+    var manualBtn = (window.currentPrimaryView !== 'work' && window.currentPrimaryView !== 'shipment')
+        ? `<div style="display:flex; justify-content:flex-end; margin:0 4px 12px;"><button onclick="openManualOrderModal()" style="background:#7c3aed; color:#fff; border:none; padding:9px 18px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem; box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-plus"></i> 建立單據</button></div>`
+        : '';
+    let html = manualBtn + `
     <div class="kanban-columns-container">
         `;
 
@@ -2460,9 +2463,92 @@ window.triggerGmailReply = function (orderId) {
     }
 };
 
+// [第3片] 手動建單（後台自建紀錄單，M 前綴、不碰庫存）
+window.normPhoneAdmin = function (raw) {
+    var s = String(raw == null ? '' : raw).replace(/[０-９]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0xFEE0); }).replace(/＋/g, '+');
+    s = s.replace(/^\s*\+?886/, '0').replace(/\D/g, '').replace(/^0+/, '0');
+    if (s.length > 10) s = s.slice(0, 10);
+    return s;
+};
+window.openManualOrderModal = function () {
+    var modal = document.getElementById('modal');
+    var body = document.getElementById('modal-body');
+    if (!modal || !body) return;
+    var fi = 'width:100%; padding:9px 10px; border-radius:6px; font-size:0.95rem; margin-bottom:2px;';
+    var lb = 'font-size:0.78rem; color:#94a3b8; display:block; margin-bottom:3px;';
+    body.innerHTML =
+        '<div style="padding:15px 22px; text-align:left;">'
+        + '<h3 style="color:#a78bfa; text-align:center; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><i class="fas fa-plus-circle"></i> 建立單據（後台紀錄單）</h3>'
+        + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">'
+        + '  <div><label style="' + lb + '">姓名 *</label><input id="m-name" class="form-input" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">手機 *（09）</label><input id="m-phone" class="form-input" inputmode="numeric" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">公司/單位</label><input id="m-company" class="form-input" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">統編</label><input id="m-taxid" class="form-input" maxlength="8" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">Email（選填）</label><input id="m-email" class="form-input" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">配送方式</label><select id="m-delivery" class="form-input" style="' + fi + '"><option>公司自取</option><option>小貨車配送</option><option>大貨車配送</option><option>店到店</option></select></div>'
+        + '</div>'
+        + '<div style="margin-top:8px;"><label style="' + lb + '">地址（選填）</label><input id="m-address" class="form-input" style="' + fi + '"></div>'
+        + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">'
+        + '  <div><label style="' + lb + '">單別標籤</label><select id="m-tag" class="form-input" style="' + fi + '"><option value="專案">專案</option><option value="普通">普通單</option><option value="急件">急件</option><option value="大量">大量</option></select></div>'
+        + '  <div><label style="' + lb + '">建單狀態</label><select id="m-status" class="form-input" style="' + fi + '"><option value="unquoted">待報價</option><option value="quoted">已報價</option><option value="paid">已收款</option><option value="shipping">進行中/待出貨</option><option value="completed">已完成</option></select></div>'
+        + '</div>'
+        + '<div style="margin-top:8px;"><label style="' + lb + '">品項內容（自由填：自家料/外購/外包都可）</label><textarea id="m-items" class="form-input" rows="4" style="' + fi + '" placeholder="例：&#10;鋁料 4040 x6支（自製）&#10;木心板 x3（外購）&#10;CNC加工發包 x1"></textarea></div>'
+        + '<div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:8px;">'
+        + '  <div><label style="' + lb + '">總價 *</label><input id="m-total" class="form-input" type="number" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">備註</label><input id="m-note" class="form-input" style="' + fi + '"></div>'
+        + '</div>'
+        + '<div style="font-size:0.72rem; color:#94a3b8; margin-top:8px;"><i class="fas fa-info-circle"></i> 這是紀錄單：不扣庫存、不走切料。報價/外購明細可建好後再到卡片補。</div>'
+        + '<div style="margin-top:18px; display:flex; gap:10px; justify-content:center;">'
+        + '  <button class="btn-secondary" onclick="closeModal()" style="padding:10px 20px; border-radius:8px;">取消</button>'
+        + '  <button onclick="submitManualOrder(this)" style="flex:1; padding:12px; background:#7c3aed; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">建立單據</button>'
+        + '</div>'
+        + '</div>';
+    modal.style.display = 'flex';
+    var pe = document.getElementById('m-phone');
+    if (pe) pe.addEventListener('input', function () { var n = window.normPhoneAdmin(pe.value); if (pe.value !== n) pe.value = n; });
+};
+window.submitManualOrder = function (btn) {
+    function v(id) { var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; }
+    var name = v('m-name');
+    var phone = window.normPhoneAdmin(v('m-phone'));
+    var total = parseInt(v('m-total')) || 0;
+    if (!name) { alert('請填姓名'); return; }
+    if (!(phone.charAt(0) === '0' && phone.charAt(1) === '9' && phone.length === 10)) { alert('手機需 09 開頭 10 碼'); return; }
+    if (!total) { if (!confirm('總價為 0，確定嗎？')) return; }
+    var company = v('m-company'), taxid = v('m-taxid'), email = v('m-email');
+    var delivery = v('m-delivery'), address = v('m-address'), tag = v('m-tag') || '專案';
+    var status = v('m-status') || 'unquoted', items = v('m-items'), note = v('m-note');
+    var BR = '<br>';
+    var noteParts = [];
+    if (company) noteParts.push('【公司】' + company);
+    if (taxid) noteParts.push('【統編】' + taxid);
+    if (note) noteParts.push('【備註】' + note);
+    var finalNote = noteParts.join(BR);
+    var details = items ? items.replace(/\n/g, '<br>') : '（無明細）';
+    if (btn) { btn.disabled = true; btn.innerHTML = '建立中…'; }
+    var payload = {
+        action: 'createManualOrder',
+        customer: { name: name, phone: phone, email: email, address: address, delivery: delivery, note: finalNote },
+        detailsText: details,
+        totalEst: total,
+        status: status,
+        orderTag: tag
+    };
+    fetch(ADMIN_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) })
+        .then(function () {
+            closeModal();
+            setTimeout(function () { if (typeof fetchOrders === 'function') fetchOrders(); }, 1300);
+            if (typeof showToast === 'function') showToast('已建立紀錄單，稍後自動重整');
+            else alert('已建立紀錄單。若沒馬上出現，稍等幾秒或重整頁面。');
+        })
+        .catch(function (e) { if (btn) { btn.disabled = false; btn.innerHTML = '建立單據'; } alert('建立失敗：' + e); });
+};
+
 function createCard(order, index, currentStatus) {
     const el = document.createElement('div');
     el.className = 'kanban-card';
+    var _isManual = String(order.projectId || '').charAt(0) === 'M';
+    if (_isManual) el.style.borderLeft = '4px solid #7c3aed';
     el.onclick = () => viewOrder(order);
 
     let time = order.timestamp;
@@ -2636,6 +2722,7 @@ function createCard(order, index, currentStatus) {
     <div class="card-header">
         <div class="card-meta">
             <span class="card-no" style="background:${tagColor}; color:#fff;">${index}</span>
+            ${_isManual ? '<span class="card-tag" style="background:#ede9fe; color:#6d28d9; font-weight:bold;">自建</span>' : ''}
         </div>
         ${tag}
     </div>
