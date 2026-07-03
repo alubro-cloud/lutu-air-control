@@ -2530,7 +2530,7 @@ window.createProjectCard = function (order) {
         + '<div class="card-info"><i class="fas fa-phone-alt"></i> ' + (order.phone || '') + '</div>'
         + (order.salesperson ? '<div class="card-info"><i class="fas fa-user-tie"></i> ' + order.salesperson + '</div>' : '')
         + '</div><div class="card-price-container"><div class="card-price">' + priceTxt + '</div></div></div>'
-        + (order.dueDate ? '<div style="font-size:0.74rem; color:#0369a1; margin-top:5px; font-weight:bold;"><i class="fas fa-flag-checkered"></i> 預計完成 ' + (window.fmtDueShort ? window.fmtDueShort(order.dueDate) : order.dueDate) + '</div>' : '')
+        + (order.dueDate ? '<div style="font-size:0.74rem; color:#0369a1; margin-top:5px; font-weight:bold;"><i class="fas fa-flag-checkered"></i> 預計出貨 ' + (window.fmtDueShort ? window.fmtDueShort(order.dueDate) : order.dueDate) + '</div>' : '')
         + '</div>';
     var cb = el.querySelector('.card-body');
     if (cb) cb.onclick = function () { if (typeof viewOrder === 'function') viewOrder(order); };
@@ -2558,8 +2558,9 @@ window.changeProjectStage = function (orderId, newStatus) {
 // [第3片] 手動建單（後台自建紀錄單，M 前綴、不碰庫存）
 window.normPhoneAdmin = function (raw) {
     var s = String(raw == null ? '' : raw).replace(/[０-９]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0xFEE0); }).replace(/＋/g, '+');
-    s = s.replace(/^\s*\+?886/, '0').replace(/\D/g, '').replace(/^0+/, '0');
-    if (s.length > 10) s = s.slice(0, 10);
+    s = s.replace(/^\s*\+?886/, '0'); // +886 / 886 → 0（市話/手機皆可）
+    s = s.replace(/\D/g, '');         // 只留數字（去掉 - 空格 括號）
+    if (s.length > 11) s = s.slice(0, 11);
     return s;
 };
 window.openManualOrderModal = function () {
@@ -2573,7 +2574,7 @@ window.openManualOrderModal = function () {
         + '<h3 style="color:#a78bfa; text-align:center; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><i class="fas fa-plus-circle"></i> 建立單據（後台紀錄單）</h3>'
         + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">'
         + '  <div><label style="' + lb + '">姓名 *</label><input id="m-name" class="form-input" style="' + fi + '"></div>'
-        + '  <div><label style="' + lb + '">手機 *（09）</label><input id="m-phone" class="form-input" inputmode="numeric" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">電話 *（手機/市話）</label><input id="m-phone" class="form-input" inputmode="tel" style="' + fi + '"></div>'
         + '  <div><label style="' + lb + '">公司/單位</label><input id="m-company" class="form-input" style="' + fi + '"></div>'
         + '  <div><label style="' + lb + '">統編</label><input id="m-taxid" class="form-input" maxlength="8" style="' + fi + '"></div>'
         + '  <div><label style="' + lb + '">Email（選填）</label><input id="m-email" class="form-input" style="' + fi + '"></div>'
@@ -2606,7 +2607,7 @@ window.submitManualOrder = function (btn) {
     var phone = window.normPhoneAdmin(v('m-phone'));
     var total = parseInt(v('m-total')) || 0;
     if (!name) { alert('請填姓名'); return; }
-    if (!(phone.charAt(0) === '0' && phone.charAt(1) === '9' && phone.length === 10)) { alert('手機需 09 開頭 10 碼'); return; }
+    if (!(phone.length >= 8 && phone.length <= 11)) { alert('請輸入正確電話（手機或市話，去掉符號後 8~11 碼數字）'); return; }
     if (!total) { if (!confirm('總價為 0，確定嗎？')) return; }
     var company = v('m-company'), taxid = v('m-taxid'), email = v('m-email');
     var delivery = v('m-delivery'), address = v('m-address'), tag = v('m-tag') || '專案';
@@ -2837,7 +2838,7 @@ function createCard(order, index, currentStatus) {
                 </div>
             </div>
         </div>
-        ${order.dueDate ? `<div style="font-size:0.74rem; color:#0369a1; margin-top:5px; font-weight:bold;"><i class="fas fa-flag-checkered"></i> 預計完成 ${window.fmtDueShort ? window.fmtDueShort(order.dueDate) : order.dueDate}</div>` : ''}
+        ${order.dueDate ? `<div style="font-size:0.74rem; color:#0369a1; margin-top:5px; font-weight:bold;"><i class="fas fa-flag-checkered"></i> 預計出貨 ${window.fmtDueShort ? window.fmtDueShort(order.dueDate) : order.dueDate}</div>` : ''}
     </div>
 
     ${window.renderOrderMeta ? window.renderOrderMeta(order) : ''}
@@ -3379,11 +3380,11 @@ window.viewOrder = function (order) {
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span style="font-size:0.78rem; color:#666;">工時 ${order.leadDays || '-'} 天</span>
-                    <span style="font-size:0.78rem; color:#666; margin-left:4px;">預計完成</span>
+                    <span style="font-size:0.78rem; color:#666; margin-left:4px;">預計出貨</span>
                     <input type="date" id="card-due-input" value="${window.toYMD ? window.toYMD(order.dueDate) : (order.dueDate || '')}" onchange="saveCardDue('${order.timestamp}')" style="padding:5px 8px; border:1px solid #bae6fd; border-radius:4px; font-size:0.8rem;">
                     <button onclick="startDueFromToday('${order.timestamp}', ${Number(order.leadDays) || 0})" style="font-size:0.75rem; padding:5px 10px; background:#0284c7; color:#fff; border:none; border-radius:5px; cursor:pointer;"><i class="fas fa-play"></i> 款到→起算 (今天+${Number(order.leadDays) || 0}天)</button>
                 </div>
-                <div style="font-size:0.68rem; color:#94a3b8; margin-top:5px;">款到才按「起算」；完成日可手動改，改了就固定、不隨階段變。</div>
+                <div style="font-size:0.68rem; color:#94a3b8; margin-top:5px;">款到才按「起算」；出貨日可手動改，改了就固定、不隨階段變。</div>
             </div>
         </div>
 
@@ -3548,7 +3549,7 @@ window._saveDue = function (orderId, due) {
         fetch(ADMIN_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'updateOrderPrice', orderId: orderId, dueDate: due }) })
             .catch(function (e) { console.warn('save due failed', e); });
     } catch (e) { console.warn(e); }
-    if (typeof window.showToast === 'function') window.showToast('預計完成日：' + (due || '(清除)'));
+    if (typeof window.showToast === 'function') window.showToast('預計出貨日：' + (due || '(清除)'));
     if (typeof applyFilter === 'function') applyFilter(); // 存完重繪，卡片即時顯示新完成日
 };
 window.saveCardDue = function (orderId) {
