@@ -3109,6 +3109,7 @@ window.viewOrder = function (order) {
                 
                 ${order.sysTotal ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>鋁材與配件小計:</span> <span>NT$ ${order.sysTotal}</span></div>` : ''}
                 ${order.outsourcePrice ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>外購品/客製品項:</span> <span>NT$ ${order.outsourcePrice}</span></div>` : ''}
+                <div id="card-ext-detail"></div>
                 ${order.assemblyFee ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>加工與組裝費:</span> <span>NT$ ${order.assemblyFee}</span></div>` : ''}
                 ${order.discountAmount ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:var(--dusty-rose); font-weight:bold; padding: 3px 0;"><span>折扣優惠:</span> <span>-NT$ ${order.discountAmount}</span></div>` : ''}
                 ${order.shippingFee !== undefined && order.shippingFee !== "" ? `<div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#666; padding: 3px 0;"><span>運費金額:</span> <span>NT$ ${order.shippingFee}</span></div>` : ''}
@@ -3185,6 +3186,45 @@ window.viewOrder = function (order) {
     `;
     updateCheckProgress();
     modal.style.display = 'flex';
+    if (window.renderCardExtDetail) window.renderCardExtDetail(order);
+};
+
+// 卡片內部檢視：外購/外包逐項＋毛利（不對客戶顯示）。
+// 有本地 extItems 就直接畫；沒有就跟後端 getExtItems 撈。
+window.renderCardExtDetail = function (order) {
+    var host = document.getElementById('card-ext-detail');
+    if (!host || !order) return;
+    function paint(list) {
+        var items = (list || []).filter(function (it) { return (it.name || it.category || Number(it.cost) || Number(it.price)); });
+        if (!items.length) { host.innerHTML = ''; return; }
+        var costSum = 0, priceSum = 0, rows = '';
+        items.forEach(function (it) {
+            var q = Number(it.qty) || 0, c = Number(it.cost) || 0, p = Number(it.price) || 0;
+            costSum += c * q; priceSum += p * q;
+            rows += '<tr>'
+                + '<td style="padding:2px 4px; color:#555;">' + (it.category ? '<span style="color:#c2410c;">[' + it.category + ']</span> ' : '') + (it.name || '') + '</td>'
+                + '<td style="padding:2px 4px; text-align:right; color:#999;">x' + q + '</td>'
+                + '<td style="padding:2px 4px; text-align:right; color:#e11d48;">成' + Math.round(c) + '</td>'
+                + '<td style="padding:2px 4px; text-align:right; color:#16a34a;">售' + Math.round(p) + '</td>'
+                + '</tr>';
+        });
+        var margin = Math.round(priceSum - costSum);
+        host.innerHTML = '<div style="margin:6px 0 2px; padding:8px 10px; background:#fff8f1; border:1px dashed #fed7aa; border-radius:6px;">'
+            + '<div style="font-size:0.72rem; color:#9a3412; font-weight:bold; margin-bottom:4px;"><i class="fas fa-eye-slash"></i> 外購/外包逐項（內部檢視，不對客戶）</div>'
+            + '<table style="width:100%; border-collapse:collapse; font-size:0.75rem;">' + rows + '</table>'
+            + '<div style="display:flex; justify-content:space-between; border-top:1px dashed #fed7aa; margin-top:5px; padding-top:5px; font-size:0.75rem;">'
+            + '<span style="color:#e11d48;">成本 ' + Math.round(costSum).toLocaleString() + '</span>'
+            + '<span style="color:#16a34a;">售價 ' + Math.round(priceSum).toLocaleString() + '</span>'
+            + '<span style="color:#333; font-weight:bold;">毛利 ' + margin.toLocaleString() + '</span>'
+            + '</div></div>';
+    }
+    if (order.extItems && order.extItems.length) { paint(order.extItems); return; }
+    try {
+        fetch(ADMIN_API_URL + '?action=getExtItems&orderId=' + encodeURIComponent(order.timestamp) + '&t=' + Date.now())
+            .then(function (r) { return r.json(); })
+            .then(function (j) { paint(j && j.items ? j.items : []); })
+            .catch(function () { host.innerHTML = ''; });
+    } catch (e) { host.innerHTML = ''; }
 };
 
 const PRODUCT_MAP = {
