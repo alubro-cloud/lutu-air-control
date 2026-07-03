@@ -165,7 +165,7 @@ window.showPriceModal = function (order, nextStatus) {
             <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:12px; margin-bottom:15px;">
                 <div style="background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
                     <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">單別標籤（自動帶工時）</label>
-                    <select id="quote-tag-input" onchange="onQuoteTagChange()" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.95rem; background:#fff;">
+                    <select id="quote-tag-input" onchange="onQuoteTagChange()" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.95rem; background:#fff; color:#1e293b;">
                         <option value="普通">普通單</option>
                         <option value="急件">急件</option>
                         <option value="大量">大量</option>
@@ -174,7 +174,7 @@ window.showPriceModal = function (order, nextStatus) {
                 </div>
                 <div style="background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
                     <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">預計工時（工作天）</label>
-                    <input type="number" id="quote-lead-input" value="${prevLeadDays}" min="0" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.95rem; text-align:right;">
+                    <input type="number" id="quote-lead-input" value="${prevLeadDays}" min="0" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.95rem; text-align:right; color:#1e293b; background:#fff;">
                 </div>
             </div>
 
@@ -215,11 +215,11 @@ window.showPriceModal = function (order, nextStatus) {
                 <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
                     <div>
                         <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">加工與組裝費</label>
-                        <input type="number" id="quote-assembly-input" value="${prevAssembly}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.05rem; text-align:right;">
+                        <input type="number" id="quote-assembly-input" value="${prevAssembly}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.05rem; text-align:right; color:#1e293b; background:#fff;">
                     </div>
                     <div>
                         <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">向客收運費</label>
-                        <input type="number" id="quote-shipping-input" value="${prevShipping}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.05rem; text-align:right;">
+                        <input type="number" id="quote-shipping-input" value="${prevShipping}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.05rem; text-align:right; color:#1e293b; background:#fff;">
                     </div>
                     <div>
                         <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#e11d48; font-weight:bold;">折扣優惠</label>
@@ -320,7 +320,7 @@ window.showPriceModal = function (order, nextStatus) {
         if (!window._quoteExtRows.length) {
             body.innerHTML = '<tr><td colspan="6" style="padding:10px 6px; color:#a8a29e; text-align:center; font-size:0.82rem;">尚無外購項目 — 按「新增一列」開始</td></tr>';
         } else {
-            var inS = 'width:100%; padding:5px 6px; border:1px solid #e7e5e4; border-radius:4px; font-size:0.82rem; outline:none;';
+            var inS = 'width:100%; padding:5px 6px; border:1px solid #e7e5e4; border-radius:4px; font-size:0.82rem; outline:none; color:#1e293b; background:#fff;';
             body.innerHTML = window._quoteExtRows.map(function (r, i) {
                 return '<tr>'
                     + '<td style="padding:2px 3px;"><input data-i="' + i + '" data-f="category" list="ext-cat-list" value="' + escAttr(r.category) + '" placeholder="類別" style="' + inS + '"></td>'
