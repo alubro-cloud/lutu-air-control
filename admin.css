@@ -5807,3 +5807,21 @@ select.form-input option {
 .modal-content [style*="background:#fff"] div[style*="display:flex"] label {
     color: #334155 !important;
 }
+
+/* [第2片] 報價面板/卡片新欄位：深色 modal 下強制深色文字，避免白底白字 */
+#quote-tag-input,
+#quote-lead-input,
+#quote-assembly-input,
+#quote-shipping-input,
+#ext-rows-body input,
+#card-due-input {
+    color: #1e293b !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    -webkit-text-fill-color: #1e293b !important;
+}
+#quote-tag-input option {
+    color: #1e293b !important;
+    background: #ffffff !important;
+    -webkit-text-fill-color: #1e293b !important;
+}
