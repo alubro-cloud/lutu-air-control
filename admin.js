@@ -1584,6 +1584,13 @@ function applyFilter() {
         return; // We are in Hub, History, or Reports. Do not render Kanban.
     }
 
+    // [切開] 專案看板：只顯示 M 開頭的自建單，用獨立渲染，不走生產看板
+    if (window.currentPrimaryView === 'project') {
+        var projOrders = ordersData.filter(function (o) { return String(o.projectId || '').charAt(0) === 'M'; });
+        if (window.renderProjectBoard) window.renderProjectBoard(projOrders);
+        return;
+    }
+
     if (window.currentPrimaryView === 'work') {
         // Today's Work Orders: Production phases only
         const workStatuses = ['paid', 'cutting', 'inspection', 'picking', 'packing'];
@@ -1599,6 +1606,8 @@ function applyFilter() {
         filtered = ordersData.filter(o => o.status !== 'completed');
     }
 
+    // [切開] 生產看板不顯示自建單（M 開頭）→ 它們搬到專案看板
+    filtered = filtered.filter(function (o) { return String(o.projectId || '').charAt(0) !== 'M'; });
     renderKanban(filtered);
 
     // Auto-Scroll Logic
@@ -1692,10 +1701,10 @@ function renderKanban(data) {
     };
 
     // Render HTML Structure
-    var manualBtn = (window.currentPrimaryView !== 'work' && window.currentPrimaryView !== 'shipment')
-        ? `<div style="display:flex; justify-content:flex-end; margin:0 4px 12px;"><button onclick="openManualOrderModal()" style="background:#7c3aed; color:#fff; border:none; padding:9px 18px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem; box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-plus"></i> 建立單據</button></div>`
+    var topBar = (window.currentPrimaryView !== 'work' && window.currentPrimaryView !== 'shipment')
+        ? `<div style="display:flex; justify-content:flex-end; margin:0 4px 12px;"><button onclick="showProjectView()" style="background:#7c3aed; color:#fff; border:none; padding:9px 18px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem; box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-diagram-project"></i> 專案看板</button></div>`
         : '';
-    let html = manualBtn + `
+    let html = topBar + `
     <div class="kanban-columns-container">
         `;
 
@@ -2463,6 +2472,87 @@ window.triggerGmailReply = function (orderId) {
     }
 };
 
+// [切開] 專案看板：階段 + 渲染 + 卡片 + 切換
+window.PROJECT_STAGES = [
+    { key: 'p_quote', label: '報價中' },
+    { key: 'p_deal', label: '已成交' },
+    { key: 'p_prep', label: '備料/發包' },
+    { key: 'p_doing', label: '進行中' },
+    { key: 'p_check', label: '驗收' },
+    { key: 'p_done', label: '結案' },
+    { key: 'p_cancel', label: '已取消' }
+];
+window.projectStageLabel = function (k) {
+    for (var i = 0; i < window.PROJECT_STAGES.length; i++) if (window.PROJECT_STAGES[i].key === k) return window.PROJECT_STAGES[i].label;
+    return '報價中';
+};
+window.showProjectView = function () { window.currentPrimaryView = 'project'; if (typeof applyFilter === 'function') applyFilter(); };
+window.showProductionView = function () { window.currentPrimaryView = 'all'; if (typeof applyFilter === 'function') applyFilter(); };
+
+window.renderProjectBoard = function (data) {
+    var board = document.getElementById('kanban-board');
+    if (!board) return;
+    var stages = window.PROJECT_STAGES;
+    var top = '<div style="display:flex; justify-content:space-between; align-items:center; margin:0 4px 14px; gap:10px;">'
+        + '<button onclick="showProductionView()" style="background:#475569; color:#fff; border:none; padding:9px 16px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem;"><i class="fas fa-arrow-left"></i> 生產看板</button>'
+        + '<span style="color:#a78bfa; font-weight:bold; font-size:1rem;"><i class="fas fa-diagram-project"></i> 專案看板</span>'
+        + '<button onclick="openManualOrderModal()" style="background:#7c3aed; color:#fff; border:none; padding:9px 18px; border-radius:8px; cursor:pointer; font-weight:bold; font-size:0.9rem;"><i class="fas fa-plus"></i> 建立單據</button>'
+        + '</div>';
+    var cols = '<div class="kanban-columns-container">';
+    stages.forEach(function (s) {
+        cols += '<div class="kanban-column"><div class="column-header" style="background:#6d28d9;"><span>' + s.label + '</span><span class="count-badge" id="pcount-' + s.key + '">0</span></div><div class="column-body" id="pcol-' + s.key + '"></div></div>';
+    });
+    cols += '</div>';
+    board.innerHTML = top + cols;
+    var counts = {};
+    (data || []).forEach(function (o) {
+        var st = o.status;
+        var found = false;
+        for (var i = 0; i < stages.length; i++) if (stages[i].key === st) { found = true; break; }
+        if (!found) st = 'p_quote'; // 舊的或非專案狀態 → 丟報價中
+        var bodyEl = document.getElementById('pcol-' + st);
+        if (bodyEl) { counts[st] = (counts[st] || 0) + 1; bodyEl.appendChild(window.createProjectCard(o)); }
+    });
+    stages.forEach(function (s) { var c = document.getElementById('pcount-' + s.key); if (c) c.innerText = counts[s.key] || 0; });
+};
+
+window.createProjectCard = function (order) {
+    var el = document.createElement('div');
+    el.className = 'kanban-card';
+    el.style.borderLeft = '4px solid #7c3aed';
+    var opts = window.PROJECT_STAGES.map(function (s) { return '<option value="' + s.key + '"' + (s.key === order.status ? ' selected' : '') + '>' + s.label + '</option>'; }).join('');
+    var tagChip = (window.orderTagChip ? window.orderTagChip(order.orderTag) : '');
+    var priceTxt = (typeof formatPrice === 'function' ? formatPrice(order.total) : ('NT$ ' + order.total));
+    el.innerHTML =
+        '<div class="card-header"><div class="card-meta"><span class="card-no" style="background:#7c3aed; color:#fff;">' + (order.projectId || 'M') + '</span>' + tagChip + '</div></div>'
+        + '<div class="card-body"><div class="card-title">' + (order.name || '') + '</div>'
+        + '<div class="card-main-content"><div class="card-contact">'
+        + '<div class="card-info"><i class="fas fa-phone-alt"></i> ' + (order.phone || '') + '</div>'
+        + (order.salesperson ? '<div class="card-info"><i class="fas fa-user-tie"></i> ' + order.salesperson + '</div>' : '')
+        + '</div><div class="card-price-container"><div class="card-price">' + priceTxt + '</div></div></div></div>';
+    var cb = el.querySelector('.card-body');
+    if (cb) cb.onclick = function () { if (typeof viewOrder === 'function') viewOrder(order); };
+    var footer = document.createElement('div');
+    footer.style.cssText = 'padding:8px 10px; border-top:1px solid rgba(255,255,255,0.08);';
+    footer.innerHTML = '<select style="width:100%; padding:6px; font-size:0.85rem; border-radius:6px;">' + opts + '</select>';
+    var sel = footer.querySelector('select');
+    sel.addEventListener('change', function () { window.changeProjectStage(order.timestamp, sel.value); });
+    sel.style.setProperty('color', '#1e293b', 'important');
+    sel.style.setProperty('-webkit-text-fill-color', '#1e293b', 'important');
+    sel.style.setProperty('background', '#ffffff', 'important');
+    el.appendChild(footer);
+    return el;
+};
+
+window.changeProjectStage = function (orderId, newStatus) {
+    var target = (typeof ordersData !== 'undefined' && ordersData) ? ordersData.find(function (o) { return String(o.timestamp) === String(orderId); }) : null;
+    if (target) target.status = newStatus;
+    if (typeof window.persistOrderStatus === 'function') {
+        window.persistOrderStatus(orderId, newStatus, target); // 只存狀態+POST，最安全
+    }
+    if (typeof applyFilter === 'function') applyFilter(); // 重繪讓卡片移到新欄
+};
+
 // [第3片] 手動建單（後台自建紀錄單，M 前綴、不碰庫存）
 window.normPhoneAdmin = function (raw) {
     var s = String(raw == null ? '' : raw).replace(/[０-９]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0xFEE0); }).replace(/＋/g, '+');
@@ -2490,8 +2580,9 @@ window.openManualOrderModal = function () {
         + '<div style="margin-top:8px;"><label style="' + lb + '">地址（選填）</label><input id="m-address" class="form-input" style="' + fi + '"></div>'
         + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">'
         + '  <div><label style="' + lb + '">單別標籤</label><select id="m-tag" class="form-input" style="' + fi + '"><option value="專案">專案</option><option value="普通">普通單</option><option value="急件">急件</option><option value="大量">大量</option></select></div>'
-        + '  <div><label style="' + lb + '">建單狀態</label><select id="m-status" class="form-input" style="' + fi + '"><option value="unquoted">待報價</option><option value="quoted">已報價</option><option value="paid">已收款</option><option value="shipping">進行中/待出貨</option><option value="completed">已完成</option></select></div>'
+        + '  <div><label style="' + lb + '">建單狀態</label><select id="m-status" class="form-input" style="' + fi + '"><option value="p_quote">報價中</option><option value="p_deal">已成交</option><option value="p_prep">備料/發包</option><option value="p_doing">進行中</option><option value="p_check">驗收</option><option value="p_done">結案</option><option value="p_cancel">已取消</option></select></div>'
         + '</div>'
+        + '<div style="margin-top:8px;"><label style="' + lb + '">業務員（誰接的案子）</label><input id="m-sales" class="form-input" style="' + fi + '" placeholder="業務員姓名"></div>'
         + '<div style="margin-top:8px;"><label style="' + lb + '">品項內容（自由填：自家料/外購/外包都可）</label><textarea id="m-items" class="form-input" rows="4" style="' + fi + '" placeholder="例：&#10;鋁料 4040 x6支（自製）&#10;木心板 x3（外購）&#10;CNC加工發包 x1"></textarea></div>'
         + '<div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:8px;">'
         + '  <div><label style="' + lb + '">總價 *</label><input id="m-total" class="form-input" type="number" style="' + fi + '"></div>'
@@ -2517,7 +2608,8 @@ window.submitManualOrder = function (btn) {
     if (!total) { if (!confirm('總價為 0，確定嗎？')) return; }
     var company = v('m-company'), taxid = v('m-taxid'), email = v('m-email');
     var delivery = v('m-delivery'), address = v('m-address'), tag = v('m-tag') || '專案';
-    var status = v('m-status') || 'unquoted', items = v('m-items'), note = v('m-note');
+    var status = v('m-status') || 'p_quote', items = v('m-items'), note = v('m-note');
+    var sales = v('m-sales');
     var BR = '<br>';
     var noteParts = [];
     if (company) noteParts.push('【公司】' + company);
@@ -2532,7 +2624,8 @@ window.submitManualOrder = function (btn) {
         detailsText: details,
         totalEst: total,
         status: status,
-        orderTag: tag
+        orderTag: tag,
+        salesperson: sales
     };
     fetch(ADMIN_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) })
         .then(function () {
