@@ -1612,7 +1612,8 @@ function applyFilter() {
     // Auto-Scroll Logic
     if (window.lastActiveOrderId) {
         setTimeout(() => {
-            const card = document.querySelector(`.kanban - card[data - id="${window.lastActiveOrderId}"]`);
+            let card = null;
+            try { card = document.querySelector('.kanban-card[data-id="' + window.lastActiveOrderId + '"]'); } catch (e) { card = null; }
             if (card) {
                 card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
                 // Add highlight effect?
@@ -3379,7 +3380,7 @@ window.viewOrder = function (order) {
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span style="font-size:0.78rem; color:#666;">工時 ${order.leadDays || '-'} 天</span>
                     <span style="font-size:0.78rem; color:#666; margin-left:4px;">預計完成</span>
-                    <input type="date" id="card-due-input" value="${order.dueDate || ''}" onchange="saveCardDue('${order.timestamp}')" style="padding:5px 8px; border:1px solid #bae6fd; border-radius:4px; font-size:0.8rem;">
+                    <input type="date" id="card-due-input" value="${window.toYMD ? window.toYMD(order.dueDate) : (order.dueDate || '')}" onchange="saveCardDue('${order.timestamp}')" style="padding:5px 8px; border:1px solid #bae6fd; border-radius:4px; font-size:0.8rem;">
                     <button onclick="startDueFromToday('${order.timestamp}', ${Number(order.leadDays) || 0})" style="font-size:0.75rem; padding:5px 10px; background:#0284c7; color:#fff; border:none; border-radius:5px; cursor:pointer;"><i class="fas fa-play"></i> 款到→起算 (今天+${Number(order.leadDays) || 0}天)</button>
                 </div>
                 <div style="font-size:0.68rem; color:#94a3b8; margin-top:5px;">款到才按「起算」；完成日可手動改，改了就固定、不隨階段變。</div>
@@ -3522,10 +3523,23 @@ window.fmtDate = function (d) {
     if (day.length < 2) day = '0' + day;
     return y + '-' + m + '-' + day;
 };
-window.fmtDueShort = function (d) {
+window.toYMD = function (d) {
     if (!d) return '';
-    var p = String(d).split('-');
-    return p.length === 3 ? (Number(p[1]) + '/' + Number(p[2])) : String(d);
+    var s = String(d);
+    var m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); // 抓開頭的 YYYY-MM-DD 或 YYYY/MM/DD（可含後面的時間）
+    if (m) {
+        var mm = m[2].length < 2 ? '0' + m[2] : m[2];
+        var dd = m[3].length < 2 ? '0' + m[3] : m[3];
+        return m[1] + '-' + mm + '-' + dd;
+    }
+    var dt = new Date(s);
+    return isNaN(dt.getTime()) ? '' : window.fmtDate(dt);
+};
+window.fmtDueShort = function (d) {
+    var ymd = window.toYMD(d);
+    if (!ymd) return '';
+    var p = ymd.split('-');
+    return Number(p[1]) + '/' + Number(p[2]);
 };
 window._saveDue = function (orderId, due) {
     var target = (typeof ordersData !== 'undefined' && ordersData) ? ordersData.find(function (o) { return String(o.timestamp) === String(orderId); }) : null;
