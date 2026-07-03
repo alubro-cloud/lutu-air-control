@@ -155,44 +155,52 @@ window.showPriceModal = function (order, nextStatus) {
                 <span style="font-size:1.2rem; font-weight:bold; color:var(--primary);">NT$ <span id="quote-sys-total">${formatPrice(sysTotal).replace('NT$','').trim()}</span></span>
             </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
-                <!-- 成本區 (不對外顯示) -->
-                <div style="background:#fff1f2; padding:15px; border-radius:8px; border:1px dashed #fecdd3;">
-                    <h4 style="margin:0 0 10px 0; color:#e11d48; font-size:0.95rem;"><i class="fas fa-eye-slash"></i> 內部成本區 (會計用)</h4>
-                    <div style="margin-bottom:10px;">
-                        <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">外購進貨成本 (板材/五金等)</label>
-                        <!-- 新增：輸入成本自動算出 1.2倍 -->
-                        <input type="number" id="quote-cost-input" value="${prevCost}" oninput="document.getElementById('quote-outsource-input').value = Math.ceil((this.value || 0) * 1.2); updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #fecdd3; border-radius:4px; outline:none; font-size:1.1rem; text-align:right;">
-                    </div>
+            <!-- 外購/外包明細小表（客戶只看合計；內部看逐項） -->
+            <div style="background:#fff8f1; padding:14px 15px; border-radius:8px; border:1px dashed #fed7aa; margin-bottom:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <h4 style="margin:0; color:#c2410c; font-size:0.95rem;"><i class="fas fa-list-ul"></i> 外購 / 外包明細 <span style="font-weight:normal; font-size:0.76rem; color:#a8a29e;">（客戶報價只顯示合計）</span></h4>
+                    <button type="button" onclick="addExtRow()" style="font-size:0.8rem; padding:5px 12px; background:#c2410c; color:#fff; border:none; border-radius:6px; cursor:pointer;"><i class="fas fa-plus"></i> 新增一列</button>
                 </div>
+                <datalist id="ext-cat-list">
+                    <option value="外購物料"></option><option value="木心板"></option><option value="五金"></option><option value="CNC加工"></option><option value="陽極處理"></option><option value="壓克力"></option><option value="外包代工"></option><option value="消耗品"></option>
+                </datalist>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="color:#9a3412; font-size:0.72rem;">
+                                <th style="padding:3px 4px; text-align:left; font-weight:600;">類別</th>
+                                <th style="padding:3px 4px; text-align:left; font-weight:600;">品名</th>
+                                <th style="padding:3px 4px; text-align:right; font-weight:600; width:50px;">數量</th>
+                                <th style="padding:3px 4px; text-align:right; font-weight:600; width:82px;">單位成本</th>
+                                <th style="padding:3px 4px; text-align:right; font-weight:600; width:82px;">單位售價</th>
+                                <th style="width:26px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="ext-rows-body"></tbody>
+                    </table>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:22px; margin-top:8px; font-size:0.82rem;">
+                    <span style="color:#e11d48;">成本合計 NT$ <b id="ext-cost-sum">0</b></span>
+                    <span style="color:#16a34a;">售價合計 NT$ <b id="ext-price-sum">0</b>（計入報價）</span>
+                </div>
+                <input type="hidden" id="quote-cost-input" value="${prevCost}">
+                <input type="hidden" id="quote-outsource-input" value="${prevOutsource}">
+            </div>
 
-                <!-- 報價區 (向客收費) -->
-                <div style="background:#f0fdf4; padding:15px; border-radius:8px; border:1px dashed #bbf7d0;">
-                    <h4 style="margin:0 0 10px 0; color:#16a34a; font-size:0.95rem;"><i class="fas fa-file-invoice-dollar"></i> 向客收費區 (給客人的報價)</h4>
-                    
-                    <div style="margin-bottom:10px;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:4px;">
-                            <label style="font-size:0.8rem; color:#888;">外購品報價 (預設 1.2倍)</label>
-                            <!-- 變成平轉按鈕 -->
-                            <button onclick="document.getElementById('quote-outsource-input').value = document.getElementById('quote-cost-input').value || 0; updateQuotePreview();" style="font-size:0.75rem; padding:2px 8px; background:#e2e8f0; border:none; border-radius:4px; cursor:pointer;">平轉 (原價)</button>
-                        </div>
-                        <input type="number" id="quote-outsource-input" value="${prevOutsource}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.1rem; text-align:right;">
-                    </div>
-
-                    <div style="margin-bottom:10px;">
+            <!-- 加工 / 運費 / 折扣 -->
+            <div style="background:#f0fdf4; padding:15px; border-radius:8px; border:1px dashed #bbf7d0; margin-bottom:15px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+                    <div>
                         <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">加工與組裝費</label>
-                        <input type="number" id="quote-assembly-input" value="${prevAssembly}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.1rem; text-align:right;">
+                        <input type="number" id="quote-assembly-input" value="${prevAssembly}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.05rem; text-align:right;">
                     </div>
-
-                    <div style="margin-bottom:10px;">
+                    <div>
                         <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">向客收運費</label>
-                        <input type="number" id="quote-shipping-input" value="${prevShipping}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.1rem; text-align:right;">
+                        <input type="number" id="quote-shipping-input" value="${prevShipping}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #bbf7d0; border-radius:4px; outline:none; font-size:1.05rem; text-align:right;">
                     </div>
-                    
-                    <!-- 新增：折扣優惠框 -->
-                    <div style="margin-bottom:10px;">
-                        <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#e11d48; font-weight:bold;">折扣優惠 (減去金額)</label>
-                        <input type="number" id="quote-discount-input" value="${prevDiscount}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #fecdd3; border-radius:4px; outline:none; font-size:1.1rem; text-align:right; color:#e11d48; background:#fff1f2;" placeholder="例如: 1100">
+                    <div>
+                        <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#e11d48; font-weight:bold;">折扣優惠</label>
+                        <input type="number" id="quote-discount-input" value="${prevDiscount}" oninput="updateQuotePreview()" style="width:100%; padding:8px; border:1px solid #fecdd3; border-radius:4px; outline:none; font-size:1.05rem; text-align:right; color:#e11d48; background:#fff1f2;" placeholder="例:1100">
                     </div>
                 </div>
             </div>
@@ -264,6 +272,88 @@ window.showPriceModal = function (order, nextStatus) {
         let profit = (outsource - cost) + assembly; 
         document.getElementById('quote-profit-preview').innerText = profit.toLocaleString();
     };
+
+    // ===== 外購/外包明細小表 =====
+    window._quoteExtRows = [];
+    var escAttr = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); };
+    window.recomputeExt = function () {
+        var costSum = 0, priceSum = 0;
+        (window._quoteExtRows || []).forEach(function (r) {
+            var q = Number(r.qty) || 0;
+            costSum += (Number(r.cost) || 0) * q;
+            priceSum += (Number(r.price) || 0) * q;
+        });
+        var cEl = document.getElementById('quote-cost-input');
+        var oEl = document.getElementById('quote-outsource-input');
+        if (cEl) cEl.value = Math.round(costSum);
+        if (oEl) oEl.value = Math.round(priceSum);
+        var cs = document.getElementById('ext-cost-sum'); if (cs) cs.innerText = Math.round(costSum).toLocaleString();
+        var ps = document.getElementById('ext-price-sum'); if (ps) ps.innerText = Math.round(priceSum).toLocaleString();
+        if (window.updateQuotePreview) window.updateQuotePreview();
+    };
+    window.renderExtRows = function () {
+        var body = document.getElementById('ext-rows-body');
+        if (!body) return;
+        if (!window._quoteExtRows.length) {
+            body.innerHTML = '<tr><td colspan="6" style="padding:10px 6px; color:#a8a29e; text-align:center; font-size:0.82rem;">尚無外購項目 — 按「新增一列」開始</td></tr>';
+        } else {
+            var inS = 'width:100%; padding:5px 6px; border:1px solid #e7e5e4; border-radius:4px; font-size:0.82rem; outline:none;';
+            body.innerHTML = window._quoteExtRows.map(function (r, i) {
+                return '<tr>'
+                    + '<td style="padding:2px 3px;"><input data-i="' + i + '" data-f="category" list="ext-cat-list" value="' + escAttr(r.category) + '" placeholder="類別" style="' + inS + '"></td>'
+                    + '<td style="padding:2px 3px;"><input data-i="' + i + '" data-f="name" value="' + escAttr(r.name) + '" placeholder="品名" style="' + inS + '"></td>'
+                    + '<td style="padding:2px 3px;"><input data-i="' + i + '" data-f="qty" type="number" value="' + escAttr(r.qty) + '" style="' + inS + ' text-align:right;"></td>'
+                    + '<td style="padding:2px 3px;"><input data-i="' + i + '" data-f="cost" type="number" value="' + escAttr(r.cost) + '" style="' + inS + ' text-align:right;"></td>'
+                    + '<td style="padding:2px 3px;"><input data-i="' + i + '" data-f="price" type="number" value="' + escAttr(r.price) + '" style="' + inS + ' text-align:right;"></td>'
+                    + '<td style="padding:2px 3px; text-align:center;"><button type="button" data-del="' + i + '" title="刪除" style="background:none; border:none; color:#ef4444; cursor:pointer;"><i class="fas fa-times"></i></button></td>'
+                    + '</tr>';
+            }).join('');
+        }
+        if (!body._extBound) {
+            body._extBound = true;
+            body.addEventListener('input', function (e) {
+                var t = e.target;
+                if (!t || t.dataset == null || t.dataset.i === undefined) return;
+                var i = Number(t.dataset.i), f = t.dataset.f;
+                if (window._quoteExtRows[i]) { window._quoteExtRows[i][f] = t.value; window.recomputeExt(); }
+            });
+            body.addEventListener('click', function (e) {
+                var b = e.target.closest ? e.target.closest('[data-del]') : null;
+                if (!b) return;
+                window.removeExtRow(Number(b.dataset.del));
+            });
+        }
+    };
+    window.addExtRow = function () {
+        window._quoteExtRows.push({ category: '', name: '', qty: 1, cost: '', price: '' });
+        window.renderExtRows(); window.recomputeExt();
+    };
+    window.removeExtRow = function (i) {
+        window._quoteExtRows.splice(i, 1);
+        window.renderExtRows(); window.recomputeExt();
+    };
+    // 種子：舊單用既有 K/L 值墊底，避免存回把外購清成 0
+    if ((prevCost && prevCost > 0) || (prevOutsource && prevOutsource > 0)) {
+        window._quoteExtRows = [{ category: '外購', name: '(既有外購)', qty: 1, cost: prevCost || 0, price: prevOutsource || 0 }];
+    }
+    window.renderExtRows();
+    window.recomputeExt();
+    // 非同步載入這張單已存的逐項明細（有的話取代種子）
+    (function () {
+        try {
+            fetch(ADMIN_API_URL + '?action=getExtItems&orderId=' + encodeURIComponent(order.timestamp) + '&t=' + Date.now())
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    if (j && j.status === 'success' && j.items && j.items.length) {
+                        window._quoteExtRows = j.items.map(function (it) {
+                            return { category: it.category || '', name: it.name || '', qty: (it.qty == null ? 1 : it.qty), cost: (it.cost == null ? '' : it.cost), price: (it.price == null ? '' : it.price) };
+                        });
+                        window.renderExtRows(); window.recomputeExt();
+                    }
+                })
+                .catch(function (e) { console.warn('getExtItems failed', e); });
+        } catch (e) { console.warn(e); }
+    })();
 
     // 觸發第一次計算
     window.updateQuotePreview();
@@ -345,6 +435,7 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
         target.discountAmount = discount;
         target.taxType = taxType;
         target.taxAmount = taxAmount;
+        target.extItems = (window._quoteExtRows || []).slice();
 
         applyFilter();
         window.lastActiveOrderId = orderId;
@@ -367,7 +458,8 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
                 taxAmount: taxAmount,
                 discountAmount: discount,
                 sysTotal: sysTotal,
-                projectId: target.projectId
+                projectId: target.projectId,
+                extItems: (window._quoteExtRows || []).filter(function (r) { return (r.name || r.category || Number(r.cost) || Number(r.price)); }).map(function (r) { return { category: r.category || '', name: r.name || '', qty: Number(r.qty) || 0, cost: Number(r.cost) || 0, price: Number(r.price) || 0 }; })
             })
         }).then(() => console.log('Advanced price update sent to backend'))
           .catch(e => console.error('Failed to update backend price', e));
