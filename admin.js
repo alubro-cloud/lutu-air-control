@@ -169,7 +169,6 @@ window.showPriceModal = function (order, nextStatus) {
                         <option value="普通">普通單</option>
                         <option value="急件">急件</option>
                         <option value="大量">大量</option>
-                        <option value="專案">專案</option>
                     </select>
                 </div>
                 <div style="background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
@@ -2529,7 +2528,9 @@ window.createProjectCard = function (order) {
         + '<div class="card-main-content"><div class="card-contact">'
         + '<div class="card-info"><i class="fas fa-phone-alt"></i> ' + (order.phone || '') + '</div>'
         + (order.salesperson ? '<div class="card-info"><i class="fas fa-user-tie"></i> ' + order.salesperson + '</div>' : '')
-        + '</div><div class="card-price-container"><div class="card-price">' + priceTxt + '</div></div></div></div>';
+        + '</div><div class="card-price-container"><div class="card-price">' + priceTxt + '</div></div></div>'
+        + (order.dueDate ? '<div style="font-size:0.74rem; color:#0369a1; margin-top:5px; font-weight:bold;"><i class="fas fa-flag-checkered"></i> 預計完成 ' + (window.fmtDueShort ? window.fmtDueShort(order.dueDate) : order.dueDate) + '</div>' : '')
+        + '</div>';
     var cb = el.querySelector('.card-body');
     if (cb) cb.onclick = function () { if (typeof viewOrder === 'function') viewOrder(order); };
     var footer = document.createElement('div');
@@ -2816,6 +2817,7 @@ function createCard(order, index, currentStatus) {
         <div class="card-meta">
             <span class="card-no" style="background:${tagColor}; color:#fff;">${index}</span>
             ${_isManual ? '<span class="card-tag" style="background:#ede9fe; color:#6d28d9; font-weight:bold;">自建</span>' : ''}
+            ${(!_isManual && window.orderTagChip) ? window.orderTagChip(order.orderTag) : ''}
         </div>
         ${tag}
     </div>
@@ -2834,6 +2836,7 @@ function createCard(order, index, currentStatus) {
                 </div>
             </div>
         </div>
+        ${order.dueDate ? `<div style="font-size:0.74rem; color:#0369a1; margin-top:5px; font-weight:bold;"><i class="fas fa-flag-checkered"></i> 預計完成 ${window.fmtDueShort ? window.fmtDueShort(order.dueDate) : order.dueDate}</div>` : ''}
     </div>
 
     ${window.renderOrderMeta ? window.renderOrderMeta(order) : ''}
@@ -3518,6 +3521,11 @@ window.fmtDate = function (d) {
     if (m.length < 2) m = '0' + m;
     if (day.length < 2) day = '0' + day;
     return y + '-' + m + '-' + day;
+};
+window.fmtDueShort = function (d) {
+    if (!d) return '';
+    var p = String(d).split('-');
+    return p.length === 3 ? (Number(p[1]) + '/' + Number(p[2])) : String(d);
 };
 window._saveDue = function (orderId, due) {
     var target = (typeof ordersData !== 'undefined' && ordersData) ? ordersData.find(function (o) { return String(o.timestamp) === String(orderId); }) : null;
@@ -8956,7 +8964,25 @@ function _omApply(id, patch) {
     if (el && t) el.outerHTML = window.renderOrderMeta(t);
 }
 window.setMetaType = function (id, v) { _omApply(id, { customerType: v }); };
-window.setMetaPay = function (id, v) { _omApply(id, { paymentStatus: v }); };
+window.setMetaPay = function (id, v) {
+    _omApply(id, { paymentStatus: v });
+    // [自動交期] 收款（訂金/已付清）時：有工時、且尚無完成日 → 自動算完成日（今天+工時，跳六日）。
+    //   已有完成日則不覆蓋（尊重已排好/已答應客戶的日期）；沒工時則不算。
+    if (v === '收訂金' || v === '已付清') {
+        var t = ordersData.find(function (o) { return String(o.timestamp) === String(id); });
+        if (t) {
+            var lead = Number(t.leadDays) || 0;
+            var hasDue = t.dueDate && String(t.dueDate).trim() !== '';
+            if (lead > 0 && !hasDue && window.addWorkdays && window.fmtDate && window._saveDue) {
+                var due = window.fmtDate(window.addWorkdays(new Date(), lead));
+                window._saveDue(id, due);
+                var de = document.getElementById('card-due-input');
+                if (de) de.value = due;
+                if (typeof applyFilter === 'function') applyFilter(); // 重繪讓卡片顯示完成日
+            }
+        }
+    }
+};
 window.toggleMetaSign = function (id) {
     var t = ordersData.find(function (o) { return String(o.timestamp) === String(id); });
     var cur = t ? (window.getMeta(t).signedBack === '已回簽') : false;
