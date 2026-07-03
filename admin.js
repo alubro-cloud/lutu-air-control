@@ -145,6 +145,12 @@ window.showPriceModal = function (order, nextStatus) {
     let prevShipping = target.shippingFee || 0;
     let prevDiscount = target.discountAmount || 0; // 新增折扣欄位
     let prevTaxType = target.taxType || 'inclusive';
+    // [第2片] 單別標籤 / 工時（預設：普通5 急件3 大量12 專案手動）
+    let _leadDefault = { '普通': 5, '急件': 3, '大量': 12, '專案': '' };
+    let prevOrderTag = target.orderTag || '普通';
+    let prevLeadDays = (target.leadDays === '' || target.leadDays == null)
+        ? (_leadDefault[prevOrderTag] === undefined ? '' : _leadDefault[prevOrderTag])
+        : target.leadDays;
 
     modalBody.innerHTML = `
         <div style="padding:15px 25px; text-align:left; color:var(--text);">
@@ -153,6 +159,23 @@ window.showPriceModal = function (order, nextStatus) {
             <div style="background:#f8fafc; padding:15px; border-radius:8px; margin-bottom:15px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:bold; color:#64748b;">系統料件小計 (鋁材/自家配件)</span>
                 <span style="font-size:1.2rem; font-weight:bold; color:var(--primary);">NT$ <span id="quote-sys-total">${formatPrice(sysTotal).replace('NT$','').trim()}</span></span>
+            </div>
+
+            <!-- 單別標籤 + 預計工時 -->
+            <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:12px; margin-bottom:15px;">
+                <div style="background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                    <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">單別標籤（自動帶工時）</label>
+                    <select id="quote-tag-input" onchange="onQuoteTagChange()" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.95rem; background:#fff;">
+                        <option value="普通">普通單</option>
+                        <option value="急件">急件</option>
+                        <option value="大量">大量</option>
+                        <option value="專案">專案</option>
+                    </select>
+                </div>
+                <div style="background:#f8fafc; padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;">
+                    <label style="display:block; font-size:0.8rem; margin-bottom:4px; color:#888;">預計工時（工作天）</label>
+                    <input type="number" id="quote-lead-input" value="${prevLeadDays}" min="0" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px; font-size:0.95rem; text-align:right;">
+                </div>
             </div>
 
             <!-- 外購/外包明細小表（客戶只看合計；內部看逐項） -->
@@ -355,6 +378,19 @@ window.showPriceModal = function (order, nextStatus) {
         } catch (e) { console.warn(e); }
     })();
 
+    // ===== 單別標籤 / 工時 =====
+    window._LEAD_BY_TAG = { '普通': 5, '急件': 3, '大量': 12, '專案': '' };
+    window.onQuoteTagChange = function () {
+        var t = (document.getElementById('quote-tag-input') || {}).value;
+        var d = window._LEAD_BY_TAG[t];
+        var el = document.getElementById('quote-lead-input');
+        if (el && d !== '' && d !== undefined) el.value = d; // 專案不自動帶，讓使用者填
+    };
+    (function () {
+        var tagEl = document.getElementById('quote-tag-input');
+        if (tagEl) tagEl.value = (target.orderTag || '普通');
+    })();
+
     // 觸發第一次計算
     window.updateQuotePreview();
 
@@ -411,6 +447,9 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
     let shipping = parseInt(document.getElementById('quote-shipping-input').value) || 0;
     let discount = parseInt(document.getElementById('quote-discount-input').value) || 0;
     let taxType = document.querySelector('input[name="tax_type"]:checked').value;
+    let orderTag = (document.getElementById('quote-tag-input') || {}).value || '';
+    let leadDays = parseInt((document.getElementById('quote-lead-input') || {}).value);
+    if (isNaN(leadDays)) leadDays = '';
 
     if (shipping === 0) {
         if (!confirm("運費為 0，確定是免運嗎？")) return;
@@ -436,6 +475,8 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
         target.taxType = taxType;
         target.taxAmount = taxAmount;
         target.extItems = (window._quoteExtRows || []).slice();
+        target.orderTag = orderTag;
+        target.leadDays = leadDays;
 
         applyFilter();
         window.lastActiveOrderId = orderId;
@@ -459,6 +500,8 @@ window.confirmQuotePrice = function (orderId, nextStatus) {
                 discountAmount: discount,
                 sysTotal: sysTotal,
                 projectId: target.projectId,
+                orderTag: orderTag,
+                leadDays: leadDays,
                 extItems: (window._quoteExtRows || []).filter(function (r) { return (r.name || r.category || Number(r.cost) || Number(r.price)); }).map(function (r) { return { category: r.category || '', name: r.name || '', qty: Number(r.qty) || 0, cost: Number(r.cost) || 0, price: Number(r.price) || 0 }; })
             })
         }).then(() => console.log('Advanced price update sent to backend'))
@@ -3121,6 +3164,21 @@ window.viewOrder = function (order) {
                     <span style="font-size:1.05rem; color:var(--accent-delivery);">NT$ ${order.total} <span style="font-size:0.75em; color:#888; font-weight:normal;">${(order.taxType === '外加 5%' || order.taxType === 'exclusive') ? '(含 5% 外加稅)' : (order.taxType === 'inclusive' ? '(含稅價)' : '')}</span></span>
                 </div>
             </div>` : ''}
+
+            <!-- [第2片] 交期 -->
+            <div style="margin-top:10px; padding:12px; background:#f0f9ff; border-radius:6px; border:1px solid #bae6fd;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:0.85rem; font-weight:bold; color:#0369a1;"><i class="fas fa-truck-loading"></i> 交期</span>
+                    ${window.orderTagChip ? window.orderTagChip(order.orderTag) : ''}
+                </div>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span style="font-size:0.78rem; color:#666;">工時 ${order.leadDays || '-'} 天</span>
+                    <span style="font-size:0.78rem; color:#666; margin-left:4px;">預計完成</span>
+                    <input type="date" id="card-due-input" value="${order.dueDate || ''}" onchange="saveCardDue('${order.timestamp}')" style="padding:5px 8px; border:1px solid #bae6fd; border-radius:4px; font-size:0.8rem;">
+                    <button onclick="startDueFromToday('${order.timestamp}', ${Number(order.leadDays) || 0})" style="font-size:0.75rem; padding:5px 10px; background:#0284c7; color:#fff; border:none; border-radius:5px; cursor:pointer;"><i class="fas fa-play"></i> 款到→起算 (今天+${Number(order.leadDays) || 0}天)</button>
+                </div>
+                <div style="font-size:0.68rem; color:#94a3b8; margin-top:5px;">款到才按「起算」；完成日可手動改，改了就固定、不隨階段變。</div>
+            </div>
         </div>
 
         <hr style="border:0; border-top:1px dashed #ddd; margin: 8px 0;">
@@ -3225,6 +3283,55 @@ window.renderCardExtDetail = function (order) {
             .then(function (j) { paint(j && j.items ? j.items : []); })
             .catch(function () { host.innerHTML = ''; });
     } catch (e) { host.innerHTML = ''; }
+};
+
+// [第2片] 交期輔助：單別標籤色塊、工作天加減、卡片存完成日
+window.orderTagChip = function (tag) {
+    var m = { '普通': ['普通單', '#e2e8f0', '#475569'], '急件': ['急件', '#fee2e2', '#b91c1c'], '大量': ['大量', '#fef3c7', '#92400e'], '專案': ['專案', '#ede9fe', '#6d28d9'] };
+    var t = m[tag];
+    if (!t) return '';
+    return '<span style="font-size:0.72rem; padding:2px 10px; border-radius:999px; background:' + t[1] + '; color:' + t[2] + '; font-weight:bold;">' + t[0] + '</span>';
+};
+window.addWorkdays = function (startDate, n) {
+    var d = new Date(startDate);
+    var added = 0, guard = 0;
+    while (added < n && guard < 1000) {
+        d.setDate(d.getDate() + 1);
+        var wd = d.getDay();
+        if (wd !== 0 && wd !== 6) added++;
+        guard++;
+    }
+    return d;
+};
+window.fmtDate = function (d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1);
+    var day = String(d.getDate());
+    if (m.length < 2) m = '0' + m;
+    if (day.length < 2) day = '0' + day;
+    return y + '-' + m + '-' + day;
+};
+window._saveDue = function (orderId, due) {
+    var target = (typeof ordersData !== 'undefined' && ordersData) ? ordersData.find(function (o) { return String(o.timestamp) === String(orderId); }) : null;
+    if (target) target.dueDate = due;
+    try {
+        fetch(ADMIN_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'updateOrderPrice', orderId: orderId, dueDate: due }) })
+            .catch(function (e) { console.warn('save due failed', e); });
+    } catch (e) { console.warn(e); }
+    if (typeof window.showToast === 'function') window.showToast('預計完成日：' + (due || '(清除)'));
+};
+window.saveCardDue = function (orderId) {
+    var el = document.getElementById('card-due-input');
+    if (!el) return;
+    window._saveDue(orderId, el.value || '');
+};
+window.startDueFromToday = function (orderId, leadDays) {
+    var n = Number(leadDays) || 0;
+    if (!n) { alert('這張單還沒設定工時，請先在報價面板選單別/填工時。'); return; }
+    var due = window.fmtDate(window.addWorkdays(new Date(), n));
+    var el = document.getElementById('card-due-input');
+    if (el) el.value = due;
+    window._saveDue(orderId, due);
 };
 
 const PRODUCT_MAP = {
