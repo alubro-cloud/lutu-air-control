@@ -332,6 +332,13 @@ window.showPriceModal = function (order, nextStatus) {
                     + '</tr>';
             }).join('');
         }
+        // 強制上色：用 JS setProperty important，壓過 admin.css 對 modal input 的 !important 白字
+        var _exi = body.querySelectorAll('input');
+        for (var _ei = 0; _ei < _exi.length; _ei++) {
+            _exi[_ei].style.setProperty('color', '#1e293b', 'important');
+            _exi[_ei].style.setProperty('-webkit-text-fill-color', '#1e293b', 'important');
+            _exi[_ei].style.setProperty('background', '#ffffff', 'important');
+        }
         if (!body._extBound) {
             body._extBound = true;
             body.addEventListener('input', function (e) {
@@ -389,6 +396,21 @@ window.showPriceModal = function (order, nextStatus) {
     (function () {
         var tagEl = document.getElementById('quote-tag-input');
         if (tagEl) tagEl.value = (target.orderTag || '普通');
+        // 強制上色：壓過 admin.css 白字（只靠 JS，不依賴 CSS 檔）
+        ['quote-tag-input', 'quote-lead-input', 'quote-assembly-input', 'quote-shipping-input'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) {
+                el.style.setProperty('color', '#1e293b', 'important');
+                el.style.setProperty('-webkit-text-fill-color', '#1e293b', 'important');
+                el.style.setProperty('background', '#ffffff', 'important');
+            }
+        });
+        var dsc = document.getElementById('quote-discount-input');
+        if (dsc) {
+            dsc.style.setProperty('color', '#e11d48', 'important');
+            dsc.style.setProperty('-webkit-text-fill-color', '#e11d48', 'important');
+            dsc.style.setProperty('background', '#fff1f2', 'important');
+        }
     })();
 
     // 觸發第一次計算
@@ -3245,6 +3267,12 @@ window.viewOrder = function (order) {
     updateCheckProgress();
     modal.style.display = 'flex';
     if (window.renderCardExtDetail) window.renderCardExtDetail(order);
+    var _due = document.getElementById('card-due-input');
+    if (_due) {
+        _due.style.setProperty('color', '#1e293b', 'important');
+        _due.style.setProperty('-webkit-text-fill-color', '#1e293b', 'important');
+        _due.style.setProperty('background', '#ffffff', 'important');
+    }
 };
 
 // 卡片內部檢視：外購/外包逐項＋毛利（不對客戶顯示）。
