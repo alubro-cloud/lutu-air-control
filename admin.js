@@ -3535,6 +3535,7 @@ window._saveDue = function (orderId, due) {
             .catch(function (e) { console.warn('save due failed', e); });
     } catch (e) { console.warn(e); }
     if (typeof window.showToast === 'function') window.showToast('預計完成日：' + (due || '(清除)'));
+    if (typeof applyFilter === 'function') applyFilter(); // 存完重繪，卡片即時顯示新完成日
 };
 window.saveCardDue = function (orderId) {
     var el = document.getElementById('card-due-input');
@@ -8978,7 +8979,6 @@ window.setMetaPay = function (id, v) {
                 window._saveDue(id, due);
                 var de = document.getElementById('card-due-input');
                 if (de) de.value = due;
-                if (typeof applyFilter === 'function') applyFilter(); // 重繪讓卡片顯示完成日
             }
         }
     }
