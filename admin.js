@@ -1775,8 +1775,20 @@ function roundToHalf(num) {
     return Math.floor(num * 2) / 2; // Floor to avoid over-estimating stock
 }
 
+// ============================================================
+// [第3批] 切料規則常數 —— 演算法內部單位一律「cm」；前台/顯示用「mm」。cm × 10 = mm。
+// 每個常數都標單位，避免 mm/cm 混淆（填錯一個，一支料長度就崩）。
+// ============================================================
+const CUT_BAR_FULL_CM     = 600;    // cm 一支新料整支（=6000mm）。扣庫存、進貨都用這個，不變。
+const CUT_HEADTAIL_LOSS_CM = 7;     // cm 頭尾去除總損耗（=70mm：料塊60 + 鋸路10）。可切長度要減這個。
+const CUT_HEADTAIL_WASTE_CM = 6;    // cm 頭尾記入廢料的「料塊」（=60mm；鋸路粉10mm不記，抓不回來）。
+const CUT_USABLE_NEW_CM   = CUT_BAR_FULL_CM - CUT_HEADTAIL_LOSS_CM; // = 593 cm（=5930mm）新料實際可切
+const CUT_OFFCUT_MIN_CM   = 5;      // cm 餘料/廢料門檻（=50mm）。切剩 ≥5cm 入餘料、<5cm 進廢料。
+const CUT_KERF_CM         = 0.5;    // cm 鋸路（=5mm）。你的安全值（實際刀片3mm多抓2mm）。
+const CUT_HEADTAIL_MM      = 30;    // mm 頭尾各切掉（給切割圖顯示「先切30」用）。
+
 class ThinkingCutter {
-    constructor(stockLength = 600, kerf = 0.5, minWaste = 10) {
+    constructor(stockLength = CUT_BAR_FULL_CM, kerf = CUT_KERF_CM, minWaste = CUT_OFFCUT_MIN_CM) {
         this.stockLength = stockLength;
         this.kerf = kerf;
         this.minWaste = minWaste;
@@ -1883,14 +1895,16 @@ class ThinkingCutter {
                 }
             } else {
                 // Create New Stock Bin
+                // [第3批] 新料頭尾各先切30mm(瑕疵) → 可切只有 593cm(CUT_USABLE_NEW_CM)；
+                //         但顯示用整支 600cm(CUT_BAR_FULL_CM)，切割圖才畫得出頭尾損耗(畫法A)。
                 let newBin = {
                     id: `new- ${bins.length} `,
-                    length: this.stockLength,
-                    originalLength: this.stockLength,
+                    length: CUT_USABLE_NEW_CM,            // 從可切 593 開始扣
+                    originalLength: CUT_BAR_FULL_CM,      // 顯示整支 600（頭尾+可切）
                     cuts: [piece],
                     isNewStock: true
                 };
-                newBin.length = roundToHalf(this.stockLength - (piece.length + this.kerf));
+                newBin.length = roundToHalf(CUT_USABLE_NEW_CM - (piece.length + this.kerf));
                 bins.push(newBin);
             }
         });
@@ -2374,8 +2388,8 @@ function renderCuttingVisuals(bins, stockLen) {
         let remainLen = bin.length;
         if (remainLen > 0) {
             let remainPerc = (remainLen / originalLen) * 100;
-            let typeClass = remainLen < 10 ? 'waste' : 'leftover';
-            let label = remainLen < 10 ? '廢' : '餘';
+            let typeClass = remainLen < CUT_OFFCUT_MIN_CM ? 'waste' : 'leftover';   // [第3批] 門檻 5cm(=50mm)
+            let label = remainLen < CUT_OFFCUT_MIN_CM ? '廢' : '餘';
             cutsHtml += `
         <div class="cut-remain ${typeClass}" style="width:${remainPerc}%;" title="剩餘 ${(remainLen * 10).toFixed(0)}mm">
             <span class="remain-len">${label} ${(remainLen * 10).toFixed(0)}</span>
@@ -2383,12 +2397,20 @@ function renderCuttingVisuals(bins, stockLen) {
     `;
         }
 
+        // [第3批] 新料頭尾各先切30mm(瑕疵) → 畫兩條灰條(畫法A)。每條 = 頭尾損耗一半 = 3.5cm。
+        if (!isOffcut) {
+            let htPerc = ((CUT_HEADTAIL_LOSS_CM / 2) / originalLen) * 100;
+            let htBlock = `<div class="cut-headtail" style="width:${htPerc}%; background:repeating-linear-gradient(45deg,#cfcfcf,#cfcfcf 3px,#b3b3b3 3px,#b3b3b3 6px); border-right:1px dashed #888;" title="頭尾先切 ${CUT_HEADTAIL_MM}mm（陽極摩擦瑕疵，屬廢料）"></div>`;
+            cutsHtml = htBlock + cutsHtml + htBlock;
+        }
+
         let label = isOffcut ? `餘料 #${idx + 1}` : `新料 #${idx + 1}`;
+        let htNote = isOffcut ? '' : ` <span style="font-size:0.72em; color:#c0392b;">· 頭尾各先切${CUT_HEADTAIL_MM}mm</span>`;
         let bgStyle = isOffcut ? 'background:#fdf6ed; border-color:#b08850;' : 'background:#f0f4f8; border-color:#6b8db0;';
 
         html += `
     <div class="cut-row" style="${bgStyle}">
-                <div class="cut-label">${label} <span style="font-size:0.8em; color:#666;">(${originalLen * 10}mm)</span></div>
+                <div class="cut-label">${label} <span style="font-size:0.8em; color:#666;">(${originalLen * 10}mm)</span>${htNote}</div>
                 <div class="cut-bar-container">
                     ${cutsHtml}
                 </div>
@@ -6378,7 +6400,7 @@ window.runCuttingOptimization = async function () {
     });
 
     // 3. Bin Packing with Offcut Priority & Kerf Loss
-    const KERF = 0.5; // Saw blade thickness
+    const KERF = CUT_KERF_CM; // 鋸路(=5mm)，用集中常數
     let visualsHtml = '<div style="background:#fff; color:#222; padding:18px; border-radius:10px;">';
 
     // 代號對照表（A/B/C → 客戶），讓看切料表的人知道字母對哪張單
@@ -6391,6 +6413,9 @@ window.runCuttingOptimization = async function () {
             .join('');
         if (legend) visualsHtml += `<div class="cut-legend" style="font-size:0.9rem; color:#333; margin-bottom:14px; padding:8px 12px; background:#f6f7f9; border-radius:6px;"><b style="margin-right:10px;">代號對照</b>${legend}</div>`;
     }
+
+    // [第3批] 生管總表用的批次累計：本批新料支數、廢料、餘料
+    let _sumNewBars = 0, _sumWasteCM = 0, _sumOffcutCM = 0, _sumOffcutCount = 0, _sumCutCM = 0;
 
     for (let model in grouped) {
         let needs = grouped[model];
@@ -6492,11 +6517,11 @@ window.runCuttingOptimization = async function () {
             }
 
             if (!placed) {
-                // C. Open New Bar (600cm)
+                // C. Open New Bar：整支600cm(CUT_BAR_FULL_CM)，頭尾各先切30mm(瑕疵)→實際可切593cm(CUT_USABLE_NEW_CM)
                 let bin = {
                     type: 'new',
-                    capacity: 600,
-                    remain: 600,
+                    capacity: CUT_BAR_FULL_CM,      // 600 顯示整支（含頭尾）
+                    remain: CUT_USABLE_NEW_CM,      // 593 可切（頭尾已先扣）
                     cuts: []
                 };
                 bin.cuts.push(cut);
@@ -6508,6 +6533,18 @@ window.runCuttingOptimization = async function () {
         // 判定系列颜色
         // [莫蘭迪配色] 使用系統 CSS 變數確保配色統一
         let s = window.detectSeries(model);
+
+        // [第3批] 累加本模型到批次統計
+        _sumNewBars += newBarBins.length;
+        _sumWasteCM += newBarBins.length * CUT_HEADTAIL_WASTE_CM; // 頭尾料塊廢料
+        needs.forEach(c => { _sumCutCM += c.len; });
+        [...offcutBins, ...newBarBins].forEach(b => {
+            if (b.cuts.length === 0) return;              // 沒用到的餘料不算
+            let r = b.remain < 0 ? 0 : b.remain;
+            if (r >= CUT_OFFCUT_MIN_CM) { _sumOffcutCM += r; _sumOffcutCount++; }
+            else if (r > 0) { _sumWasteCM += r; }
+        });
+
         let seriesColor = 'var(--accent-20)'; // 莫蘭迪藍
         if (s === 30) seriesColor = 'var(--accent-30)'; // 莫蘭迪橘
         else if (s === 40) seriesColor = 'var(--accent-40)'; // 莫蘭迪綠
@@ -6549,19 +6586,19 @@ window.runCuttingOptimization = async function () {
         if (newBarBins.length > 0) {
             visualsHtml += `<div style="font-size:0.85rem; font-weight:bold; color:#222; margin:10px 0 5px 0;">使用新料(${newBarBins.length} 支):</div>`;
             newBarBins.forEach((bin, idx) => {
-                let remain = bin.remain;
-                let isRemCheck = remain >= 10;
+                let remain = bin.remain < 0 ? 0 : bin.remain;   // clamp（訂到剛好可切長度時可能微負）
+                let isRemCheck = remain >= CUT_OFFCUT_MIN_CM;    // [第3批] 門檻 5cm(=50mm)
 
                 visualsHtml += `<div class="cut-row" style="display:flex; flex-direction:column; margin-bottom:10px; border:1px solid ${seriesColor}; border-left:3px solid ${seriesColor}; padding:5px; border-radius:4px; background:#fff;">`;
                 let cutCounts = {};
                 bin.cuts.forEach(c => { let k = (c.len * 10) + 'mm'; cutCounts[k] = (cutCounts[k] || 0) + 1; });
                 let cutListStr = Object.keys(cutCounts).map(k => `${k} x${cutCounts[k]}`).join(', ');
                 visualsHtml += `<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; margin-bottom:5px;">`;
-                visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#222; margin-right:10px; font-size:0.95rem;">新料 #${idx + 1}（${(bin.capacity || 600) * 10}mm）</div>`;
+                visualsHtml += `<div class="bin-header" style="font-weight:bold; color:#222; margin-right:10px; font-size:0.95rem;">新料 #${idx + 1}（${(bin.capacity || CUT_BAR_FULL_CM) * 10}mm）<span style="font-size:0.8em; color:#c0392b; font-weight:bold;"> · 頭尾各先切${CUT_HEADTAIL_MM}mm</span></div>`;
                 visualsHtml += `<div style="font-size:0.85rem; color:#222; font-weight:bold; text-align:right; flex:1; min-width:200px;">切料清單: ${cutListStr}</div>`;
                 visualsHtml += `</div>`;
                 let _remColor = isRemCheck ? grayColors.offcut : grayColors.waste;
-                visualsHtml += window._cutTrackHtml(bin.cuts, remain, seriesColor, _remColor, 100);
+                visualsHtml += window._cutTrackHtml(bin.cuts, remain, seriesColor, _remColor, 100, true); // 新料→畫頭尾
                 visualsHtml += `</div>`; // close cut-row
             });
         }
@@ -6569,6 +6606,18 @@ window.runCuttingOptimization = async function () {
         visualsHtml += `</div>`;
         visualsHtml += `</div>`; // Close cutting-model-section
     }
+
+    // [第3批] 生管總表：本批用料 / 廢料 / 餘料 摘要
+    visualsHtml += `<div style="margin-top:16px; padding:12px 16px; border:2px solid #556270; border-radius:8px; background:#f8fafc;">`
+        + `<div style="font-weight:900; color:#334155; font-size:1rem; margin-bottom:6px;">📋 本批用料摘要（給生管核對）</div>`
+        + `<div style="display:flex; gap:24px; flex-wrap:wrap; font-size:0.95rem; color:#222;">`
+        + `<div>本批開新料：<b>${_sumNewBars}</b> 支</div>`
+        + `<div>切給客人：<b>${Math.round(_sumCutCM * 10)}</b> mm</div>`
+        + `<div>產生餘料：<b>${_sumOffcutCount}</b> 支（共 <b>${Math.round(_sumOffcutCM * 10)}</b> mm）</div>`
+        + `<div>廢料：<b>${Math.round(_sumWasteCM * 10)}</b> mm</div>`
+        + `</div>`
+        + `<div style="font-size:0.78rem; color:#888; margin-top:6px;">※ 廢料＝頭尾料塊(每支60mm)＋太短尾料(<50mm)；鋸路粉不計。餘料≥50mm、可再用。</div>`
+        + `</div>`;
 
     // Add Action Buttons (Print + Confirm)
     visualsHtml += `<div class="no-print" style="text-align:center; margin-top:30px; border-top:1px solid #eee; padding-top:20px; display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
@@ -6735,7 +6784,14 @@ window._cutLetterColor = function (L) {
     return pal[((i % pal.length) + pal.length) % pal.length];
 };
 // 切料表「直欄」渲染：每段上方=長度數字格、下方=置中的訂單字母；橫向依比例排
-window._cutTrackHtml = function (cuts, remain, seriesColor, remainColor, widthPct) {
+window._cutTrackHtml = function (cuts, remain, seriesColor, remainColor, widthPct, showHeadTail) {
+    // [第3批] showHeadTail=true 時(新料)，前後各畫一條「頭尾先切30mm」灰條(畫法A)
+    let htCol = '';
+    if (showHeadTail) {
+        htCol = `<div style="flex-grow:${CUT_HEADTAIL_LOSS_CM / 2}; min-width:16px; display:flex; flex-direction:column;">`
+            + `<div style="background:repeating-linear-gradient(45deg,#cfcfcf,#cfcfcf 3px,#b3b3b3 3px,#b3b3b3 6px); color:#444; font-size:9px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.05;" title="頭尾先切 ${CUT_HEADTAIL_MM}mm（陽極摩擦瑕疵，屬廢料）">切${CUT_HEADTAIL_MM}</div>`
+            + `<div style="height:24px; margin-top:3px;"></div></div>`;
+    }
     let cols = (cuts || []).map(c => {
         const lc = window._cutLetterColor ? window._cutLetterColor(c.letter) : '#888';
         const chip = c.letter ? `<span style="background:${lc}; color:#fff; font-weight:900; border-radius:3px; padding:1px 6px; font-size:12px;">${c.letter}</span>` : '';
@@ -6748,12 +6804,12 @@ window._cutTrackHtml = function (cuts, remain, seriesColor, remainColor, widthPc
         // [修正] 餘料方塊必須帶 cut-remain class 與 title(mm)，
         // recordCuttingPlanToInventory() 才抓得到並寫入 addOffcuts / F欄餘料。
         var remMm = Math.round(remain * 10);
-        var remTypeClass = (remain >= 10) ? 'leftover' : 'waste'; // ≥10cm=餘料, <10cm=廢料
+        var remTypeClass = (remain >= CUT_OFFCUT_MIN_CM) ? 'leftover' : 'waste'; // [第3批] ≥5cm(=50mm)=餘料, <5cm=廢料
         remCol = `<div class="cut-remain ${remTypeClass}" title="剩餘 ${remMm}mm" style="display:flex; flex-direction:column; flex-grow:${remain}; min-width:46px;">`
             + `<div style="background:${remainColor}; color:#fff; font-size:11px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center;">餘 ${remMm}</div>`
             + `<div style="height:24px; margin-top:3px;"></div></div>`;
     }
-    return `<div class="cut-track" style="display:flex; align-items:stretch; width:${widthPct}%;">${cols}${remCol}</div>`;
+    return `<div class="cut-track" style="display:flex; align-items:stretch; width:${widthPct}%;">${htCol}${cols}${remCol}${htCol}</div>`;
 };
 
 // [出貨] 產生單張訂單的「貼紙頁 + 裝箱單頁」HTML（單張 / 批次共用）
@@ -7024,10 +7080,9 @@ window.recordCuttingPlanToInventory = async function () {
 
             // Case A: New Bar (新料)
             if (headerText.includes('新料')) {
-                // Determine how much to deduct.
-                // Assuming fetching a "New Bar" consumes one standard stock unit (600cm).
-                // The remainder is tracked as offcut/waste.
-                cuttingPlans[modelName].deductStandardCM += 600;
+                // [第3批] 開一支新料：扣整支 600cm(不變)；並記頭尾料塊 60mm(=6cm)為廢料(鋸路粉不記)。
+                cuttingPlans[modelName].deductStandardCM += CUT_BAR_FULL_CM;      // 扣整支 600cm
+                cuttingPlans[modelName].addWasteCM += CUT_HEADTAIL_WASTE_CM;      // 頭尾料塊 6cm 進廢料
             }
             // Case B: Offcut (餘料) — header 是「餘料 XXXmm」，數字是 mm，要 ÷10 還原 cm
             else if (headerText.includes('餘料')) {
@@ -7046,8 +7101,8 @@ window.recordCuttingPlanToInventory = async function () {
 
                 if (remainMatch) {
                     const remainLen = parseFloat(remainMatch[0]) / 10; // [修正] mm → cm
-                    // Logic: >= 10cm is useful Offcut, else Waste
-                    if (remainLen >= 10) {
+                    // [第3批] Logic: ≥5cm(=50mm) 入餘料(跟前台最小下單一致)，<5cm 進廢料
+                    if (remainLen >= CUT_OFFCUT_MIN_CM) {
                         cuttingPlans[modelName].addOffcuts.push(remainLen);
                     } else if (remainLen > 0) {
                         cuttingPlans[modelName].addWasteCM += remainLen;
