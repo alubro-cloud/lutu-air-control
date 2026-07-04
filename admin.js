@@ -6662,11 +6662,21 @@ window.CUT_I18N = {
 window.translateCutHtml = function (html, lang) {
     if (lang === 'zh' || !window.CUT_I18N[lang]) return html;
     var map = lang === 'vi' ? {
+        '頭尾各先切': 'Cắt bỏ 2 đầu ', '切30': 'Cắt30',
         '切料清單': 'Danh sách cắt', '使用新料': 'Liệu mới dùng', '使用餘料': 'Liệu thừa dùng',
-        '新料 #': 'Cây mới #', '餘料 ': 'Liệu thừa ', '切 ': 'Cắt ', ' 支)': ' cây)'
+        '新料 #': 'Cây mới #', '餘料 ': 'Liệu thừa ', '切 ': 'Cắt ', ' 支)': ' cây)',
+        '本批用料摘要（給生管核對）': 'Tóm tắt vật liệu lô này (quản lý kiểm tra)',
+        '本批開新料': 'Cây mới lô này', '切給客人': 'Cắt cho khách', '產生餘料': 'Liệu thừa tạo ra',
+        '※ 廢料＝頭尾料塊(每支60mm)＋太短尾料(<50mm)；鋸路粉不計。餘料≥50mm、可再用。': '※ Phế liệu = liệu 2 đầu (60mm/cây) + đuôi quá ngắn (<50mm); mạt cưa không tính. Liệu thừa ≥50mm dùng lại được.',
+        '廢料': 'Phế liệu', '共 ': 'Tổng ', ' 支': ' cây'
     } : {
+        '頭尾各先切': 'Potong 2 ujung ', '切30': 'Potong30',
         '切料清單': 'Daftar potong', '使用新料': 'Bahan baru dipakai', '使用餘料': 'Sisa dipakai',
-        '新料 #': 'Batang baru #', '餘料 ': 'Sisa ', '切 ': 'Potong ', ' 支)': ' batang)'
+        '新料 #': 'Batang baru #', '餘料 ': 'Sisa ', '切 ': 'Potong ', ' 支)': ' batang)',
+        '本批用料摘要（給生管核對）': 'Ringkasan bahan lot ini (cek supervisor)',
+        '本批開新料': 'Batang baru lot ini', '切給客人': 'Potong utk pelanggan', '產生餘料': 'Sisa dihasilkan',
+        '※ 廢料＝頭尾料塊(每支60mm)＋太短尾料(<50mm)；鋸路粉不計。餘料≥50mm、可再用。': '※ Limbah = bahan 2 ujung (60mm/batang) + ekor terlalu pendek (<50mm); serbuk tidak dihitung. Sisa ≥50mm bisa dipakai lagi.',
+        '廢料': 'Limbah', '共 ': 'Total ', ' 支': ' batang'
     };
     Object.keys(map).forEach(function (k) { html = html.split(k).join(map[k]); });
     return html;
