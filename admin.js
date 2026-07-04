@@ -2846,7 +2846,7 @@ function createCard(order, index, currentStatus) {
     let rawBody = window.generateMailBody(order.name, order.total, order.shippingFee || 0, order.details);
     let mailBody = encodeURIComponent(rawBody);
     let _ctype = (window.getMeta ? window.getMeta(order).customerType : '個人');
-    let _quoteBtnLabel = (_ctype === '公司') ? '報價單' : '付款通知';
+    let _quoteBtnLabel = (_ctype === '公司') ? '報價單' : '聯絡客戶';
 
     el.innerHTML = `
     <div class="card-header">
@@ -8876,7 +8876,12 @@ window.preloadCalendarForHub = async function () {
         if (!Array.isArray(list)) return '';
         return list.length + '|' + list.map(o =>
             String(o.timestamp) + ':' + (o.status || '') + ':' +
-            (o.total || 0) + ':' + (o.shippingFee || 0)
+            (o.total || 0) + ':' + (o.shippingFee || 0) + ':' +
+            // [修同步] 加入 meta 欄位，別機改配送/付款/回簽/末五碼/大榮單號/備註/交期 才會被偵測到並重畫
+            (o.vehicle || '') + ':' + (o.paymentStatus || '') + ':' + (o.customerType || '') + ':' +
+            (o.signedBack || '') + ':' + (o.remitNote || '') + ':' + (o.shipNo || '') + ':' +
+            (o.csNote || '') + ':' + (o.orderTag || '') + ':' + (o.dueDate || '') + ':' +
+            (o.leadDays || '') + ':' + (o.salesperson || '')
         ).join(',');
     }
 
@@ -9170,30 +9175,31 @@ window.buildPaymentNoticeBody = function (order) {
     var proc = (Number(order.outsourcePrice) || 0) + (Number(order.assemblyFee) || 0);
     var ship = Number(order.shippingFee) || 0;
     var sub = rows.reduce(function (a, r) { return a + r.amount; }, 0);
-    var body = 'ALUMIBRO 鋁材兄弟 — 訂單付款通知\n\n';
+    var body = 'ALUMIBRO 鋁材兄弟 — 報價回覆\n\n';
     var greet = window._honorific(order.name, _extractCompany(order.note));
-    body += (greet ? greet + ' ' : '') + '您好，感謝您的訂購，明細如下：\n\n';
+    body += (greet ? greet + ' ' : '') + '您好，感謝您的詢問與訂購，為您報價如下：\n\n';
     body += detailText + '\n';
     body += '———————————\n';
     body += '商品小計：$' + sub + '\n';
     if (proc > 0) body += '加工費：$' + proc + '\n';
     if (ship > 0) body += '運費：$' + ship + '\n';
-    body += '應付總額：NT$' + (Number(order.total) || 0) + '\n';
+    body += '總計：NT$' + (Number(order.total) || 0) + '\n';
     body += '———————————\n\n';
-    body += '請匯款至：\n' + ALUMIBRO_BANK_LINES + '\n\n';
-    body += '匯款後請回覆末五碼，我們將盡快為您安排出貨，謝謝！';
+    body += '如確認訂購或有任何問題，歡迎直接回覆本信或來電，我們將盡快為您安排。\n\n';
+    body += '如需匯款，帳戶資訊如下：\n' + ALUMIBRO_BANK_LINES + '\n';
+    body += '（匯款後請回覆末五碼，我們會盡快為您安排出貨）\n\n謝謝！';
     return body;
 };
 
 window.triggerPaymentNotice = function (orderId) {
     var o = ordersData.find(function (x) { return String(x.timestamp) === String(orderId); });
     if (!o) return;
-    if (!o.email || String(o.email).indexOf('@') < 0) { alert('此訂單沒有有效 Email，無法寄付款通知。'); return; }
-    var subject = encodeURIComponent('ALUMIBRO 鋁材兄弟 — 訂單付款通知');
+    if (!o.email || String(o.email).indexOf('@') < 0) { alert('此訂單沒有有效 Email，無法寄出信件。'); return; }
+    var subject = encodeURIComponent('ALUMIBRO 鋁材兄弟 — 報價回覆');
     var body = encodeURIComponent(window.buildPaymentNoticeBody(o));
     var url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + o.email + '&su=' + subject + '&body=' + body;
     window.open(url, '_blank'); // 嘗試自動開（被擋也沒關係，下面有可點按鈕）
-    _omToastLink('付款通知已備好。沒自動跳轉就點這裡：', url, '開啟 Gmail 撰寫');
+    _omToastLink('信件已備好。沒自動跳轉就點這裡：', url, '開啟 Gmail 撰寫');
 };
 
 window.printQuote = function (orderId) {
