@@ -6668,6 +6668,7 @@ window.translateCutHtml = function (html, lang) {
         '頭尾各先切': 'Cắt bỏ 2 đầu ', '切30': 'Cắt30',
         '切料清單': 'Danh sách cắt', '使用新料': 'Liệu mới dùng', '使用餘料': 'Liệu thừa dùng',
         '新料 #': 'Cây mới #', '餘料 ': 'Liệu thừa ', '切 ': 'Cắt ', ' 支)': ' cây)',
+        '餘 ': 'Thừa ', '廢 ': 'Phế ',
         '本批用料摘要（給生管核對）': 'Tóm tắt vật liệu lô này (quản lý kiểm tra)',
         '本批開新料': 'Cây mới lô này', '切給客人': 'Cắt cho khách', '產生餘料': 'Liệu thừa tạo ra',
         '※ 廢料＝頭尾料塊(每支60mm)＋太短尾料(<50mm)；鋸路粉不計。餘料≥50mm、可再用。': '※ Phế liệu = liệu 2 đầu (60mm/cây) + đuôi quá ngắn (<50mm); mạt cưa không tính. Liệu thừa ≥50mm dùng lại được.',
@@ -6676,6 +6677,7 @@ window.translateCutHtml = function (html, lang) {
         '頭尾各先切': 'Potong 2 ujung ', '切30': 'Potong30',
         '切料清單': 'Daftar potong', '使用新料': 'Bahan baru dipakai', '使用餘料': 'Sisa dipakai',
         '新料 #': 'Batang baru #', '餘料 ': 'Sisa ', '切 ': 'Potong ', ' 支)': ' batang)',
+        '餘 ': 'Sisa ', '廢 ': 'Buang ',
         '本批用料摘要（給生管核對）': 'Ringkasan bahan lot ini (cek supervisor)',
         '本批開新料': 'Batang baru lot ini', '切給客人': 'Potong utk pelanggan', '產生餘料': 'Sisa dihasilkan',
         '※ 廢料＝頭尾料塊(每支60mm)＋太短尾料(<50mm)；鋸路粉不計。餘料≥50mm、可再用。': '※ Limbah = bahan 2 ujung (60mm/batang) + ekor terlalu pendek (<50mm); serbuk tidak dihitung. Sisa ≥50mm bisa dipakai lagi.',
@@ -6822,8 +6824,9 @@ window._cutTrackHtml = function (cuts, remain, seriesColor, remainColor, widthPc
         // recordCuttingPlanToInventory() 才抓得到並寫入 addOffcuts / F欄餘料。
         var remMm = Math.round(remain * 10);
         var remTypeClass = (remain >= CUT_OFFCUT_MIN_CM) ? 'leftover' : 'waste'; // [第3批] ≥5cm(=50mm)=餘料, <5cm=廢料
+        var remLabel = (remain >= CUT_OFFCUT_MIN_CM) ? '餘' : '廢';               // [修正] <50mm 顯示「廢」，不再一律「餘」
         remCol = `<div class="cut-remain ${remTypeClass}" title="剩餘 ${remMm}mm" style="display:flex; flex-direction:column; flex-grow:${remain}; min-width:46px;">`
-            + `<div style="background:${remainColor}; color:#fff; font-size:11px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center;">餘 ${remMm}</div>`
+            + `<div style="background:${remainColor}; color:#fff; font-size:11px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center;">${remLabel} ${remMm}</div>`
             + `<div style="height:24px; margin-top:3px;"></div></div>`;
     }
     return `<div class="cut-track" style="display:flex; align-items:stretch; width:${widthPct}%;">${htCol}${cols}${remCol}${htCol}</div>`;
