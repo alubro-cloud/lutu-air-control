@@ -6644,16 +6644,19 @@ window.runCuttingOptimization = async function () {
 window.CUT_I18N = {
     zh: {
         title: '合併切料表', doc: '切料表列印', gen: '產生時間',
+        headtail: '每支新料上切台，頭尾各先切 30mm 再切料！（陽極摩擦，頭尾有瑕疵，不可給客人）',
         n1: '依切料清單裁切；不同規格/長度不可混切。切法相同的料（如本單各支都一樣）可整批一次切。',
         n2: '切完後，每段餘料務必「量長度並標示」後歸位。'
     },
     vi: {
         title: 'PHIẾU CẮT LIỆU (GỘP)', doc: 'In phiếu cắt liệu', gen: 'Thời gian',
+        headtail: 'Mỗi cây liệu mới lên máy, CẮT BỎ 30mm MỖI ĐẦU trước khi cắt! (2 đầu bị lỗi do ma sát mạ, không được giao cho khách)',
         n1: 'Cắt theo danh sách. KHÔNG cắt lẫn các quy cách / chiều dài khác nhau. Các cây cùng kiểu cắt (như phiếu này) có thể cắt CHUNG MỘT LƯỢT.',
         n2: 'Sau khi cắt, mỗi đoạn liệu thừa PHẢI ĐO chiều dài và DÁN NHÃN trước khi cất.'
     },
     id: {
         title: 'DAFTAR POTONG BAHAN (GABUNGAN)', doc: 'Cetak daftar potong', gen: 'Waktu',
+        headtail: 'Tiap batang baru, POTONG 30mm TIAP UJUNG dulu sebelum memotong! (2 ujung cacat karena gesekan anodizing, jangan diberikan ke pelanggan)',
         n1: 'Potong sesuai daftar. JANGAN campur spesifikasi / panjang berbeda. Batang dengan pola potong sama (seperti order ini) boleh dipotong SEKALIGUS.',
         n2: 'Setelah memotong, tiap sisa WAJIB DIUKUR panjangnya & DIBERI LABEL sebelum disimpan.'
     }
@@ -6747,6 +6750,10 @@ window.printCuttingList = function (lang) {
             <h1 style="text-align:center; margin-bottom:12px; border-bottom:2px solid #333; padding-bottom:15px;">
                 <i class="fas fa-cut"></i> ${L.title}
             </h1>
+            <div style="border:3px solid #c0392b; background:#c0392b; color:#fff; border-radius:6px; padding:14px 18px; margin-bottom:14px; text-align:center; font-weight:900; font-size:1.35rem; line-height:1.4;">
+                ⚠ ${L.headtail}
+                ${lang !== 'zh' ? `<div style="margin-top:6px; font-size:0.9rem; font-weight:bold; opacity:0.92;">${window.CUT_I18N.zh.headtail}</div>` : ''}
+            </div>
             <div style="border:2px solid #c0392b; background:#fdecea; border-radius:6px; padding:12px 16px; margin-bottom:24px; line-height:1.7;">
                 <div style="font-weight:bold; color:#c0392b; font-size:1.1rem;">① ${L.n1}</div>
                 <div style="font-weight:bold; color:#c0392b; font-size:1.1rem;">② ${L.n2}</div>
