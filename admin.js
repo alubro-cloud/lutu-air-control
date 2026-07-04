@@ -6823,10 +6823,15 @@ window._cutTrackHtml = function (cuts, remain, seriesColor, remainColor, widthPc
         // [修正] 餘料方塊必須帶 cut-remain class 與 title(mm)，
         // recordCuttingPlanToInventory() 才抓得到並寫入 addOffcuts / F欄餘料。
         var remMm = Math.round(remain * 10);
-        var remTypeClass = (remain >= CUT_OFFCUT_MIN_CM) ? 'leftover' : 'waste'; // [第3批] ≥5cm(=50mm)=餘料, <5cm=廢料
-        var remLabel = (remain >= CUT_OFFCUT_MIN_CM) ? '餘' : '廢';               // [修正] <50mm 顯示「廢」，不再一律「餘」
+        var isWaste = remain < CUT_OFFCUT_MIN_CM;                                  // <50mm = 廢料
+        var remTypeClass = isWaste ? 'waste' : 'leftover';
+        var remLabel = isWaste ? '廢' : '餘';                                      // [修正] <50mm 顯示「廢」
+        // [修正] 廢料用斜紋(跟頭尾一樣=要丟)，餘料用實心(=要留)，一眼分得出
+        var remBg = isWaste
+            ? 'background:repeating-linear-gradient(45deg,#9a9a9a,#9a9a9a 3px,#7a7a7a 3px,#7a7a7a 6px); color:#fff;'
+            : 'background:' + remainColor + '; color:#fff;';
         remCol = `<div class="cut-remain ${remTypeClass}" title="剩餘 ${remMm}mm" style="display:flex; flex-direction:column; flex-grow:${remain}; min-width:46px;">`
-            + `<div style="background:${remainColor}; color:#fff; font-size:11px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center;">${remLabel} ${remMm}</div>`
+            + `<div style="${remBg} font-size:11px; font-weight:bold; height:38px; display:flex; align-items:center; justify-content:center;">${remLabel} ${remMm}</div>`
             + `<div style="height:24px; margin-top:3px;"></div></div>`;
     }
     return `<div class="cut-track" style="display:flex; align-items:stretch; width:${widthPct}%;">${htCol}${cols}${remCol}${htCol}</div>`;
