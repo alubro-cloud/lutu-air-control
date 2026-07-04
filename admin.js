@@ -460,6 +460,11 @@ ${taxLine}-------------------
 };
 
 window.confirmQuotePrice = function (orderId, nextStatus) {
+    // [第2.5批] 防重複報價：這單先前若已報過（狀態非「待報價」）→ 跳提醒，避免重複寄信給客人
+    var _reQ = ordersData.find(function (o) { return String(o.timestamp) === String(orderId); });
+    if (_reQ && _reQ.status && _reQ.status !== 'unquoted') {
+        if (!confirm('⚠️ 此單先前已報價過。\n\n確定要「再報一次」並重新寄信給客人嗎？\n（避免重複報價造成客人困擾）')) return;
+    }
     // 獲取所有填寫的金額
     let sysTotal = parseInt(document.getElementById('quote-sys-total').innerText.replace(/,/g, '')) || 0;
     let cost = parseInt(document.getElementById('quote-cost-input').value) || 0;
@@ -619,6 +624,16 @@ const STATUS_LABELS = {
     dispatched: "已出貨/已取件",
     completed: "已完成" // 新增完成狀態
 };
+
+// [自取修正] 自取訂單的出貨階段改用「取貨」字眼；其餘沿用 STATUS_LABELS。
+// 欄位標題(共用、混合訂單)仍用 STATUS_LABELS 的「待出貨/待取件」；此函數只給「特定卡片」的按鈕用。
+function statusLabelFor(statusKey, isPickup) {
+    if (isPickup) {
+        if (statusKey === 'shipping') return '待取貨';
+        if (statusKey === 'dispatched') return '已取貨';
+    }
+    return STATUS_LABELS[statusKey] || statusKey;
+}
 
 const STANDARD_FLOW = ['unquoted', 'quoted', 'paid', 'shipping', 'dispatched', 'completed'];
 const WORK_FLOW = ['cutting', 'inspection', 'picking', 'packing'];
@@ -2392,8 +2407,9 @@ function formatPrice(val) {
 }
 
 // 根據訂單明細判斷公司配送車型 (同 script.js renderAnalysisAndManifest 邏輯)
-function detectVehicleType(detailsStr) {
-    if (!detailsStr) return null;
+// [第2批] 配送方式：算出分類(big大白/small小藍/rong大榮)。門檻 400cm / 1000kg(1噸)；大榮=小輕件(≤200cm且≤20kg)。
+function detectVehicleCat(detailsStr) {
+    if (!detailsStr) return 'small';
     const weightMap = {
         '2020型': 0.458, '2040型': 0.862, '2060型': 1.266, '2080型': 1.7,
         '3030輕型': 0.693, '3030重型': 1.07, '3060輕型': 1.218, '3060重型': 1.844,
@@ -2413,21 +2429,39 @@ function detectVehicleType(detailsStr) {
         const qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
         if (len <= 0) return;
         if (len > maxLen) maxLen = len;
-        // 找對應重量
         let wPerM = 0;
         for (const [key, w] of Object.entries(weightMap)) {
             if (line.includes(key)) { wPerM = w; break; }
         }
-        if (wPerM === 0) wPerM = 1; // 未知型號預設 1kg/m
+        if (wPerM === 0) wPerM = 1;
         totalWeight += wPerM * (len / 100) * qty;
     });
-    if (maxLen === 0 && totalWeight === 0) {
-        // 只有配件，沒有鋁材 → 小貨車就夠
-        return '<span style="color:#27ae60;"><i class="fas fa-truck-pickup"></i> 小貨車</span>';
-    }
-    return (maxLen > 250 || totalWeight > 50)
-        ? '<span style="color:#c0392b;"><i class="fas fa-truck-moving"></i> 大貨車</span>'
-        : '<span style="color:#27ae60;"><i class="fas fa-truck-pickup"></i> 小貨車</span>';
+    if (maxLen === 0 && totalWeight === 0) return 'small';        // 只有配件 → 小藍
+    if (maxLen > 400 || totalWeight > 1000) return 'big';         // >400cm 或 >1噸 → 大白
+    if (maxLen <= 200 && totalWeight <= 20) return 'rong';        // ≤200cm 且 ≤20kg → 大榮
+    return 'small';                                               // 其餘 → 小藍
+}
+// 配送方式的顯示資料（顏色/圖示/中文）
+window.VEHICLE_META = {
+    big:   { key: '大白', label: '大白', color: '#c0392b', icon: 'fa-truck-moving' },
+    small: { key: '小藍', label: '小藍', color: '#2980b9', icon: 'fa-truck-pickup' },
+    rong:  { key: '大榮', label: '大榮', color: '#8e44ad', icon: 'fa-truck-fast' }
+};
+function _vehKeyToCat(k) { if (k === '大白') return 'big'; if (k === '大榮') return 'rong'; if (k === '小藍') return 'small'; return null; }
+function vehicleLabel(cat) {
+    const m = window.VEHICLE_META[cat] || window.VEHICLE_META.small;
+    return '<span style="color:' + m.color + ';"><i class="fas ' + m.icon + '"></i> ' + m.label + '</span>';
+}
+// 取得訂單的配送分類：優先用已存的(AB欄 order.vehicle)，沒有才即時判定
+window.getVehicleCat = function (order) {
+    const stored = _vehKeyToCat(order && order.vehicle);
+    if (stored) return stored;
+    return detectVehicleCat(order ? order.details : '');
+};
+// 相容：舊呼叫 detectVehicleType(details) 仍回傳標籤（現在是大白/小藍/大榮）
+function detectVehicleType(detailsStr) {
+    if (!detailsStr) return null;
+    return vehicleLabel(detectVehicleCat(detailsStr));
 }
 
 window.openGmail = function (email, subject, body) {
@@ -2698,7 +2732,7 @@ function createCard(order, index, currentStatus) {
         isSelfPickup = false;
     }
     if (addrStr.includes("公司配送")) {
-        const vt = detectVehicleType(order.details);
+        const vt = vehicleLabel(window.getVehicleCat(order)); // [第2批] 用已存/已改的配送方式
         const vtLabel = vt
             ? (vt.includes('大貨車') ? ' <i class="fas fa-truck-moving"></i>' : ' <i class="fas fa-truck-pickup"></i>')
             : '';
@@ -2745,7 +2779,7 @@ function createCard(order, index, currentStatus) {
 
     let nextBtnHtml = '';
     if (nextStatus) {
-        let nextLabel = STATUS_LABELS[nextStatus];
+        let nextLabel = statusLabelFor(nextStatus, isSelfPickup);
         let btnText = nextLabel;
 
         // [Final Logic Enforcement] Ensure text and status are correct for S2S
@@ -2800,7 +2834,7 @@ function createCard(order, index, currentStatus) {
     //  - 目標是退回「切料單」(代表目前在對料，鋁材已切料扣帳 → 跨越扣料點)
     if (prevStatus && prevStatus !== 'unquoted' && prevStatus !== 'cutting'
         && currentStatus !== 'shipping' && currentStatus !== 'dispatched' && currentStatus !== 'completed') {
-        let prevLabel = STATUS_LABELS[prevStatus];
+        let prevLabel = statusLabelFor(prevStatus, isSelfPickup);
         prevBtnHtml = `
         <button class="btn-card-action btn-prev" title="退回${prevLabel}"
     onclick="event.stopPropagation(); regressStatus('${order.timestamp}', '${prevStatus}')">
@@ -3330,7 +3364,7 @@ window.viewOrder = function (order) {
             if (addr.includes("自取")) return "客戶自取";
             if (addr.includes("店到店")) return "店到店";
             if (addr.includes("公司配送")) {
-                const vt = detectVehicleType(order.details);
+                const vt = vehicleLabel(window.getVehicleCat(order)); // [第2批] 用已存/已改的配送方式
                 return "公司配送" + (vt ? " · " + vt : "");
             }
             return "一般貨運";
@@ -8960,7 +8994,10 @@ window.getMeta = function (order) {
         customerType: _omPick(l.customerType, order.customerType, window._guessCustomerType(order)),
         paymentStatus: _omPick(l.paymentStatus, order.paymentStatus),
         signedBack: _omPick(l.signedBack, order.signedBack),
-        remitNote: _omPick(l.remitNote, order.remitNote)
+        remitNote: _omPick(l.remitNote, order.remitNote),
+        vehicle: _omPick(l.vehicle, order.vehicle),
+        shipNo: _omPick(l.shipNo, order.shipNo),
+        csNote: _omPick(l.csNote, order.csNote)
     };
 };
 function _omPush(id, patch) {
@@ -9004,6 +9041,23 @@ window.toggleMetaSign = function (id) {
     _omApply(id, { signedBack: cur ? '' : '已回簽' });
 };
 window.setMetaRemit = function (id, v) { _omApply(id, { remitNote: v }); };
+// [第2批] 手動改配送方式（大白/小藍/大榮）→ 存 AB + 10秒多機同步
+window.setMetaVehicle = function (id, v) { _omApply(id, { vehicle: v }); };
+// [第2.5批] 大榮貨運單號、客服備註 → 存 Sheet + 同步
+window.setMetaShipNo = function (id, v) { _omApply(id, { shipNo: v }); };
+window.setMetaCsNote = function (id, v) { _omApply(id, { csNote: v }); };
+// [第2批] 若這張配送單還沒存過配送方式(AB空)，自動判定並寫入一次（本機立即標記避免重複寫）
+window._autoPersistVehicle = function (order) {
+    if (!order || order.vehicle) return;                       // 已存過 → 不動
+    var addr = String(order.address || order.delivery || '');
+    if (/自取/.test(addr)) return;                              // 自取不需要車型
+    var cat = detectVehicleCat(order.details);
+    var key = (window.VEHICLE_META[cat] || {}).key;
+    if (!key) return;
+    order.vehicle = key;                                        // 本機立即標記，之後 render 不再重寫
+    if (typeof _omSaveLocal === 'function') _omSaveLocal(order.timestamp, { vehicle: key });
+    if (typeof _omPush === 'function') _omPush(order.timestamp, { vehicle: key }); // 寫回 Sheet
+};
 
 window.renderOrderMeta = function (order) {
     var m = window.getMeta(order);
@@ -9016,11 +9070,36 @@ window.renderOrderMeta = function (order) {
     };
     var signed = m.signedBack === '已回簽';
     var remit = String(m.remitNote || '').replace(/"/g, '&quot;');
+    // [第2批] 配送方式 pills（自取單不顯示；非自取單首次自動判定並寫入）
+    var isPickup = /自取/.test(String(order.address || order.delivery || ''));
+    var vehRow = '';
+    if (!isPickup) {
+        if (typeof window._autoPersistVehicle === 'function') window._autoPersistVehicle(order);
+        var curCat = window.getVehicleCat(order);
+        var vehBtn = function (cat) {
+            var vm = window.VEHICLE_META[cat];
+            var onStyle = (curCat === cat) ? ('background:' + vm.color + ';color:#fff;border-color:' + vm.color + ';') : '';
+            return '<button class="om-pill" style="' + onStyle + '" onclick="event.stopPropagation();window.setMetaVehicle(\'' + id + '\',\'' + vm.key + '\')"><i class="fas ' + vm.icon + '"></i> ' + vm.label + '</button>';
+        };
+        vehRow = '<div class="om-row"><span class="om-lbl">配送</span>' + vehBtn('small') + vehBtn('big') + vehBtn('rong') + '</div>';
+    }
+    // [第2.5批] 大榮貨運單號（只在配送方式=大榮時顯示）
+    var shipNoRow = '';
+    if (!isPickup && window.getVehicleCat(order) === 'rong') {
+        var shipNo = String(m.shipNo || '').replace(/"/g, '&quot;');
+        shipNoRow = '<div class="om-row"><span class="om-lbl">大榮單號</span><input class="om-remit" value="' + shipNo + '" placeholder="大榮貨運托運單號" onclick="event.stopPropagation()" onchange="window.setMetaShipNo(\'' + id + '\', this.value)"></div>';
+    }
+    // [第2.5批] 客服備註（隨手記這單提醒）
+    var csNote = String(m.csNote || '').replace(/"/g, '&quot;');
+    var csNoteRow = '<div class="om-row"><span class="om-lbl">備註</span><input class="om-remit" value="' + csNote + '" placeholder="客服備註（這單的提醒）" onclick="event.stopPropagation()" onchange="window.setMetaCsNote(\'' + id + '\', this.value)"></div>';
     return '<div class="order-meta" id="meta-' + id + '" onclick="event.stopPropagation()">'
       + '<div class="om-row"><span class="om-lbl">類別</span>' + typeBtn('個人') + typeBtn('公司')
       + '<button class="om-sign' + (signed ? ' on' : '') + '" onclick="event.stopPropagation();window.toggleMetaSign(\'' + id + '\')"><i class="fas fa-' + (signed ? 'check-circle' : 'circle') + '"></i> 回簽</button></div>'
       + '<div class="om-row"><span class="om-lbl">付款</span>' + payBtn('未付', '未付', 'unpaid') + payBtn('收訂金', '訂金', 'part') + payBtn('已付清', '已付清', 'paid') + payBtn('月結', '月結', 'part') + '</div>'
+      + vehRow
+      + shipNoRow
       + '<div class="om-row"><span class="om-lbl">末五碼</span><input class="om-remit" value="' + remit + '" placeholder="匯款末五碼 / 日期" onclick="event.stopPropagation()" onchange="window.setMetaRemit(\'' + id + '\', this.value)"></div>'
+      + csNoteRow
       + '</div>';
 };
 
