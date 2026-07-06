@@ -2538,6 +2538,43 @@ window.PROJECT_STAGES = [
     { key: 'p_done', label: '結案' },
     { key: 'p_cancel', label: '已取消' }
 ];
+// [第4批] 時程節點「快速加」預設：工程 vs OEM 不同
+window.PROJ_TIMELINE_PRESETS = {
+    '工程': ['看圖', '評估', '細談', '看現場', '簽約', '繪圖', '拆BOM', '發包', '排程', '叫工', '追料', '安排車', '進場', '施工', '吊裝', '試機', '出場', '驗收'],
+    'OEM': ['拆BOM', '發包', '打樣', '確認樣', '量產', '品檢', '組裝', '交貨', '到貨']
+};
+// [第4批] 現場勘查欄位（工程用）
+window.PROJ_SITE_FIELDS = [
+    { key: 'elevator', label: '電梯尺寸' },
+    { key: 'passage', label: '通道/門寬' },
+    { key: 'forklift', label: '可用堆高機' },
+    { key: 'crane', label: '可用高空車' },
+    { key: 'floor', label: '樓層/高度' },
+    { key: 'interfere', label: '現場干涉' },
+    { key: 'maxlen', label: '料最長限制' }
+];
+// [第4批] 時程節點狀態
+window.PROJ_NODE_ST = { todo: '待辦', doing: '進行中', done: '完成' };
+window.PROJ_TYPE_META = {
+    '工程': { color: '#7c3aed', dark: '#6d28d9', icon: 'fa-helmet-safety' },
+    'OEM': { color: '#0891b2', dark: '#0e7490', icon: 'fa-industry' }
+};
+window.projTypeOf = function (order) {
+    var t = (window.getMeta ? window.getMeta(order).projType : order.projType) || '工程';
+    return (t === 'OEM') ? 'OEM' : '工程';
+};
+// 解析時程節點 JSON（容錯）
+window.parseTimeline = function (order) {
+    var raw = (window.getMeta ? window.getMeta(order).projTimeline : order.projTimeline) || '';
+    if (!raw) return [];
+    try { var a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+};
+// 解析現場勘查 JSON（容錯）
+window.parseSite = function (order) {
+    var raw = (window.getMeta ? window.getMeta(order).projSite : order.projSite) || '';
+    if (!raw) return {};
+    try { var o = JSON.parse(raw); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; }
+};
 window.projectStageLabel = function (k) {
     for (var i = 0; i < window.PROJECT_STAGES.length; i++) if (window.PROJECT_STAGES[i].key === k) return window.PROJECT_STAGES[i].label;
     return '報價中';
@@ -2589,7 +2626,7 @@ window.createProjectCard = function (order) {
         + (order.dueDate ? '<div style="font-size:0.74rem; color:#0369a1; margin-top:5px; font-weight:bold;"><i class="fas fa-flag-checkered"></i> 預計出貨 ' + (window.fmtDueShort ? window.fmtDueShort(order.dueDate) : order.dueDate) + '</div>' : '')
         + '</div>';
     var cb = el.querySelector('.card-body');
-    if (cb) cb.onclick = function () { if (typeof viewOrder === 'function') viewOrder(order); };
+    if (cb) cb.onclick = function () { if (typeof window.viewProject === 'function') window.viewProject(order); else if (typeof viewOrder === 'function') viewOrder(order); };
     var footer = document.createElement('div');
     footer.style.cssText = 'padding:8px 10px; border-top:1px solid rgba(255,255,255,0.08);';
     footer.innerHTML = '<select style="width:100%; padding:6px; font-size:0.85rem; border-radius:6px;">' + opts + '</select>';
@@ -2609,6 +2646,188 @@ window.changeProjectStage = function (orderId, newStatus) {
         window.persistOrderStatus(orderId, newStatus, target); // 只存狀態+POST，最安全
     }
     if (typeof applyFilter === 'function') applyFilter(); // 重繪讓卡片移到新欄
+};
+
+// ============================================================
+// [第4批] 專案專屬詳情頁 viewProject —— 案子儀表板：頂部摘要 + 分頁(時程/現場/收款/備註)
+// 不含生產按鈕/切料/報價面板。時程節點、現場勘查存 AF/AG(JSON)，走多機同步。
+// ============================================================
+window._projReRender = function (id) {
+    var o = (typeof ordersData !== 'undefined' && ordersData) ? ordersData.find(function (x) { return String(x.timestamp) === String(id); }) : null;
+    if (o) window.viewProject(o);
+};
+window.setMetaTotal = function (id, v) { _omApply(id, { total: Number(v) || 0 }); };
+
+// --- 時程節點操作（存 AF JSON，多機同步）---
+window._projAddNode = function (id, name) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(id); }); if (!o) return;
+    var arr = window.parseTimeline(o); arr.push({ n: name || '新節點', d: '', s: 'todo' });
+    window.setMetaTimeline(id, arr); window._projReRender(id);
+};
+window._projCustomNode = function (id) { var nm = prompt('節點名稱：'); if (nm && nm.trim()) window._projAddNode(id, nm.trim()); };
+window._projRenameNode = function (id, idx) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(id); }); if (!o) return;
+    var arr = window.parseTimeline(o); if (!arr[idx]) return;
+    var nm = prompt('節點名稱：', arr[idx].n); if (nm === null) return;
+    arr[idx].n = nm.trim() || arr[idx].n; window.setMetaTimeline(id, arr); window._projReRender(id);
+};
+window._projDelNode = function (id, idx) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(id); }); if (!o) return;
+    var arr = window.parseTimeline(o); arr.splice(idx, 1); window.setMetaTimeline(id, arr); window._projReRender(id);
+};
+window._projNodeDate = function (id, idx, val) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(id); }); if (!o) return;
+    var arr = window.parseTimeline(o); if (!arr[idx]) return; arr[idx].d = val; window.setMetaTimeline(id, arr); // 不重繪，保留輸入焦點
+};
+window._projCycleStatus = function (id, idx) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(id); }); if (!o) return;
+    var arr = window.parseTimeline(o); if (!arr[idx]) return;
+    var order = ['todo', 'doing', 'done']; var cur = order.indexOf(arr[idx].s); arr[idx].s = order[(cur + 1) % 3];
+    window.setMetaTimeline(id, arr); window._projReRender(id);
+};
+// --- 現場勘查（存 AG JSON）---
+window._projSetSite = function (id, key, val) {
+    var o = ordersData.find(function (x) { return String(x.timestamp) === String(id); }); if (!o) return;
+    var s = window.parseSite(o); s[key] = val; window.setMetaSite(id, s); // 不重繪
+};
+// --- 類型切換（工程/OEM）---
+window._projSetType = function (id, t) { window.setMetaProjType(id, t); window._projReRender(id); };
+// --- 分頁切換 ---
+window._projTab = function (id, tab) {
+    ['timeline', 'site', 'money', 'note'].forEach(function (k) {
+        var c = document.getElementById('ptab-' + k); var b = document.getElementById('ptabbtn-' + k);
+        if (c) c.style.display = (k === tab) ? 'block' : 'none';
+        if (b) { b.style.borderBottom = (k === tab) ? '3px solid ' + b.getAttribute('data-c') : '3px solid transparent'; b.style.color = (k === tab) ? '#0f172a' : '#94a3b8'; }
+    });
+};
+
+window.viewProject = function (order) {
+    var modal = document.getElementById('modal'); var body = document.getElementById('modal-body');
+    if (!modal || !body) return;
+    var id = order.timestamp;
+    var type = window.projTypeOf(order);
+    var tm = window.PROJ_TYPE_META[type];
+    var m = (window.getMeta ? window.getMeta(order) : order);
+    var nodes = window.parseTimeline(order);
+    var site = window.parseSite(order);
+    var pay = m.paymentStatus || '未付';
+    var total = Number(order.total) || 0;
+    var fmtP = function (n) { return 'NT$ ' + (Number(n) || 0).toLocaleString(); };
+
+    // 下一步：第一個未完成節點
+    var nextNode = null;
+    for (var i = 0; i < nodes.length; i++) { if (nodes[i].s !== 'done') { nextNode = nodes[i]; break; } }
+    var maxlen = site.maxlen || '';
+
+    // 阶段下拉
+    var stageOpts = window.PROJECT_STAGES.map(function (s) { return '<option value="' + s.key + '"' + (s.key === order.status ? ' selected' : '') + '>' + s.label + '</option>'; }).join('');
+
+    // ===== 頂部 =====
+    var html = '<div style="max-width:560px; margin:0 auto; text-align:left;">';
+    html += '<div style="background:linear-gradient(135deg,' + tm.color + ',' + tm.dark + '); color:#fff; padding:16px 20px; border-radius:12px 12px 0 0;">';
+    html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">';
+    html += '<span style="background:rgba(255,255,255,0.25); padding:3px 12px; border-radius:6px; font-weight:900; font-size:0.9rem;">' + (order.projectId || 'M') + '</span>';
+    html += '<div style="display:flex; gap:6px; align-items:center;">';
+    // 類型切換（可改，怕按錯）
+    html += '<select onchange="window._projSetType(\'' + id + '\', this.value)" style="border:none; border-radius:6px; padding:4px 8px; font-weight:800; font-size:0.78rem; color:' + tm.dark + ';"><option value="工程"' + (type === '工程' ? ' selected' : '') + '>🏗️ 工程</option><option value="OEM"' + (type === 'OEM' ? ' selected' : '') + '>🏭 OEM</option></select>';
+    html += '<select onchange="window.changeProjectStage(\'' + id + '\', this.value); window._projReRender(\'' + id + '\')" style="border:none; border-radius:20px; padding:5px 12px; font-weight:800; font-size:0.82rem; color:' + tm.dark + ';">' + stageOpts + '</select>';
+    html += '</div></div>';
+    html += '<div style="font-size:1.2rem; font-weight:900; margin-bottom:4px;">' + (order.name || '（未命名）') + '</div>';
+    html += '<div style="font-size:0.8rem; opacity:0.92;"><i class="fas fa-phone-alt"></i> ' + (order.phone || '') + (order.salesperson ? '　·　' + order.salesperson : '') + '</div>';
+    html += '</div>';
+
+    // ===== 摘要（不用點就看到）=====
+    html += '<div style="background:#f8fafc; border-left:1px solid #e2e8f0; border-right:1px solid #e2e8f0; padding:12px 20px; display:flex; flex-wrap:wrap; gap:8px 20px; font-size:0.86rem;">';
+    html += '<div>💰 <b>' + fmtP(total) + '</b> <span style="color:#64748b;">(' + pay + ')</span></div>';
+    if (nextNode) html += '<div>📅 下一步：<b>' + nextNode.n + '</b>' + (nextNode.d ? ' <span style="color:#64748b;">' + nextNode.d + '</span>' : '') + '</div>';
+    if (type === '工程' && maxlen) html += '<div style="color:#c0392b; font-weight:700;">🏗️ 料最長：' + maxlen + '</div>';
+    html += '</div>';
+
+    // ===== 品項內容 =====
+    html += '<div style="background:#fff; border-left:1px solid #e2e8f0; border-right:1px solid #e2e8f0; padding:12px 20px;">';
+    html += '<div style="font-size:0.7rem; color:#94a3b8; font-weight:800; letter-spacing:1px; margin-bottom:6px;">品項內容 / 工程範圍</div>';
+    html += '<div style="font-size:0.88rem; color:#334155; line-height:1.6;">' + (order.details || '（無明細）') + '</div>';
+    html += '</div>';
+
+    // ===== 分頁按鈕 =====
+    var tabBtn = function (k, label, c) { return '<button id="ptabbtn-' + k + '" data-c="' + c + '" onclick="window._projTab(\'' + id + '\',\'' + k + '\')" style="flex:1; background:none; border:none; border-bottom:3px solid transparent; padding:11px 4px; font-weight:800; font-size:0.86rem; color:#94a3b8; cursor:pointer;">' + label + '</button>'; };
+    html += '<div style="display:flex; background:#fff; border:1px solid #e2e8f0; border-bottom:2px solid #e2e8f0;">';
+    html += tabBtn('timeline', '📅 時程', tm.color);
+    if (type === '工程') html += tabBtn('site', '🏗️ 現場', tm.color);
+    html += tabBtn('money', '💰 收款', tm.color);
+    html += tabBtn('note', '📋 備註', tm.color);
+    html += '</div>';
+
+    // ===== 分頁內容容器 =====
+    html += '<div style="background:#fff; border:1px solid #e2e8f0; border-top:none; border-radius:0 0 12px 12px; padding:16px 20px; min-height:180px;">';
+
+    // --- 時程 tab ---
+    html += '<div id="ptab-timeline">';
+    if (nodes.length === 0) html += '<div style="color:#94a3b8; font-size:0.85rem; text-align:center; padding:10px 0;">還沒有時程節點，用下面「快速加」開始</div>';
+    nodes.forEach(function (nd, idx) {
+        var st = nd.s || 'todo';
+        var dotC = st === 'done' ? '#16a34a' : (st === 'doing' ? '#f59e0b' : '#cbd5e1');
+        var stBg = st === 'done' ? 'background:#dcfce7;color:#15803d;' : (st === 'doing' ? 'background:#fef3c7;color:#b45309;' : 'background:#f1f5f9;color:#64748b;');
+        var stTx = window.PROJ_NODE_ST[st];
+        html += '<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px dashed #eef;">';
+        html += '<span onclick="window._projCycleStatus(\'' + id + '\',' + idx + ')" title="點一下換狀態" style="width:12px; height:12px; border-radius:50%; background:' + dotC + '; cursor:pointer; flex-shrink:0;' + (st === 'doing' ? 'box-shadow:0 0 0 3px #fde68a;' : '') + '"></span>';
+        html += '<span onclick="window._projRenameNode(\'' + id + '\',' + idx + ')" title="點一下改名稱" style="font-weight:700; color:#334155; font-size:0.9rem; width:96px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + nd.n + '</span>';
+        html += '<input value="' + String(nd.d || '').replace(/"/g, '&quot;') + '" placeholder="日期" onchange="window._projNodeDate(\'' + id + '\',' + idx + ', this.value)" style="flex:1; min-width:60px; padding:4px 8px; border:1px solid #e2e8f0; border-radius:6px; font-size:0.82rem;">';
+        html += '<span onclick="window._projCycleStatus(\'' + id + '\',' + idx + ')" style="font-size:0.74rem; font-weight:800; padding:2px 9px; border-radius:20px; cursor:pointer; ' + stBg + '">' + stTx + '</span>';
+        html += '<span onclick="window._projDelNode(\'' + id + '\',' + idx + ')" title="刪除" style="color:#cbd5e1; cursor:pointer; font-weight:900; padding:0 4px;">✕</span>';
+        html += '</div>';
+    });
+    // 快速加
+    var presets = window.PROJ_TIMELINE_PRESETS[type] || [];
+    html += '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;">';
+    html += '<span style="font-size:0.74rem; color:#94a3b8;">快速加：</span>';
+    presets.forEach(function (p) { html += '<span onclick="window._projAddNode(\'' + id + '\',\'' + p + '\')" style="background:#f1f5f9; border:1px dashed ' + tm.color + '; color:' + tm.dark + '; font-size:0.76rem; padding:4px 10px; border-radius:20px; cursor:pointer; font-weight:700;">' + p + '</span>'; });
+    html += '<span onclick="window._projCustomNode(\'' + id + '\')" style="background:' + tm.color + '22; border:1px solid ' + tm.color + '; color:' + tm.dark + '; font-size:0.76rem; padding:4px 10px; border-radius:20px; cursor:pointer; font-weight:800;">+ 自訂…</span>';
+    html += '</div></div>';
+
+    // --- 現場 tab（工程）---
+    if (type === '工程') {
+        html += '<div id="ptab-site" style="display:none;">';
+        html += '<div style="font-size:0.78rem; color:#64748b; margin-bottom:10px;">去現場勘查後填，設計前先看，避免料做太長塞不進去。</div>';
+        window.PROJ_SITE_FIELDS.forEach(function (f) {
+            var val = String(site[f.key] || '').replace(/"/g, '&quot;');
+            var hot = (f.key === 'maxlen'); // 料最長限制標紅
+            html += '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">';
+            html += '<span style="width:96px; font-size:0.84rem; font-weight:700; color:' + (hot ? '#c0392b' : '#475569') + ';">' + f.label + (hot ? ' ⚠' : '') + '</span>';
+            html += '<input value="' + val + '" placeholder="' + (hot ? '如：3米（電梯限制）' : '填寫…') + '" onchange="window._projSetSite(\'' + id + '\',\'' + f.key + '\', this.value)" style="flex:1; padding:6px 10px; border:1px solid ' + (hot ? '#fca5a5' : '#e2e8f0') + '; border-radius:6px; font-size:0.85rem;">';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    // --- 收款 tab（簡單：總價 + 付款狀態）---
+    html += '<div id="ptab-money" style="display:none;">';
+    html += '<div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">';
+    html += '<span style="font-size:0.86rem; font-weight:700; color:#475569;">專案總價</span>';
+    html += '<input type="number" value="' + total + '" onchange="window.setMetaTotal(\'' + id + '\', this.value); window._projReRender(\'' + id + '\')" style="flex:1; padding:8px 12px; border:1px solid #e2e8f0; border-radius:6px; font-size:1rem; font-weight:800;">';
+    html += '</div>';
+    html += '<div style="font-size:0.78rem; color:#94a3b8; margin-bottom:8px;">付款狀態</div>';
+    var payBtn2 = function (val, label) { var on = pay === val; return '<button onclick="window.setMetaPay(\'' + id + '\',\'' + val + '\'); window._projReRender(\'' + id + '\')" style="padding:7px 14px; margin:0 6px 6px 0; border-radius:20px; font-size:0.84rem; font-weight:700; cursor:pointer; border:1px solid ' + (on ? tm.color : '#cbd5e1') + '; ' + (on ? 'background:' + tm.color + ';color:#fff;' : 'background:#fff;color:#475569;') + '">' + label + '</button>'; };
+    html += payBtn2('未付', '未付') + payBtn2('收訂金', '收訂金') + payBtn2('已付清', '已付清') + payBtn2('月結', '月結');
+    html += '<div style="font-size:0.76rem; color:#94a3b8; margin-top:10px;"><i class="fas fa-info-circle"></i> 專案報價在外面做好，這裡填總價 + 記付款狀態即可。</div>';
+    html += '</div>';
+
+    // --- 備註 tab ---
+    var csn = String(m.csNote || '').replace(/"/g, '&quot;');
+    html += '<div id="ptab-note" style="display:none;">';
+    html += '<div style="font-size:0.78rem; color:#94a3b8; margin-bottom:6px;">進度備註（做到哪、下一步、狀況）</div>';
+    html += '<textarea onchange="window.setMetaCsNote(\'' + id + '\', this.value)" rows="4" placeholder="例：外包廠 5/20 交貨，現場預計 5/25 施工…" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:8px; font-size:0.88rem; line-height:1.5;">' + csn + '</textarea>';
+    html += '<div style="margin-top:12px; display:flex; gap:10px;">';
+    html += '<button onclick="window.triggerQuoteOrNotice(\'' + id + '\')" style="flex:1; padding:10px; border-radius:8px; border:none; background:' + tm.dark + '; color:#fff; font-weight:800; font-size:0.88rem; cursor:pointer;">✉ 聯絡客戶</button>';
+    html += '</div></div>';
+
+    html += '</div>'; // close tab container
+    html += '<div style="text-align:center; margin-top:14px;"><button onclick="closeModal()" style="padding:9px 24px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; color:#475569; font-weight:700; cursor:pointer;">關閉</button></div>';
+    html += '</div>';
+
+    body.innerHTML = html;
+    modal.style.display = 'flex';
+    window._projTab(id, 'timeline'); // 預設開時程分頁
 };
 
 // [第3片] 手動建單（後台自建紀錄單，M 前綴、不碰庫存）
@@ -2641,6 +2860,7 @@ window.openManualOrderModal = function () {
         + '  <div><label style="' + lb + '">單別標籤</label><select id="m-tag" class="form-input" style="' + fi + '"><option value="專案">專案</option><option value="普通">普通單</option><option value="急件">急件</option><option value="大量">大量</option></select></div>'
         + '  <div><label style="' + lb + '">建單狀態</label><select id="m-status" class="form-input" style="' + fi + '"><option value="p_quote">報價中</option><option value="p_deal">已成交</option><option value="p_prep">備料/發包</option><option value="p_doing">進行中</option><option value="p_check">驗收</option><option value="p_done">結案</option><option value="p_cancel">已取消</option></select></div>'
         + '</div>'
+        + '<div style="margin-top:8px;"><label style="' + lb + '">專案類型</label><select id="m-ptype" class="form-input" style="' + fi + '"><option value="工程">🏗️ 工程（工地：有現場、進出場）</option><option value="OEM">🏭 OEM（代工：發包、量產、交貨）</option></select></div>'
         + '<div style="margin-top:8px;"><label style="' + lb + '">業務員（誰接的案子）</label><input id="m-sales" class="form-input" style="' + fi + '" placeholder="業務員姓名"></div>'
         + '<div style="margin-top:8px;"><label style="' + lb + '">品項內容（自由填：自家料/外購/外包都可）</label><textarea id="m-items" class="form-input" rows="4" style="' + fi + '" placeholder="例：&#10;鋁料 4040 x6支（自製）&#10;木心板 x3（外購）&#10;CNC加工發包 x1"></textarea></div>'
         + '<div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:8px;">'
@@ -2669,6 +2889,7 @@ window.submitManualOrder = function (btn) {
     var delivery = v('m-delivery'), address = v('m-address'), tag = v('m-tag') || '專案';
     var status = v('m-status') || 'p_quote', items = v('m-items'), note = v('m-note');
     var sales = v('m-sales');
+    var ptype = v('m-ptype') || '工程';
     var BR = '<br>';
     var noteParts = [];
     if (company) noteParts.push('【公司】' + company);
@@ -2684,7 +2905,8 @@ window.submitManualOrder = function (btn) {
         totalEst: total,
         status: status,
         orderTag: tag,
-        salesperson: sales
+        salesperson: sales,
+        projType: ptype
     };
     fetch(ADMIN_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) })
         .then(function () {
@@ -9082,7 +9304,10 @@ window.getMeta = function (order) {
         remitNote: _omPick(l.remitNote, order.remitNote),
         vehicle: _omPick(l.vehicle, order.vehicle),
         shipNo: _omPick(l.shipNo, order.shipNo),
-        csNote: _omPick(l.csNote, order.csNote)
+        csNote: _omPick(l.csNote, order.csNote),
+        projType: _omPick(l.projType, order.projType),
+        projTimeline: _omPick(l.projTimeline, order.projTimeline),
+        projSite: _omPick(l.projSite, order.projSite)
     };
 };
 function _omPush(id, patch) {
@@ -9131,6 +9356,10 @@ window.setMetaVehicle = function (id, v) { _omApply(id, { vehicle: v }); };
 // [第2.5批] 大榮貨運單號、客服備註 → 存 Sheet + 同步
 window.setMetaShipNo = function (id, v) { _omApply(id, { shipNo: v }); };
 window.setMetaCsNote = function (id, v) { _omApply(id, { csNote: v }); };
+// [第4批] 專案：類型、時程節點(JSON)、現場勘查(JSON) → 存 Sheet + 多機同步
+window.setMetaProjType = function (id, v) { _omApply(id, { projType: v }); };
+window.setMetaTimeline = function (id, arr) { _omApply(id, { projTimeline: JSON.stringify(arr || []) }); };
+window.setMetaSite = function (id, obj) { _omApply(id, { projSite: JSON.stringify(obj || {}) }); };
 // [第2批] 若這張配送單還沒存過配送方式(AB空)，自動判定並寫入一次（本機立即標記避免重複寫）
 window._autoPersistVehicle = function (order) {
     if (!order || order.vehicle) return;                       // 已存過 → 不動
