@@ -2612,12 +2612,16 @@ window.renderProjectBoard = function (data) {
 window.createProjectCard = function (order) {
     var el = document.createElement('div');
     el.className = 'kanban-card';
-    el.style.borderLeft = '4px solid #7c3aed';
+    // [第4批] 依專案類型變色：工程=紫、OEM=青
+    var _pt = window.projTypeOf ? window.projTypeOf(order) : '工程';
+    var _ptm = (window.PROJ_TYPE_META && window.PROJ_TYPE_META[_pt]) ? window.PROJ_TYPE_META[_pt] : { color: '#7c3aed', dark: '#6d28d9' };
+    var _ptc = _ptm.color;
+    el.style.borderLeft = '4px solid ' + _ptc;
     var opts = window.PROJECT_STAGES.map(function (s) { return '<option value="' + s.key + '"' + (s.key === order.status ? ' selected' : '') + '>' + s.label + '</option>'; }).join('');
-    var tagChip = (window.orderTagChip ? window.orderTagChip(order.orderTag) : '');
+    var typeChip = '<span style="background:' + _ptc + '22; color:' + _ptm.dark + '; font-weight:800; font-size:0.68rem; padding:2px 8px; border-radius:5px; margin-left:5px;">' + (_pt === 'OEM' ? '🏭 OEM' : '🏗️ 工程') + '</span>';
     var priceTxt = (typeof formatPrice === 'function' ? formatPrice(order.total) : ('NT$ ' + order.total));
     el.innerHTML =
-        '<div class="card-header"><div class="card-meta"><span class="card-no" style="background:#7c3aed; color:#fff;">' + (order.projectId || 'M') + '</span>' + tagChip + '</div></div>'
+        '<div class="card-header"><div class="card-meta"><span class="card-no" style="background:' + _ptc + '; color:#fff;">' + (order.projectId || 'M') + '</span>' + typeChip + '</div></div>'
         + '<div class="card-body"><div class="card-title">' + (order.name || '') + '</div>'
         + '<div class="card-main-content"><div class="card-contact">'
         + '<div class="card-info"><i class="fas fa-phone-alt"></i> ' + (order.phone || '') + '</div>'
@@ -2691,7 +2695,7 @@ window._projSetSite = function (id, key, val) {
     var s = window.parseSite(o); s[key] = val; window.setMetaSite(id, s); // 不重繪
 };
 // --- 類型切換（工程/OEM）---
-window._projSetType = function (id, t) { window.setMetaProjType(id, t); window._projReRender(id); };
+window._projSetType = function (id, t) { window.setMetaProjType(id, t); if (typeof applyFilter === 'function') applyFilter(); window._projReRender(id); };
 // --- 分頁切換 ---
 window._projTab = function (id, tab) {
     ['timeline', 'site', 'money', 'note'].forEach(function (k) {
@@ -2857,10 +2861,9 @@ window.openManualOrderModal = function () {
         + '</div>'
         + '<div style="margin-top:8px;"><label style="' + lb + '">地址（選填）</label><input id="m-address" class="form-input" style="' + fi + '"></div>'
         + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">'
-        + '  <div><label style="' + lb + '">單別標籤</label><select id="m-tag" class="form-input" style="' + fi + '"><option value="專案">專案</option><option value="普通">普通單</option><option value="急件">急件</option><option value="大量">大量</option></select></div>'
+        + '  <div><label style="' + lb + '">專案類型</label><select id="m-ptype" class="form-input" style="' + fi + '"><option value="工程">🏗️ 工程（工地）</option><option value="OEM">🏭 OEM（代工）</option></select></div>'
         + '  <div><label style="' + lb + '">建單狀態</label><select id="m-status" class="form-input" style="' + fi + '"><option value="p_quote">報價中</option><option value="p_deal">已成交</option><option value="p_prep">備料/發包</option><option value="p_doing">進行中</option><option value="p_check">驗收</option><option value="p_done">結案</option><option value="p_cancel">已取消</option></select></div>'
         + '</div>'
-        + '<div style="margin-top:8px;"><label style="' + lb + '">專案類型</label><select id="m-ptype" class="form-input" style="' + fi + '"><option value="工程">🏗️ 工程（工地：有現場、進出場）</option><option value="OEM">🏭 OEM（代工：發包、量產、交貨）</option></select></div>'
         + '<div style="margin-top:8px;"><label style="' + lb + '">業務員（誰接的案子）</label><input id="m-sales" class="form-input" style="' + fi + '" placeholder="業務員姓名"></div>'
         + '<div style="margin-top:8px;"><label style="' + lb + '">品項內容（自由填：自家料/外購/外包都可）</label><textarea id="m-items" class="form-input" rows="4" style="' + fi + '" placeholder="例：&#10;鋁料 4040 x6支（自製）&#10;木心板 x3（外購）&#10;CNC加工發包 x1"></textarea></div>'
         + '<div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:8px;">'
