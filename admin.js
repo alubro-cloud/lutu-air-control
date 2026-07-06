@@ -2738,6 +2738,8 @@ window.viewProject = function (order) {
     html += '</div></div>';
     html += '<div style="font-size:1.2rem; font-weight:900; margin-bottom:4px;">' + (order.name || '（未命名）') + '</div>';
     html += '<div style="font-size:0.8rem; opacity:0.92;"><i class="fas fa-phone-alt"></i> ' + (order.phone || '') + (order.salesperson ? '　·　' + order.salesperson : '') + '</div>';
+    var _addr = String(order.address || '').replace(/^\[.*?\]\s*/, '').trim();
+    if (_addr) html += '<div style="font-size:0.78rem; opacity:0.9; margin-top:3px;"><i class="fas fa-location-dot"></i> ' + _addr + '</div>';
     html += '</div>';
 
     // ===== 摘要（不用點就看到）=====
@@ -2850,24 +2852,23 @@ window.openManualOrderModal = function () {
     var lb = 'font-size:0.78rem; color:#94a3b8; display:block; margin-bottom:3px;';
     body.innerHTML =
         '<div style="padding:15px 22px; text-align:left;">'
-        + '<h3 style="color:#a78bfa; text-align:center; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><i class="fas fa-plus-circle"></i> 建立單據（後台紀錄單）</h3>'
+        + '<h3 style="color:#a78bfa; text-align:center; margin-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;"><i class="fas fa-diagram-project"></i> 建立專案（工程 / OEM）</h3>'
         + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">'
-        + '  <div><label style="' + lb + '">姓名 *</label><input id="m-name" class="form-input" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">客戶 / 公司名稱 *</label><input id="m-name" class="form-input" style="' + fi + '"></div>'
         + '  <div><label style="' + lb + '">電話 *（手機/市話）</label><input id="m-phone" class="form-input" inputmode="tel" style="' + fi + '"></div>'
         + '  <div><label style="' + lb + '">公司/單位</label><input id="m-company" class="form-input" style="' + fi + '"></div>'
         + '  <div><label style="' + lb + '">統編</label><input id="m-taxid" class="form-input" maxlength="8" style="' + fi + '"></div>'
         + '  <div><label style="' + lb + '">Email（選填）</label><input id="m-email" class="form-input" style="' + fi + '"></div>'
-        + '  <div><label style="' + lb + '">配送方式</label><select id="m-delivery" class="form-input" style="' + fi + '"><option>公司自取</option><option>小貨車配送</option><option>大貨車配送</option><option>店到店</option></select></div>'
+        + '  <div><label style="' + lb + '">業務員（誰接的案子）</label><input id="m-sales" class="form-input" style="' + fi + '" placeholder="業務員姓名"></div>'
         + '</div>'
-        + '<div style="margin-top:8px;"><label style="' + lb + '">地址（選填）</label><input id="m-address" class="form-input" style="' + fi + '"></div>'
         + '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">'
-        + '  <div><label style="' + lb + '">專案類型</label><select id="m-ptype" class="form-input" style="' + fi + '"><option value="工程">🏗️ 工程（工地）</option><option value="OEM">🏭 OEM（代工）</option></select></div>'
-        + '  <div><label style="' + lb + '">建單狀態</label><select id="m-status" class="form-input" style="' + fi + '"><option value="p_quote">報價中</option><option value="p_deal">已成交</option><option value="p_prep">備料/發包</option><option value="p_doing">進行中</option><option value="p_check">驗收</option><option value="p_done">結案</option><option value="p_cancel">已取消</option></select></div>'
+        + '  <div><label style="' + lb + '">專案類型 *</label><select id="m-ptype" class="form-input" style="' + fi + '"><option value="工程">🏗️ 工程（工地：有現場、進出場）</option><option value="OEM">🏭 OEM（代工：發包、量產、交貨）</option></select></div>'
+        + '  <div><label style="' + lb + '">目前階段</label><select id="m-status" class="form-input" style="' + fi + '"><option value="p_quote">報價中</option><option value="p_deal">已成交</option><option value="p_prep">備料/發包</option><option value="p_doing">進行中</option><option value="p_check">驗收</option><option value="p_done">結案</option><option value="p_cancel">已取消</option></select></div>'
         + '</div>'
-        + '<div style="margin-top:8px;"><label style="' + lb + '">業務員（誰接的案子）</label><input id="m-sales" class="form-input" style="' + fi + '" placeholder="業務員姓名"></div>'
-        + '<div style="margin-top:8px;"><label style="' + lb + '">品項內容（自由填：自家料/外購/外包都可）</label><textarea id="m-items" class="form-input" rows="4" style="' + fi + '" placeholder="例：&#10;鋁料 4040 x6支（自製）&#10;木心板 x3（外購）&#10;CNC加工發包 x1"></textarea></div>'
+        + '<div style="margin-top:8px;"><label style="' + lb + '">地址 / 工地位置（選填）</label><input id="m-address" class="form-input" style="' + fi + '" placeholder="工地或客戶地址"></div>'
+        + '<div style="margin-top:8px;"><label style="' + lb + '">品項內容 / 工程範圍（自由填：自家料/外購/外包/工程都可）</label><textarea id="m-items" class="form-input" rows="4" style="' + fi + '" placeholder="例：&#10;鋁外罩框架 4080 全套（外包）&#10;CNC 加工發包 x1&#10;現場安裝工程"></textarea></div>'
         + '<div style="display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:8px;">'
-        + '  <div><label style="' + lb + '">總價 *</label><input id="m-total" class="form-input" type="number" style="' + fi + '"></div>'
+        + '  <div><label style="' + lb + '">專案總價 *</label><input id="m-total" class="form-input" type="number" style="' + fi + '" placeholder="報價單金額"></div>'
         + '  <div><label style="' + lb + '">備註</label><input id="m-note" class="form-input" style="' + fi + '"></div>'
         + '</div>'
         + '<div style="font-size:0.72rem; color:#94a3b8; margin-top:8px;"><i class="fas fa-info-circle"></i> 這是紀錄單：不扣庫存、不走切料。報價/外購明細可建好後再到卡片補。</div>'
@@ -2889,7 +2890,7 @@ window.submitManualOrder = function (btn) {
     if (!(phone.length >= 8 && phone.length <= 11)) { alert('請輸入正確電話（手機或市話，去掉符號後 8~11 碼數字）'); return; }
     if (!total) { if (!confirm('總價為 0，確定嗎？')) return; }
     var company = v('m-company'), taxid = v('m-taxid'), email = v('m-email');
-    var delivery = v('m-delivery'), address = v('m-address'), tag = v('m-tag') || '專案';
+    var delivery = '', address = v('m-address'), tag = '專案';
     var status = v('m-status') || 'p_quote', items = v('m-items'), note = v('m-note');
     var sales = v('m-sales');
     var ptype = v('m-ptype') || '工程';
