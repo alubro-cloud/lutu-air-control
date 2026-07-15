@@ -5736,6 +5736,34 @@ async function deductInventory(items) {
 
 // --- Inventory Management Functions ---
 
+// [單價同步] 讀「商品資料」Sheet 的真實單價（NT/cm），給庫存頁的 $/kg 用。
+// 原本 $/kg 是用 admin.js 內建寫死的價格算的，改了 Sheet 單價不會動 → 老闆自檢時看到錯數字。
+// 現在改成讀真實單價；重量(kg/m)是物理值不會變，仍留在程式內建。
+window._prodPriceMap = null;
+window.fetchProductPrices = async function () {
+    try {
+        const res = await fetch(ADMIN_API_URL + "?action=getProducts&t=" + new Date().getTime());
+        const json = await res.json();
+        // 後端回 { products: [[標題列], [row], ...] }；欄位順序 [0]分類 [1]系列 [2]型號 [3]單價 …
+        if (!json || !Array.isArray(json.products)) return null;
+        const map = {};
+        json.products.slice(1).forEach(function (row) {   // 跳過第一列標題
+            if (!row || row.length < 4) return;
+            // 「商品資料」的品項名稱含 SKU（例：2020型 [HR-2020L]），庫存頁的型號是去括號的（2020型）
+            // → 兩邊都去掉 [] 和空白才對得上
+            const nm = String(row[2] || '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, '').trim();  // [2]=品項名稱
+            const pr = Number(row[3]);                                   // [3]=單價 NT/cm
+            if (nm && pr > 0) map[nm] = pr;
+        });
+        window._prodPriceMap = map;
+        console.log("[單價同步] 已讀取商品資料單價，共 " + Object.keys(map).length + " 項");
+        return map;
+    } catch (e) {
+        console.warn("[單價同步] 讀取商品資料單價失敗，$/kg 暫用內建預設值", e);
+        return null;
+    }
+};
+
 window.fetchInventoryData = async function () {
     const container = document.getElementById('inventory-content');
     if (!container) return;
@@ -5764,6 +5792,7 @@ window.fetchInventoryData = async function () {
             console.log("Extracted Item 0 Keys:", Object.keys(data[0]));
             console.log("Extracted Item 0 Sample:", data[0]);
             window.allInventory = data;
+            await window.fetchProductPrices();   // [單價同步] 先拿真實單價，$/kg 才會是最新的
             renderInventory(data);
             if (typeof renderInventoryDashboard === 'function') {
                 renderInventoryDashboard();
@@ -6307,6 +6336,7 @@ function renderInventory(inventory, isPartial = false) {
             const lengthCm = rawStock.toLocaleString();
             const lengthM = (rawStock / 100).toFixed(0);
 
+            // weight(kg/m)=物理值不會變，留內建；priceCm=備援（讀不到「商品資料」時才用）
             const specData = {
                 '2020型': { weight: 0.458, priceCm: 1.3 }, '2040型': { weight: 0.862, priceCm: 2.4 },
                 '3030輕型': { weight: 0.693, priceCm: 1.9 }, '3030重型': { weight: 1.07, priceCm: 2.9 },
@@ -6315,10 +6345,15 @@ function renderInventory(inventory, isPartial = false) {
                 '4040輕型': { weight: 1.298, priceCm: 3.6 }, '4040重型': { weight: 1.923, priceCm: 5.2 },
                 '4080輕型': { weight: 2.265, priceCm: 6.2 }, '4080重型': { weight: 3.505, priceCm: 9.5 }
             }[cleanName];
-            const specRow = specData
+            // [單價同步] $/kg 優先用「商品資料」真實單價；讀不到才用內建備援，並標示(預設)提醒不可信
+            const _pKey = String(cleanName).replace(/\[[^\]]*\]/g, '').replace(/\s+/g, '').trim();
+            const _liveP = (window._prodPriceMap && window._prodPriceMap[_pKey]) || 0;
+            const _useP = _liveP || (specData ? specData.priceCm : 0);
+            const _isLive = _liveP > 0;
+            const specRow = (specData && _useP > 0)
                 ? `<span><span style="color:rgba(255,255,255,0.75);">${specData.weight}</span> kg/m</span>
                    <span style="color:rgba(255,255,255,0.2);">·</span>
-                   <span>$<span style="color:rgba(255,255,255,0.75);">${Math.round((specData.priceCm * 100) / specData.weight)}</span>/kg</span>`
+                   <span title="${_isLive ? '單價 $' + _useP + '/cm（讀自商品資料，即時）' : '⚠ 讀不到商品資料，暫用內建預設價 $' + _useP + '/cm，僅供參考'}">$<span style="color:${_isLive ? 'rgba(255,255,255,0.75)' : 'rgba(212,160,160,0.9)'};">${Math.round((_useP * 100) / specData.weight)}</span>/kg${_isLive ? '' : ' <span style="color:rgba(212,160,160,0.7); font-size:0.85em;">(預設)</span>'}</span>`
                 : '';
 
             html += `
